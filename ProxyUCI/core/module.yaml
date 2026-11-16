@@ -1,0 +1,17 @@
+product:
+  type: kmp/lib
+  platforms: [ jvm, android, iosArm64, iosSimulatorArm64 ]
+
+# Núcleo sin Compose: lo enlaza también la extensión de iOS, que tiene un límite de memoria estricto.
+dependencies:
+  - $libs.koin.core: exported
+
+dependencies@jvm:
+  - $libs.slf4j.api
+
+test-dependencies:
+  - $libs.koin.test
+
+settings:
+  android:
+    namespace: org.uci.proxy.core
