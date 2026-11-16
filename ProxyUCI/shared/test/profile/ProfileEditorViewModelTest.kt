@@ -80,6 +80,19 @@ class ProfileEditorViewModelTest : MainDispatcherTest() {
     }
 
     @Test
+    fun `once the screen has handled the save the flag is cleared`() {
+        val viewModel = newViewModel()
+        viewModel.start(profileId = null)
+        viewModel.onDraftChange(validDraft)
+        viewModel.save()
+
+        viewModel.onSavedHandled()
+
+        // El view model se reutiliza: si la marca quedara puesta, el siguiente formulario se cerraría solo.
+        assertFalse(viewModel.uiState.value.saved)
+    }
+
+    @Test
     fun `saving an edited profile keeps its id`() {
         val viewModel = newViewModel()
         viewModel.start(uci.id)

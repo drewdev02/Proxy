@@ -3,8 +3,10 @@ package org.uci.proxy.core.di
 import kotlinx.coroutines.Dispatchers
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.bind
+import org.koin.core.module.dsl.binds
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
+import org.uci.proxy.core.engine.UnavailableTunnel
 import org.uci.proxy.core.platform.FileKeyValueStore
 import org.uci.proxy.core.platform.JavaSecureRandomBytes
 import org.uci.proxy.core.platform.JvmAppDirectories
@@ -20,6 +22,8 @@ import org.uci.proxy.core.port.PlatformInfo
 import org.uci.proxy.core.port.PlatformKind
 import org.uci.proxy.core.port.RandomBytes
 import org.uci.proxy.core.port.SecretStore
+import org.uci.proxy.core.port.TunnelControl
+import org.uci.proxy.core.port.TunnelMonitor
 import org.uci.proxy.core.profile.AppDispatchers
 import org.uci.proxy.core.storage.EncryptedSecretStore
 
@@ -36,6 +40,8 @@ actual val platformModule: Module = module {
     singleOf(::Slf4jLogger) { bind<Logger>() }
     singleOf(::JavaSecureRandomBytes) { bind<RandomBytes>() }
     singleOf(::GrantedLocalNetworkPermission) { bind<LocalNetworkPermission>() }
+    // El túnel de escritorio llega en las capas 5 y 6.
+    singleOf(::UnavailableTunnel) { binds(listOf(TunnelControl::class, TunnelMonitor::class)) }
     single { JvmAppDirectories.fromSystem(get()) }
     single<KeyValueStore> { FileKeyValueStore(get<JvmAppDirectories>().dataDir.resolve("settings.properties")) }
     single<SecretStore> {

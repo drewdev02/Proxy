@@ -23,9 +23,20 @@ appId: org.uci.proxy.ProxyUCI
 - inputText: "andrey"
 - tapOn: "Contraseña (opcional)"
 - inputText: "secreta7"
-# Sin hideKeyboard: en iOS falla con los campos de Compose, y «Guardar» queda visible sobre el teclado.
+# Sin hideKeyboard: en iOS falla con los campos de Compose. «Guardar» queda bajo el teclado,
+# así que se desplaza el formulario hasta verlo.
+- scrollUntilVisible:
+    element: "Guardar"
+    direction: DOWN
 - tapOn: "Guardar"
 - assertVisible: "HTTP · proxy.uci.cu:3128 · andrey"
+
+# El editor se abre también justo después de guardar, sin reiniciar la app.
+# (Regresión: la marca de «guardado» del formulario anterior lo cerraba al instante.)
+- tapOn: "Editar"
+- assertVisible: "Editar perfil"
+- tapOn: "Cancelar"
+- assertVisible: "Perfiles de proxy"
 
 # El perfil sobrevive a cerrar la app.
 - stopApp

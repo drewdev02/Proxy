@@ -4,8 +4,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.bind
+import org.koin.core.module.dsl.binds
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
+import org.uci.proxy.core.engine.UnavailableTunnel
 import org.uci.proxy.core.platform.IosPlatformInfo
 import org.uci.proxy.core.platform.KeychainSecretStore
 import org.uci.proxy.core.platform.NsLogLogger
@@ -18,6 +20,8 @@ import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.PlatformInfo
 import org.uci.proxy.core.port.RandomBytes
 import org.uci.proxy.core.port.SecretStore
+import org.uci.proxy.core.port.TunnelControl
+import org.uci.proxy.core.port.TunnelMonitor
 import org.uci.proxy.core.profile.AppDispatchers
 import platform.Foundation.NSUserDefaults
 
@@ -33,6 +37,8 @@ actual val platformModule: Module = module {
     singleOf(::SecRandomBytes) { bind<RandomBytes>() }
     // iOS muestra por su cuenta el aviso de red local la primera vez que la app se conecta.
     singleOf(::GrantedLocalNetworkPermission) { bind<LocalNetworkPermission>() }
+    // El túnel de iOS llega en la capa 7, con la extensión de red.
+    singleOf(::UnavailableTunnel) { binds(listOf(TunnelControl::class, TunnelMonitor::class)) }
     single<KeyValueStore> { UserDefaultsKeyValueStore(NSUserDefaults.standardUserDefaults) }
     single<SecretStore> { KeychainSecretStore(KEYCHAIN_SERVICE) }
 }

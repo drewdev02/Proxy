@@ -208,6 +208,7 @@ El resto del código no sabe en qué sistema corre.
 | Puerto | Android | iOS | JVM en Windows | JVM en macOS |
 |---|---|---|---|---|
 | `PlatformTunnel` | `VpnService.Builder` → descriptor de archivo | `NEPacketTunnelNetworkSettings` → `packetFlow` | `wintun.dll` por JNA, rutas con `netsh`/`route` | `utun` por JNA, `ifconfig`/`route`/`networksetup` |
+| `LocalAddresses` | `NetworkInterface` | Pendiente (capa 7) | Pendiente (capa 6) | Pendiente (capa 5) |
 | `TunnelControl` y `TunnelMonitor` | `Intent` a `ProxyVpnService`, permiso `VpnService.prepare()` | `NETunnelProviderManager` | Cliente IPC del proceso `--engine` elevado (UAC) | Igual, con elevación por `osascript` |
 | `SecretStore` | `EncryptedSecretStore` común + clave AES-GCM en Android Keystore | Keychain; grupo compartido app/extensión a partir de la capa 7 | `EncryptedSecretStore` común + DPAPI | Llavero mediante `/usr/bin/security`, con la orden por la entrada estándar |
 | `KeyValueStore` | `SharedPreferences` | `NSUserDefaults` de App Group | Archivo en `%LOCALAPPDATA%` | Archivo en `~/Library/Application Support` |

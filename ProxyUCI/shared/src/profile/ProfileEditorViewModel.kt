@@ -93,6 +93,14 @@ class ProfileEditorViewModel(
         state.update { it.copy(password = password, saveFailed = false, test = it.test.afterEdit()) }
     }
 
+    /**
+     * La pantalla ya reaccionó al guardado y se cerró. Sin esto, [ProfileEditorUiState.saved] seguiría
+     * a true en este view model, que se reutiliza, y la siguiente apertura del formulario se cerraría sola.
+     */
+    fun onSavedHandled() {
+        state.update { it.copy(saved = false) }
+    }
+
     /** Prueba el proxy con lo que hay en el formulario, sin necesidad de guardarlo antes. */
     fun testProxy() {
         val current = state.value

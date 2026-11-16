@@ -1,0 +1,29 @@
+# Capa 3: conectar el túnel en Android.
+# Deja el túnel conectado para poder comprobar el DNS desde fuera de la app:
+#   adb shell ping -c 1 cualquier.nombre.test   -> debe resolver a una dirección 10.x.1.y
+# Después se desconecta con tunel-android-desconectar.yaml.
+# El emulador debe tener la pantalla encendida. Borra los datos de la app al empezar.
+appId: org.uci.proxy
+---
+- launchApp:
+    clearState: true
+- tapOn: "Nuevo perfil"
+- tapOn: "Nombre"
+- inputText: "Pruebas"
+- tapOn: "Servidor"
+- inputText: "10.0.2.2"
+- tapOn: "Puerto"
+- inputText: "3128"
+- hideKeyboard
+- tapOn: "Guardar"
+- assertVisible: "HTTP · 10.0.2.2:3128"
+
+- tapOn: "Conectar"
+# Primera vez: Android pide autorizar la conexión VPN.
+- tapOn:
+    text: "OK|Aceptar"
+    optional: true
+- extendedWaitUntil:
+    visible: "Desconectar"
+    timeout: 15000
+- assertVisible: "Conectado"

@@ -15,6 +15,8 @@ import org.uci.proxy.profile.ProfileEditorScreen
 import org.uci.proxy.profile.ProfileEditorViewModel
 import org.uci.proxy.profile.ProfileListScreen
 import org.uci.proxy.profile.ProfileListViewModel
+import org.uci.proxy.profile.TunnelUiModel
+import org.uci.proxy.tunnel.TunnelViewModel
 
 private sealed interface Screen {
     data object ProfileList : Screen
@@ -47,17 +49,22 @@ fun App() {
 private fun ProfileListRoute(onAdd: () -> Unit, onEdit: (String) -> Unit) {
     val viewModel = koinViewModel<ProfileListViewModel>()
     val home = koinViewModel<HomeViewModel>()
+    val tunnel = koinViewModel<TunnelViewModel>()
     val profiles by viewModel.profiles.collectAsStateWithLifecycle()
     val deleteFailed by viewModel.deleteFailed.collectAsStateWithLifecycle()
+    val tunnelState by tunnel.state.collectAsStateWithLifecycle()
 
     ProfileListScreen(
         profiles = profiles,
         platformLabel = "ProxyUCI en ${home.uiState.platformName} ${home.uiState.osVersion}",
         deleteFailed = deleteFailed,
+        tunnel = TunnelUiModel(isAvailable = tunnel.isAvailable, state = tunnelState),
         onAdd = onAdd,
         onEdit = onEdit,
         onDelete = viewModel::delete,
         onDismissDeleteError = viewModel::dismissDeleteError,
+        onConnect = tunnel::connect,
+        onDisconnect = tunnel::disconnect,
     )
 }
 
@@ -68,7 +75,12 @@ private fun ProfileEditorRoute(profileId: String?, onClose: () -> Unit) {
 
     // El view model se reutiliza entre aperturas: cada vez que se entra se prepara para ese perfil.
     LaunchedEffect(profileId) { viewModel.start(profileId) }
-    LaunchedEffect(state.saved) { if (state.saved) onClose() }
+    LaunchedEffect(state.saved) {
+        if (state.saved) {
+            viewModel.onSavedHandled()
+            onClose()
+        }
+    }
 
     ProfileEditorScreen(
         state = state,

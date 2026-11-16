@@ -1,7 +1,12 @@
 package org.uci.proxy
 
+import org.koin.dsl.binds
 import org.koin.dsl.koinApplication
 import org.koin.dsl.module
+import org.uci.proxy.core.port.TunnelControl
+import org.uci.proxy.core.port.TunnelMonitor
+import org.uci.proxy.fakes.FakeTunnel
+import org.uci.proxy.tunnel.TunnelViewModel
 import org.uci.proxy.core.port.KeyValueStore
 import org.uci.proxy.core.port.LocalNetworkPermission
 import org.uci.proxy.core.port.Logger
@@ -27,6 +32,8 @@ class AppModulesTest {
         single<KeyValueStore> { InMemoryKeyValueStore() }
         single<SecretStore> { InMemorySecretStore() }
         single<LocalNetworkPermission> { FakeLocalNetworkPermission() }
+        // En Android el túnel lo enlazan módulos de la propia app, que aquí no se cargan.
+        single { FakeTunnel() } binds arrayOf(TunnelControl::class, TunnelMonitor::class)
     }
     private val koin = koinApplication { modules(appModules + testOverrides) }.koin
 
@@ -39,5 +46,10 @@ class AppModulesTest {
     fun `profile view models resolve from the app modules`() {
         assertNotNull(koin.get<ProfileListViewModel>())
         assertNotNull(koin.get<ProfileEditorViewModel>())
+    }
+
+    @Test
+    fun `tunnel view model resolves from the app modules`() {
+        assertNotNull(koin.get<TunnelViewModel>())
     }
 }

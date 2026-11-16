@@ -9,6 +9,9 @@ import org.uci.proxy.core.port.LocalNetworkPermission
 import org.uci.proxy.core.port.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.SecretStore
+import org.uci.proxy.core.port.TunnelControl
+import org.uci.proxy.core.port.TunnelMonitor
+import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.profile.ProfileRepository
 import org.uci.proxy.core.proxy.ProxyTestResult
 import org.uci.proxy.core.proxy.ProxyTester
@@ -55,6 +58,22 @@ class FakeLocalNetworkPermission(var granted: Boolean = true) : LocalNetworkPerm
     override suspend fun request(): Boolean {
         requests++
         return granted
+    }
+}
+
+/** Túnel simulado: conectar pasa directamente a conectado. */
+class FakeTunnel(override val isAvailable: Boolean = true) : TunnelControl, TunnelMonitor {
+    private val mutableState = MutableStateFlow<TunnelState>(TunnelState.Disconnected)
+    override val state: StateFlow<TunnelState> = mutableState
+    val connectRequests = mutableListOf<String>()
+
+    override suspend fun connect(profileId: String) {
+        connectRequests += profileId
+        mutableState.value = TunnelState.Connected(profileId)
+    }
+
+    override suspend fun disconnect() {
+        mutableState.value = TunnelState.Disconnected
     }
 }
 

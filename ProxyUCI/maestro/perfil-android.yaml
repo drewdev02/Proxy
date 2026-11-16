@@ -28,6 +28,13 @@ appId: org.uci.proxy
 - tapOn: "Guardar"
 - assertVisible: "HTTP · proxy.uci.cu:3128 · andrey"
 
+# El editor se abre también justo después de guardar, sin reiniciar la app.
+# (Regresión: la marca de «guardado» del formulario anterior lo cerraba al instante.)
+- tapOn: "Editar"
+- assertVisible: "Editar perfil"
+- tapOn: "Cancelar"
+- assertVisible: "Perfiles de proxy"
+
 # El perfil y su contraseña sobreviven a cerrar la app.
 - stopApp
 - launchApp

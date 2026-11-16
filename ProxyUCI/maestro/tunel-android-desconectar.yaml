@@ -1,0 +1,11 @@
+# Capa 3: desconectar el túnel que dejó abierto tunel-android.yaml.
+# Tras esto no debe quedar interfaz tun0 ni el servicio de VPN:
+#   adb shell ip -4 addr show | grep tun                 -> nada
+#   adb shell dumpsys activity services org.uci.proxy    -> sin ServiceRecord
+appId: org.uci.proxy
+---
+- tapOn: "Desconectar"
+- extendedWaitUntil:
+    visible: "Conectar"
+    timeout: 10000
+- assertNotVisible: "Conectado"

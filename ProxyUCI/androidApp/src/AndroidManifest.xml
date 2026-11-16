@@ -4,6 +4,10 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Android 17 o superior: sin este permiso no se puede conectar con un proxy de la red local. -->
     <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
+    <!-- El túnel corre en un servicio en primer plano; "systemExempted" es el tipo previsto para apps de VPN. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SYSTEM_EXEMPTED" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
             android:name=".ProxyUciApplication"
@@ -22,6 +26,17 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Solo el sistema puede enlazarse a un servicio de VPN: lo garantiza BIND_VPN_SERVICE. -->
+        <service
+                android:name=".vpn.ProxyVpnService"
+                android:exported="false"
+                android:foregroundServiceType="systemExempted"
+                android:permission="android.permission.BIND_VPN_SERVICE">
+            <intent-filter>
+                <action android:name="android.net.VpnService" />
+            </intent-filter>
+        </service>
     </application>
 
 </manifest>
