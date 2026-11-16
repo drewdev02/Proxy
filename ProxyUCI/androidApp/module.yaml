@@ -12,3 +12,4 @@ settings:
   android:
     namespace: org.uci.proxy
     applicationId: org.uci.proxy
+    minSdk: 26

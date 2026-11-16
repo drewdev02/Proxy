@@ -1,0 +1,47 @@
+# Capa 1: crear un perfil, comprobar que sobrevive a un reinicio, editarlo y eliminarlo.
+# Es la única comprobación automática del llavero de iOS: no se puede probar desde `./kotlin test`.
+# Borra los datos de la app al empezar.
+appId: org.uci.proxy.ProxyUCI
+---
+- launchApp:
+    clearState: true
+- assertVisible: "Todavía no hay perfiles.*"
+
+# El formulario vacío no se guarda y señala los campos obligatorios.
+- tapOn: "Nuevo perfil"
+- tapOn: "Guardar"
+- assertVisible: "Escribe un nombre para el perfil."
+- assertVisible: "El puerto debe ser un número entre 1 y 65535."
+
+- tapOn: "Nombre"
+- inputText: "UCI"
+- tapOn: "Servidor"
+- inputText: "proxy.uci.cu"
+- tapOn: "Puerto"
+- inputText: "3128"
+- tapOn: "Usuario (opcional)"
+- inputText: "andrey"
+- tapOn: "Contraseña (opcional)"
+- inputText: "secreta7"
+# Sin hideKeyboard: en iOS falla con los campos de Compose, y «Guardar» queda visible sobre el teclado.
+- tapOn: "Guardar"
+- assertVisible: "HTTP · proxy.uci.cu:3128 · andrey"
+
+# El perfil sobrevive a cerrar la app.
+- stopApp
+- launchApp
+- assertVisible: "HTTP · proxy.uci.cu:3128 · andrey"
+- tapOn: "Editar"
+- assertVisible: "Editar perfil"
+- assertVisible: "proxy.uci.cu"
+- tapOn: "Cancelar"
+
+- tapOn: "Eliminar"
+- assertVisible: "Se eliminará «UCI» junto con su contraseña guardada."
+- tapOn:
+    text: "Eliminar"
+    below: "Se eliminará «UCI» junto con su contraseña guardada."
+- assertVisible: "Todavía no hay perfiles.*"
+- stopApp
+- launchApp
+- assertVisible: "Todavía no hay perfiles.*"

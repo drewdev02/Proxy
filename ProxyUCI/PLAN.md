@@ -209,7 +209,7 @@ El resto del código no sabe en qué sistema corre.
 |---|---|---|---|---|
 | `PlatformTunnel` | `VpnService.Builder` → descriptor de archivo | `NEPacketTunnelNetworkSettings` → `packetFlow` | `wintun.dll` por JNA, rutas con `netsh`/`route` | `utun` por JNA, `ifconfig`/`route`/`networksetup` |
 | `TunnelControl` y `TunnelMonitor` | `Intent` a `ProxyVpnService`, permiso `VpnService.prepare()` | `NETunnelProviderManager` | Cliente IPC del proceso `--engine` elevado (UAC) | Igual, con elevación por `osascript` |
-| `SecretStore` | Android Keystore | Keychain con grupo compartido app/extensión | DPAPI | Keychain (`security`) |
+| `SecretStore` | `EncryptedSecretStore` común + clave AES-GCM en Android Keystore | Keychain; grupo compartido app/extensión a partir de la capa 7 | `EncryptedSecretStore` común + DPAPI | Llavero mediante `/usr/bin/security`, con la orden por la entrada estándar |
 | `KeyValueStore` | `SharedPreferences` | `NSUserDefaults` de App Group | Archivo en `%LOCALAPPDATA%` | Archivo en `~/Library/Application Support` |
 | `Logger` | Logcat | `NSLog` (válido también en la extensión) | SLF4J, con Logback en `desktopApp` | SLF4J, con Logback en `desktopApp` |
 | `PlatformInfo` | Constante, versión de `Build.VERSION` | Constante, versión de `NSProcessInfo` (válido también en la extensión) | `os.name` en ejecución | `os.name` en ejecución |
@@ -436,6 +436,9 @@ Tomadas (2026-11-16):
 
 - Inyección de dependencias con Koin, siempre por constructor, y diseño según SOLID (sección 3). Los
   adaptadores pasan de `expect class` a interfaces; el único `expect` es `platformModule`.
+
+- Firma de iOS (2026-11-16): se trabaja sin firmar, en simulador, hasta que haga falta. La firma con cuenta de
+  pago, sesión iniciada en Xcode e iPhone real se retoma al llegar a la capa 7, que es la única que la exige.
 
 Abierta:
 

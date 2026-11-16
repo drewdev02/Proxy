@@ -5,13 +5,22 @@ product:
 # Núcleo sin Compose: lo enlaza también la extensión de iOS, que tiene un límite de memoria estricto.
 dependencies:
   - $libs.koin.core: exported
+  - $libs.kotlinx.coroutines.core: exported
+  - $kotlin.serialization.json
 
 dependencies@jvm:
   - $libs.slf4j.api
+  - $libs.jna
+  - $libs.jna.platform
 
 test-dependencies:
   - $libs.koin.test
+  - $libs.kotlinx.coroutines.test
 
 settings:
+  kotlin:
+    serialization: enabled
   android:
     namespace: org.uci.proxy.core
+    # El cifrado con Android Keystore (KeyGenParameterSpec) exige API 23; se fija 26 como base del proyecto.
+    minSdk: 26

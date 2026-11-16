@@ -2,28 +2,39 @@ package org.uci.proxy
 
 import org.koin.dsl.koinApplication
 import org.koin.dsl.module
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.port.KeyValueStore
 import org.uci.proxy.core.port.Logger
+import org.uci.proxy.core.port.SecretStore
 import org.uci.proxy.di.appModules
+import org.uci.proxy.fakes.InMemoryKeyValueStore
+import org.uci.proxy.fakes.InMemorySecretStore
+import org.uci.proxy.fakes.RecordingLogger
 import org.uci.proxy.home.HomeViewModel
+import org.uci.proxy.profile.ProfileEditorViewModel
+import org.uci.proxy.profile.ProfileListViewModel
 import kotlin.test.Test
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /** Corre en cada target: el grafo de la interfaz se resuelve con los módulos reales de esa plataforma. */
 class AppModulesTest {
-    private object SilentLogger : Logger {
-        override fun log(level: LogLevel, tag: String, message: String) = Unit
+    // Se sustituye solo lo que toca el sistema: en las pruebas locales de Android no hay Context ni Logcat,
+    // y en escritorio e iOS los almacenes reales escribirían en el disco y el llavero del equipo.
+    private val testOverrides = module {
+        single<Logger> { RecordingLogger() }
+        single<KeyValueStore> { InMemoryKeyValueStore() }
+        single<SecretStore> { InMemorySecretStore() }
     }
-
-    // Solo se sustituye el registro: en las pruebas locales de Android, android.util.Log es un stub que lanza.
-    private val testOverrides = module { single<Logger> { SilentLogger } }
+    private val koin = koinApplication { modules(appModules + testOverrides) }.koin
 
     @Test
     fun `HomeViewModel resolves from the app modules`() {
-        val koin = koinApplication { modules(appModules + testOverrides) }.koin
+        assertTrue(koin.get<HomeViewModel>().uiState.platformName.isNotBlank())
+    }
 
-        val viewModel = koin.get<HomeViewModel>()
-
-        assertTrue(viewModel.uiState.platformName.isNotBlank())
+    @Test
+    fun `profile view models resolve from the app modules`() {
+        assertNotNull(koin.get<ProfileListViewModel>())
+        assertNotNull(koin.get<ProfileEditorViewModel>())
     }
 }

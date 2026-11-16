@@ -21,8 +21,11 @@ dependencies@android:
 
 test-dependencies:
   - $libs.koin.test
+  - $libs.kotlinx.coroutines.test
 
 settings:
+  android:
+    minSdk: 26
   compose:
     enabled: true
     resources:

@@ -77,6 +77,26 @@ dato que llega por inyección desde el adaptador de cada una.
 
 ## Capa 1: perfil de proxy
 
+> **Estado: terminada el 2026-11-16 en Android e iOS; en escritorio falta la prueba manual.** Verificado con
+> flujos de Maestro en emulador Android y simulador iOS: crear un perfil, cerrar la app, reabrirla, editarlo
+> (la contraseña vuelve del almacén seguro) y eliminarlo. En Android la contraseña queda cifrada en disco.
+> `./kotlin test` pasa en los tres targets.
+>
+> Pendiente: recorrer el formulario a mano en macOS y en Windows. En macOS el archivo de preferencias y el
+> llavero real están cubiertos por pruebas de integración y la app arranca con ellos; el cifrado DPAPI de
+> Windows no se ha ejecutado nunca.
+>
+> El llavero de iOS no se puede probar desde `./kotlin test`: el ejecutable de pruebas no es una app y recibe
+> `errSecMissingEntitlement`; y si se firma a mano con permisos de llavero, el simulador se niega a lanzarlo
+> ("Security policy issue"). Se comprueba con la app instalada, mediante los flujos de `maestro/`:
+>
+> ```bash
+> maestro --device <id> test maestro/perfil-android.yaml
+> maestro --device <id> test maestro/perfil-ios.yaml
+> ```
+>
+> Ambos borran los datos de la app al empezar.
+
 **Resultado:** se puede crear un perfil (servidor, puerto, protocolo, usuario, contraseña), cerrarlo y
 encontrarlo al volver a abrir la app.
 
