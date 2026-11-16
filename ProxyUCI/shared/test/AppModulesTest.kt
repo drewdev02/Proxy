@@ -3,9 +3,11 @@ package org.uci.proxy
 import org.koin.dsl.koinApplication
 import org.koin.dsl.module
 import org.uci.proxy.core.port.KeyValueStore
+import org.uci.proxy.core.port.LocalNetworkPermission
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.SecretStore
 import org.uci.proxy.di.appModules
+import org.uci.proxy.fakes.FakeLocalNetworkPermission
 import org.uci.proxy.fakes.InMemoryKeyValueStore
 import org.uci.proxy.fakes.InMemorySecretStore
 import org.uci.proxy.fakes.RecordingLogger
@@ -24,6 +26,7 @@ class AppModulesTest {
         single<Logger> { RecordingLogger() }
         single<KeyValueStore> { InMemoryKeyValueStore() }
         single<SecretStore> { InMemorySecretStore() }
+        single<LocalNetworkPermission> { FakeLocalNetworkPermission() }
     }
     private val koin = koinApplication { modules(appModules + testOverrides) }.koin
 

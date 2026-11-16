@@ -212,6 +212,8 @@ El resto del código no sabe en qué sistema corre.
 | `SecretStore` | `EncryptedSecretStore` común + clave AES-GCM en Android Keystore | Keychain; grupo compartido app/extensión a partir de la capa 7 | `EncryptedSecretStore` común + DPAPI | Llavero mediante `/usr/bin/security`, con la orden por la entrada estándar |
 | `KeyValueStore` | `SharedPreferences` | `NSUserDefaults` de App Group | Archivo en `%LOCALAPPDATA%` | Archivo en `~/Library/Application Support` |
 | `Logger` | Logcat | `NSLog` (válido también en la extensión) | SLF4J, con Logback en `desktopApp` | SLF4J, con Logback en `desktopApp` |
+| `LocalNetworkPermission` | Pide `ACCESS_LOCAL_NETWORK` en Android 17 o superior, mediante la Activity | Sin acción: iOS muestra su propio aviso | Sin acción | Sin acción |
+| `RandomBytes` | `SecureRandom` | `SecRandomCopyBytes` | `SecureRandom` | `SecureRandom` |
 | `PlatformInfo` | Constante, versión de `Build.VERSION` | Constante, versión de `NSProcessInfo` (válido también en la extensión) | `os.name` en ejecución | `os.name` en ejecución |
 
 En Android e iOS el `PlatformTunnel` necesita el objeto que crea el sistema (`VpnService`,
@@ -348,7 +350,7 @@ falsa en memoria y un proxy falso local.
 
 | Qué validar | Por qué | Si falla |
 |---|---|---|
-| `ktor-network` (TCP y UDP) compila y conecta en `iosArm64` | Decide si los sockets son comunes | Añadir un puerto `SocketFactory` con implementación POSIX en iOS y NIO en JVM/Android |
+| `ktor-network` (TCP y UDP) compila y conecta en `iosArm64` | Decide si los sockets son comunes | Añadir un puerto `SocketFactory` con implementación POSIX en iOS y NIO en JVM/Android. **Resuelto para TCP en la capa 2:** funciona en la app de iOS (simulador), tras el puerto `TcpConnector`; queda por probar dentro de la extensión y con UDP |
 | Amper 0.13 puede generar el framework de `core` y enlazarlo desde un target de extensión | Sin esto no hay iOS | Añadir el target a mano en `iosApp/module.xcodeproj` (el `.pbxproj` sí está versionado) |
 | El perfil de aprovisionamiento admite Network Extensions (packet tunnel), App Groups y Keychain compartido para la app y la extensión | Hay cuenta de pago; falta crear los identificadores | Ajustar identificadores y capacidades en el portal |
 | JNA funciona en `jvm/app` y abre un `utun` con `sudo` en este Mac | Base del adaptador de escritorio | Probar la API FFM del JDK |

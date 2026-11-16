@@ -13,6 +13,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -27,6 +28,8 @@ import androidx.compose.ui.unit.dp
 import org.uci.proxy.core.model.ProxyProtocol
 import org.uci.proxy.core.profile.ProfileDraft
 import org.uci.proxy.core.profile.ProfileField
+import org.uci.proxy.core.proxy.ProxyFailure
+import org.uci.proxy.core.proxy.ProxyTestResult
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,6 +37,7 @@ fun ProfileEditorScreen(
     state: ProfileEditorUiState,
     onDraftChange: (ProfileDraft) -> Unit,
     onPasswordChange: (String) -> Unit,
+    onTest: () -> Unit,
     onSave: () -> Unit,
     onCancel: () -> Unit,
 ) {
@@ -97,6 +101,18 @@ fun ProfileEditorScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
 
+            OutlinedButton(onClick = onTest, enabled = !state.isBusy, modifier = Modifier.fillMaxWidth()) {
+                Text(if (state.test == ProxyTestUiState.Running) "Probando…" else "Probar proxy")
+            }
+            state.test.message()?.let { message ->
+                val succeeded = state.test == ProxyTestUiState.Finished(ProxyTestResult.Success)
+                Text(
+                    message,
+                    color = if (succeeded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+
             if (state.saveFailed) {
                 Text(
                     "No se pudo guardar el perfil. Inténtalo de nuevo.",
@@ -106,8 +122,8 @@ fun ProfileEditorScreen(
             }
 
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = onCancel, enabled = !state.isSaving) { Text("Cancelar") }
-                Button(onClick = onSave, enabled = !state.isSaving) { Text("Guardar") }
+                TextButton(onClick = onCancel, enabled = !state.isBusy) { Text("Cancelar") }
+                Button(onClick = onSave, enabled = !state.isBusy) { Text("Guardar") }
             }
         }
     }
@@ -133,6 +149,29 @@ private fun ProfileTextField(
     )
 }
 
+private fun ProxyTestUiState.message(): String? = when (this) {
+    ProxyTestUiState.Idle, ProxyTestUiState.Running -> null
+    ProxyTestUiState.LocalNetworkDenied ->
+        "La app necesita permiso para acceder a la red local y así poder conectar con el proxy."
+    is ProxyTestUiState.Finished -> result.message()
+}
+
+private fun ProxyTestResult.message(): String = when (this) {
+    ProxyTestResult.Success -> "Conexión correcta: el proxy aceptó los datos del perfil."
+    ProxyTestResult.Timeout -> "El proxy no respondió a tiempo."
+    is ProxyTestResult.Failure -> when (val failure = failure) {
+        ProxyFailure.AuthRequired -> "El proxy pide usuario y contraseña."
+        ProxyFailure.AuthRejected -> "El proxy rechazó el usuario o la contraseña."
+        is ProxyFailure.UnsupportedAuth -> {
+            val schemes = if (failure.schemes.isEmpty()) "" else " (${failure.schemes.joinToString()})"
+            "El proxy exige un tipo de autenticación que la app no admite$schemes."
+        }
+        is ProxyFailure.Refused -> "El proxy respondió, pero no permitió la conexión de prueba: ${failure.detail}"
+        is ProxyFailure.Unreachable -> "No se pudo conectar con el proxy. ${failure.detail}"
+        is ProxyFailure.ProtocolError -> "El servidor no respondió como se esperaba. ${failure.detail}"
+    }
+}
+
 @Preview
 @Composable
 private fun ProfileEditorScreenPreview() {
@@ -144,6 +183,7 @@ private fun ProfileEditorScreenPreview() {
             ),
             onDraftChange = {},
             onPasswordChange = {},
+            onTest = {},
             onSave = {},
             onCancel = {},
         )

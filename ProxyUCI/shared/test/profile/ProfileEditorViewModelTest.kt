@@ -1,12 +1,17 @@
 package org.uci.proxy.profile
 
+import kotlinx.coroutines.CompletableDeferred
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.ProxyProtocol
 import org.uci.proxy.core.port.LogLevel
 import org.uci.proxy.core.profile.ProfileDraft
 import org.uci.proxy.core.profile.ProfileField
 import org.uci.proxy.core.profile.ProfileValidator
+import org.uci.proxy.core.proxy.ProxyFailure
+import org.uci.proxy.core.proxy.ProxyTestResult
+import org.uci.proxy.fakes.FakeLocalNetworkPermission
 import org.uci.proxy.fakes.FakeProfileRepository
+import org.uci.proxy.fakes.FakeProxyTester
 import org.uci.proxy.fakes.MainDispatcherTest
 import org.uci.proxy.fakes.RecordingLogger
 import kotlin.test.Test
@@ -19,8 +24,12 @@ class ProfileEditorViewModelTest : MainDispatcherTest() {
     private val repository = FakeProfileRepository(listOf(uci)).apply { passwords[uci.id] = "secreta" }
     private val logger = RecordingLogger()
 
-    private fun newViewModel() =
-        ProfileEditorViewModel(repository, ProfileValidator(), idGenerator = { "nuevo-id" }, logger)
+    private val proxyTester = FakeProxyTester()
+
+    private val localNetwork = FakeLocalNetworkPermission()
+
+    private fun newViewModel(tester: FakeProxyTester = proxyTester) =
+        ProfileEditorViewModel(repository, ProfileValidator(), idGenerator = { "nuevo-id" }, tester, localNetwork, logger)
 
     private val validDraft = ProfileDraft("Casa", "10.0.0.1", "1080", ProxyProtocol.SOCKS5, "")
 
@@ -122,6 +131,106 @@ class ProfileEditorViewModelTest : MainDispatcherTest() {
         assertFalse(state.saved)
         assertFalse(state.isSaving)
         assertEquals(listOf(LogLevel.ERROR), logger.entries.map { it.first })
+    }
+
+    @Test
+    fun `testing the proxy uses the form contents without saving anything`() {
+        val viewModel = newViewModel()
+        viewModel.start(profileId = null)
+        viewModel.onDraftChange(validDraft)
+        viewModel.onPasswordChange("clave")
+
+        viewModel.testProxy()
+
+        val (profile, password) = proxyTester.calls.single()
+        assertEquals("10.0.0.1" to 1080, profile.host to profile.port)
+        assertEquals("clave", password)
+        assertEquals(ProxyTestUiState.Finished(ProxyTestResult.Success), viewModel.uiState.value.test)
+        assertEquals(listOf(uci), repository.profiles.value)
+    }
+
+    @Test
+    fun `a failed test shows the reason`() {
+        proxyTester.result = ProxyTestResult.Failure(ProxyFailure.AuthRejected)
+        val viewModel = newViewModel()
+        viewModel.start(uci.id)
+
+        viewModel.testProxy()
+
+        assertEquals(
+            ProxyTestUiState.Finished(ProxyTestResult.Failure(ProxyFailure.AuthRejected)),
+            viewModel.uiState.value.test,
+        )
+    }
+
+    @Test
+    fun `without local network permission the proxy is not contacted`() {
+        localNetwork.granted = false
+        val viewModel = newViewModel()
+        viewModel.start(uci.id)
+
+        viewModel.testProxy()
+
+        assertEquals(ProxyTestUiState.LocalNetworkDenied, viewModel.uiState.value.test)
+        assertTrue(proxyTester.calls.isEmpty())
+    }
+
+    @Test
+    fun `the permission is asked again on the next attempt`() {
+        localNetwork.granted = false
+        val viewModel = newViewModel()
+        viewModel.start(uci.id)
+        viewModel.testProxy()
+
+        localNetwork.granted = true
+        viewModel.testProxy()
+
+        assertEquals(2, localNetwork.requests)
+        assertEquals(ProxyTestUiState.Finished(ProxyTestResult.Success), viewModel.uiState.value.test)
+    }
+
+    @Test
+    fun `testing an invalid form shows the errors and does not call the proxy`() {
+        val viewModel = newViewModel()
+        viewModel.start(profileId = null)
+        viewModel.onDraftChange(validDraft.copy(port = "abc"))
+
+        viewModel.testProxy()
+
+        assertEquals(setOf(ProfileField.PORT), viewModel.uiState.value.errors)
+        assertTrue(proxyTester.calls.isEmpty())
+        assertEquals(ProxyTestUiState.Idle, viewModel.uiState.value.test)
+    }
+
+    @Test
+    fun `while a test runs the form is busy and a second test is ignored`() {
+        val gate = CompletableDeferred<Unit>()
+        val slowTester = FakeProxyTester(gate = gate)
+        val viewModel = newViewModel(slowTester)
+        viewModel.start(uci.id)
+
+        viewModel.testProxy()
+        viewModel.testProxy()
+
+        assertEquals(ProxyTestUiState.Running, viewModel.uiState.value.test)
+        assertTrue(viewModel.uiState.value.isBusy)
+        assertEquals(1, slowTester.calls.size)
+
+        gate.complete(Unit)
+
+        assertEquals(ProxyTestUiState.Finished(ProxyTestResult.Success), viewModel.uiState.value.test)
+        assertFalse(viewModel.uiState.value.isBusy)
+    }
+
+    @Test
+    fun `editing the form discards the previous test result`() {
+        val viewModel = newViewModel()
+        viewModel.start(uci.id)
+        viewModel.testProxy()
+
+        viewModel.onPasswordChange("otra")
+
+        assertEquals(ProxyTestUiState.Idle, viewModel.uiState.value.test)
     }
 
     @Test

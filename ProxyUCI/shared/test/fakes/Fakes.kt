@@ -1,13 +1,17 @@
 package org.uci.proxy.fakes
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.port.KeyValueStore
+import org.uci.proxy.core.port.LocalNetworkPermission
 import org.uci.proxy.core.port.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.SecretStore
 import org.uci.proxy.core.profile.ProfileRepository
+import org.uci.proxy.core.proxy.ProxyTestResult
+import org.uci.proxy.core.proxy.ProxyTester
 
 class FakeProfileRepository(initial: List<ProxyProfile> = emptyList()) : ProfileRepository {
     private val state = MutableStateFlow(initial)
@@ -29,6 +33,29 @@ class FakeProfileRepository(initial: List<ProxyProfile> = emptyList()) : Profile
     }
 
     override suspend fun password(id: String): String = passwords[id].orEmpty()
+}
+
+/** Devuelve [result] y recuerda con qué se le llamó. Con [gate] la prueba queda en curso hasta completarlo. */
+class FakeProxyTester(
+    var result: ProxyTestResult = ProxyTestResult.Success,
+    private val gate: CompletableDeferred<Unit>? = null,
+) : ProxyTester {
+    val calls = mutableListOf<Pair<ProxyProfile, String>>()
+
+    override suspend fun test(profile: ProxyProfile, password: String): ProxyTestResult {
+        calls += profile to password
+        gate?.await()
+        return result
+    }
+}
+
+class FakeLocalNetworkPermission(var granted: Boolean = true) : LocalNetworkPermission {
+    var requests = 0
+
+    override suspend fun request(): Boolean {
+        requests++
+        return granted
+    }
 }
 
 class RecordingLogger : Logger {

@@ -1,0 +1,47 @@
+# Capa 2: «Probar proxy» contra un proxy real, con sockets de verdad.
+#
+# Antes de lanzarlo hay que arrancar en el equipo los dos proxies de prueba:
+#   python3 tools/test_proxy.py --auth ntlm  --port 3128
+#   python3 tools/test_proxy.py --auth basic --port 3129
+# Ambos aceptan el usuario «andrey» con la contraseña «secreta7».
+# Desde el simulador el equipo anfitrión es 127.0.0.1. Borra los datos de la app en cada caso.
+appId: org.uci.proxy.ProxyUCI
+env:
+  APP_ID: org.uci.proxy.ProxyUCI
+  PROXY_HOST: "127.0.0.1"
+---
+- runFlow:
+    label: "NTLMv2 con la contraseña correcta"
+    file: subflows/probar-proxy-caso.yaml
+    env:
+      PORT: "3128"
+      PASSWORD: "secreta7"
+      EXPECTED: "Conexión correcta: el proxy aceptó los datos del perfil."
+- runFlow:
+    label: "NTLMv2 con la contraseña equivocada"
+    file: subflows/probar-proxy-caso.yaml
+    env:
+      PORT: "3128"
+      PASSWORD: "equivocada"
+      EXPECTED: "El proxy rechazó el usuario o la contraseña."
+- runFlow:
+    label: "Basic con la contraseña correcta"
+    file: subflows/probar-proxy-caso.yaml
+    env:
+      PORT: "3129"
+      PASSWORD: "secreta7"
+      EXPECTED: "Conexión correcta: el proxy aceptó los datos del perfil."
+- runFlow:
+    label: "Basic con la contraseña equivocada"
+    file: subflows/probar-proxy-caso.yaml
+    env:
+      PORT: "3129"
+      PASSWORD: "equivocada"
+      EXPECTED: "El proxy rechazó el usuario o la contraseña."
+- runFlow:
+    label: "Puerto donde no escucha nadie"
+    file: subflows/probar-proxy-caso.yaml
+    env:
+      PORT: "3999"
+      PASSWORD: "secreta7"
+      EXPECTED: "No se pudo conectar con el proxy.*"

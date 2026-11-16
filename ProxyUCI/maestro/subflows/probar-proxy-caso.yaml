@@ -1,0 +1,41 @@
+# Un caso de «Probar proxy»: rellena el formulario desde cero, pulsa el botón y comprueba el mensaje.
+# Variables: APP_ID, PROXY_HOST, PORT, PASSWORD y EXPECTED (expresión regular del mensaje esperado).
+appId: ${APP_ID}
+---
+- launchApp:
+    clearState: true
+- tapOn: "Nuevo perfil"
+- tapOn: "Nombre"
+- inputText: "Pruebas"
+- tapOn: "Servidor"
+- inputText: ${PROXY_HOST}
+- tapOn: "Puerto"
+- inputText: ${PORT}
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
+- tapOn: "Usuario (opcional)"
+- inputText: "andrey"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
+- tapOn: "Contraseña (opcional)"
+- inputText: ${PASSWORD}
+# En iOS no se oculta el teclado: hideKeyboard falla con los campos de Compose y el botón queda visible.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
+- tapOn: "Probar proxy"
+# Primera conexión a la red local: Android 17 pide permiso en ejecución e iOS muestra su propio aviso.
+- tapOn:
+    text: "Allow|Permitir"
+    optional: true
+- extendedWaitUntil:
+    visible: ${EXPECTED}
+    timeout: 25000

@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.uci.proxy.core.model.ProxyProfile
+import org.uci.proxy.core.port.LocalNetworkPermission
 import org.uci.proxy.core.port.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.profile.IdGenerator
@@ -17,6 +18,19 @@ import org.uci.proxy.core.profile.ProfileField
 import org.uci.proxy.core.profile.ProfileRepository
 import org.uci.proxy.core.profile.ProfileValidation
 import org.uci.proxy.core.profile.ProfileValidator
+import org.uci.proxy.core.proxy.ProxyTestResult
+import org.uci.proxy.core.proxy.ProxyTester
+
+sealed interface ProxyTestUiState {
+    data object Idle : ProxyTestUiState
+
+    data object Running : ProxyTestUiState
+
+    data class Finished(val result: ProxyTestResult) : ProxyTestUiState
+
+    /** La persona no concedió el acceso a la red local, así que la prueba no llegó a hacerse. */
+    data object LocalNetworkDenied : ProxyTestUiState
+}
 
 data class ProfileEditorUiState(
     val isNew: Boolean = true,
@@ -27,12 +41,17 @@ data class ProfileEditorUiState(
     val saveFailed: Boolean = false,
     /** Pasa a true cuando el perfil quedó guardado; la pantalla lo usa para cerrarse. */
     val saved: Boolean = false,
-)
+    val test: ProxyTestUiState = ProxyTestUiState.Idle,
+) {
+    val isBusy: Boolean get() = isSaving || test == ProxyTestUiState.Running
+}
 
 class ProfileEditorViewModel(
     private val repository: ProfileRepository,
     private val validator: ProfileValidator,
     private val idGenerator: IdGenerator,
+    private val proxyTester: ProxyTester,
+    private val localNetworkPermission: LocalNetworkPermission,
     private val logger: Logger,
 ) : ViewModel() {
     private val state = MutableStateFlow(ProfileEditorUiState())
@@ -59,18 +78,46 @@ class ProfileEditorViewModel(
 
     fun onDraftChange(draft: ProfileDraft) {
         // Al corregir un campo se retira su error; el resto se revalida al guardar.
+        // El resultado de una prueba anterior deja de valer en cuanto cambian los datos.
         state.update { current ->
-            current.copy(draft = draft, errors = current.errors - changedFields(current.draft, draft), saveFailed = false)
+            current.copy(
+                draft = draft,
+                errors = current.errors - changedFields(current.draft, draft),
+                saveFailed = false,
+                test = current.test.afterEdit(),
+            )
         }
     }
 
     fun onPasswordChange(password: String) {
-        state.update { it.copy(password = password, saveFailed = false) }
+        state.update { it.copy(password = password, saveFailed = false, test = it.test.afterEdit()) }
+    }
+
+    /** Prueba el proxy con lo que hay en el formulario, sin necesidad de guardarlo antes. */
+    fun testProxy() {
+        val current = state.value
+        if (current.isBusy) return
+
+        when (val validation = validator.validate(editingId ?: TEST_PROFILE_ID, current.draft)) {
+            is ProfileValidation.Invalid -> state.update { it.copy(errors = validation.errors) }
+            is ProfileValidation.Valid -> {
+                state.update { it.copy(errors = emptySet(), test = ProxyTestUiState.Running) }
+                viewModelScope.launch {
+                    val outcome = if (localNetworkPermission.request()) {
+                        ProxyTestUiState.Finished(proxyTester.test(validation.profile, current.password))
+                    } else {
+                        ProxyTestUiState.LocalNetworkDenied
+                    }
+                    // Si el formulario cambió mientras tanto, este resultado ya no le corresponde.
+                    state.update { if (it.test == ProxyTestUiState.Running) it.copy(test = outcome) else it }
+                }
+            }
+        }
     }
 
     fun save() {
         val current = state.value
-        if (current.isSaving) return
+        if (current.isBusy) return
 
         when (val validation = validator.validate(editingId ?: idGenerator.newId(), current.draft)) {
             is ProfileValidation.Invalid -> state.update { it.copy(errors = validation.errors) }
@@ -108,7 +155,13 @@ class ProfileEditorViewModel(
         username = username,
     )
 
+    private fun ProxyTestUiState.afterEdit(): ProxyTestUiState =
+        if (this == ProxyTestUiState.Running) this else ProxyTestUiState.Idle
+
     private companion object {
         const val TAG = "ProfileEditor"
+
+        // La prueba no guarda nada: el perfil temporal solo necesita un id cualquiera.
+        const val TEST_PROFILE_ID = "prueba"
     }
 }

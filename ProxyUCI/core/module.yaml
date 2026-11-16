@@ -7,6 +7,7 @@ dependencies:
   - $libs.koin.core: exported
   - $libs.kotlinx.coroutines.core: exported
   - $kotlin.serialization.json
+  - $libs.ktor.network
 
 dependencies@jvm:
   - $libs.slf4j.api

@@ -77,14 +77,16 @@ dato que llega por inyección desde el adaptador de cada una.
 
 ## Capa 1: perfil de proxy
 
-> **Estado: terminada el 2026-11-16 en Android e iOS; en escritorio falta la prueba manual.** Verificado con
-> flujos de Maestro en emulador Android y simulador iOS: crear un perfil, cerrar la app, reabrirla, editarlo
-> (la contraseña vuelve del almacén seguro) y eliminarlo. En Android la contraseña queda cifrada en disco.
+> **Estado: terminada el 2026-11-16 en Android, iOS y macOS; falta Windows.** Verificado con flujos de
+> Maestro en emulador Android y simulador iOS: crear un perfil, cerrar la app, reabrirla, editarlo (la
+> contraseña vuelve del almacén seguro) y eliminarlo. En Android la contraseña queda cifrada en disco.
 > `./kotlin test` pasa en los tres targets.
 >
-> Pendiente: recorrer el formulario a mano en macOS y en Windows. En macOS el archivo de preferencias y el
-> llavero real están cubiertos por pruebas de integración y la app arranca con ellos; el cifrado DPAPI de
-> Windows no se ha ejecutado nunca.
+> En macOS se recorrió lo mismo en la app de escritorio, manejando la ventana por accesibilidad con
+> `orca computer`: el perfil queda en `~/Library/Application Support/ProxyUCI/settings.properties` sin la
+> contraseña, esta va al llavero, ambos sobreviven a reiniciar la app y se borran al eliminar el perfil.
+>
+> Pendiente: Windows. El cifrado DPAPI no se ha ejecutado nunca.
 >
 > El llavero de iOS no se puede probar desde `./kotlin test`: el ejecutable de pruebas no es una app y recibe
 > `errSecMissingEntitlement`; y si se firma a mano con permisos de llavero, el simulador se niega a lanzarlo
@@ -110,6 +112,37 @@ encontrarlo al volver a abrir la app.
 **Demo:** guardar un perfil, matar la app, reabrir y verlo. La contraseña no aparece en claro en disco.
 
 ## Capa 2: probar proxy
+
+> **Estado: terminada el 2026-11-16 en Android, iOS y macOS contra un proxy de pruebas; falta el proxy real de
+> la UCI y probar en Windows.**
+>
+> Verificado:
+> - `./kotlin test` pasa en los tres targets. MD4, MD5, HMAC-MD5 y NTLMv2 cumplen los vectores de las RFC
+>   1320, 1321 y 2202 y de MS-NLMP 4.2.4, comprobados además con OpenSSL.
+> - Con sockets reales, en emulador Android y simulador iOS (`maestro/probar-proxy-*.yaml`): NTLMv2 y Basic
+>   con contraseña correcta y equivocada, y puerto sin servicio.
+> - En JVM, la misma pila real contra el proxy de pruebas da los mismos cinco resultados.
+> - En la app de escritorio en macOS, manejando la ventana por accesibilidad (`orca computer`, en segundo
+>   plano): probar con NTLMv2 con contraseña correcta y equivocada.
+>
+> El proxy de pruebas es `tools/test_proxy.py`. Su verificación de NTLMv2 es independiente de la de la app y
+> está contrastada con `curl --proxy-ntlm`.
+>
+> Pendiente:
+> - **Proxy real de la UCI.** Sin acceso a esa red no se puede probar. El único punto dudoso es el dominio: si
+>   el usuario no lo escribe, se usa el que anuncia el proxy en su desafío, mientras que `SuperProxyWin` usaba
+>   "UCI" fijo. Si fallara, basta escribir el usuario como `UCI\usuario`.
+> - Windows: no se ha ejecutado nada de esta capa allí.
+> - SOCKS5 solo está probado contra un servidor simulado, no contra uno real.
+>
+> Hallazgos que cambiaron el diseño:
+> - **Android 17 bloquea la red local.** Con `targetSdk` 37 la app necesita el permiso en ejecución
+>   `ACCESS_LOCAL_NETWORK`; sin él la conexión se queda colgada hasta agotar el tiempo. Hay un puerto nuevo,
+>   `LocalNetworkPermission`, que también hará falta antes de levantar el túnel (capa 3).
+> - **Conectar bloquea el hilo.** En Android lanzaba `NetworkOnMainThreadException`; la conexión se hace en
+>   el dispatcher de entrada/salida, que ahora aporta cada `platformModule` porque `Dispatchers.IO` no existe
+>   en el código común.
+> - **`ktor-network` funciona en iOS** dentro de la app. Dentro de la extensión de red sigue sin probar.
 
 **Resultado:** el botón "Probar proxy" conecta con el proxy real y responde: correcto, credenciales rechazadas
 (407), o proxy inalcanzable.

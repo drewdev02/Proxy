@@ -18,6 +18,8 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>ProxyUCI se conecta al servidor proxy de tu red local para probarlo y enrutar el tráfico.</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>

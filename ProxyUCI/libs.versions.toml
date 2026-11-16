@@ -7,7 +7,7 @@ ktor = "3.6.1"
 jna = "5.19.1"
 androidx-core = "1.19.1"
 koin = "4.2.2"
-slf4j = "2.0.18"
+slf4j = "2.0.19"
 
 [libraries]
 # Inyección de dependencias (solo en paquetes di/ y puntos de entrada)
@@ -33,7 +33,7 @@ ktor-network-tls = { module = "io.ktor:ktor-network-tls", version.ref = "ktor" }
 # core (solo jvm): Wintun en Windows, utun en macOS, DPAPI
 jna = { module = "net.java.dev.jna:jna", version.ref = "jna" }
 jna-platform = { module = "net.java.dev.jna:jna-platform", version.ref = "jna" }
-# API de registro; la implementación (Logback) la aporta desktopApp. 2.0.18 es la que usa Logback 1.6.2
+# API de registro; la implementación (Logback) la aporta desktopApp. 2.0.19 es la que trae ktor-network
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
 
 # androidApp: notificación del servicio en primer plano

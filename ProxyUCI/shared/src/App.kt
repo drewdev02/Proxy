@@ -74,6 +74,7 @@ private fun ProfileEditorRoute(profileId: String?, onClose: () -> Unit) {
         state = state,
         onDraftChange = viewModel::onDraftChange,
         onPasswordChange = viewModel::onPasswordChange,
+        onTest = viewModel::testProxy,
         onSave = viewModel::save,
         onCancel = onClose,
     )
