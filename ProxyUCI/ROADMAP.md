@@ -214,6 +214,39 @@ muestra "Conectado" y un `nslookup` desde otra app devuelve una IP de la subred 
 
 ## Capa 4: navegación en Android
 
+> **Estado: terminada el 2026-11-16 en el emulador de Android 17, contra el proxy de pruebas con NTLM y
+> salida real a Internet.** Verificado:
+> - `./kotlin test` (660 pruebas) y `./kotlin build` pasan en los tres targets. La pila TCP se prueba con
+>   un cliente simulado y tiempo virtual: saludo, datos en ambos sentidos, segmentos duplicados, solapados y
+>   desordenados, ventana cerrada, retransmisión, cierres, RST y desbordamiento de números de secuencia.
+> - Chrome carga `https://example.com` por el túnel y el proxy registra `CONNECT example.com:443`
+>   (`maestro/navegar-android.yaml`).
+> - Desde la shell del dispositivo, una petición HTTP a `example.com` devuelve `200` pasando por el proxy.
+> - Una descarga de 5 MB por el túnel llega con el mismo SHA-256 que el original; cinco a la vez, también.
+> - El tráfico propio de Android (comprobación de conectividad, servicios de Google) sale por el proxy.
+> - Al desconectar no quedan interfaz ni servicio, y no hay errores en el registro.
+> - iOS (simulador) y macOS siguen funcionando igual; allí esta capa no añade nada visible.
+>
+> Rendimiento medido: 1,7 MB/s en la descarga de 5 MB dentro del emulador. Es modesto y esperable: la pila
+> no usa escalado de ventana (tope de 64 KB por conexión) y protege todo su estado con un solo candado.
+>
+> Sin probar:
+> - **El proxy real de la UCI** y un dispositivo físico.
+> - **SOCKS5** como transporte del túnel (solo el conector, contra un servidor simulado).
+> - Sesiones largas, cambios de red y uso sostenido de memoria.
+>
+> Diferencias con `SuperProxyWin` que quedan pendientes, porque afectan sobre todo a la UCI:
+> - **HTTP en claro por el puerto 80.** Aquí todo va por `CONNECT`. `SuperProxyWin` reenviaba el puerto 80
+>   como petición de proxy normal porque el Squid de la UCI rechaza `CONNECT` a ese puerto. Hasta
+>   portarlo, las páginas `http://` fallarían allí. El proxy de pruebas sí acepta `CONNECT` al 80.
+> - **Atajos para Telegram** (no inspeccionar sus IP, cortar rápido el puerto 80): no portados.
+>
+> Sí portado, con un matiz: el recurso a `sslip.io` para IP públicas se usa solo si el proxy rechaza la IP
+> escrita tal cual, en vez de siempre; así no se depende de ese servicio con proxies que no lo necesitan.
+>
+> Cierre a medias: si una app cierra su envío antes de recibir la respuesta, el relé se lo transmite al
+> proxy, como hacía `SuperProxyWin`. Funciona con el proxy de pruebas; falta ver cómo lo trata Squid.
+
 **Resultado:** con el túnel activo, apps que no soportan proxy (mensajería, tiendas, navegador) funcionan a
 través del proxy institucional.
 
@@ -336,6 +369,8 @@ Cada una es una capa vertical independiente, por prioridad a decidir:
 
 | Capa | Resultado |
 |---|---|
+| HTTP en claro en la UCI | Páginas `http://` a través de un Squid que rechaza `CONNECT` al puerto 80 |
+| Rendimiento TCP | Escalado de ventana y menos contención, si las medidas en dispositivo real lo piden |
 | Proxies con TLS | Perfiles HTTPS y SOCKS5 sobre TLS, con fijación de certificado |
 | UDP por SOCKS5 | Llamadas y juegos con un proxy `socks5udp` |
 | Split tunneling | Elegir qué apps pasan por el túnel |

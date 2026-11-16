@@ -1,5 +1,6 @@
 package org.uci.proxy.core.engine
 
+import org.uci.proxy.core.packet.Ipv4Route
 import org.uci.proxy.core.packet.formatIpv4
 import org.uci.proxy.core.port.LocalAddresses
 import org.uci.proxy.core.port.RandomBytes
@@ -12,9 +13,16 @@ data class TunAddressPlan(val subnetBase: Int) {
     /** Servidor DNS anunciado a las apps: x.x.0.2. */
     val dnsServer: Int get() = subnetBase or 2
 
+    /** La subred virtual 10.A.0.0/16, de donde salen las direcciones del DNS falso. */
+    val subnet: Ipv4Route get() = Ipv4Route(subnetBase, SUBNET_PREFIX)
+
     val subnetText: String get() = formatIpv4(subnetBase)
     val tunAddressText: String get() = formatIpv4(tunAddress)
     val dnsServerText: String get() = formatIpv4(dnsServer)
+
+    private companion object {
+        const val SUBNET_PREFIX = 16
+    }
 }
 
 /**

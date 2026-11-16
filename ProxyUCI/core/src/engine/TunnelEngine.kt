@@ -1,23 +1,34 @@
 package org.uci.proxy.core.engine
 
+import kotlinx.coroutines.CoroutineScope
 import org.uci.proxy.core.dns.DnsResponder
 import org.uci.proxy.core.dns.FakeDnsTable
+import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.packet.Ipv4Packet
+import org.uci.proxy.core.packet.TcpFlags
+import org.uci.proxy.core.packet.TcpSegment
 import org.uci.proxy.core.packet.UdpDatagram
+import org.uci.proxy.core.packet.buildIcmpPortUnreachable
+import org.uci.proxy.core.packet.buildTcpPacket
 import org.uci.proxy.core.packet.buildUdpPacket
 import org.uci.proxy.core.port.LogLevel
 import org.uci.proxy.core.port.Logger
+import org.uci.proxy.core.port.PacketWriter
+import org.uci.proxy.core.port.RandomBytes
 import org.uci.proxy.core.port.TunDevice
+import org.uci.proxy.core.proxy.ProxyConnector
+import org.uci.proxy.core.tcp.TunTcpStack
+import kotlin.time.TimeSource
 
 /**
- * Atiende un tipo de tráfico. Añadir un protocolo (TCP en la capa siguiente) es escribir otro
- * manejador y registrarlo; [TunnelEngine] no cambia.
+ * Atiende un tipo de tráfico. Añadir un protocolo es escribir otro manejador y registrarlo;
+ * [TunnelEngine] no cambia.
  */
 fun interface PacketHandler {
     /**
      * @return los paquetes que hay que devolver a las apps, o null si [packet] no es de este manejador.
      */
-    fun handle(packet: Ipv4Packet): List<ByteArray>?
+    suspend fun handle(packet: Ipv4Packet): List<ByteArray>?
 }
 
 /** Contesta las consultas DNS (UDP al puerto 53) con direcciones de la tabla falsa. */
@@ -25,7 +36,7 @@ class DnsPacketHandler(
     private val responder: DnsResponder,
     private val logger: Logger,
 ) : PacketHandler {
-    override fun handle(packet: Ipv4Packet): List<ByteArray>? {
+    override suspend fun handle(packet: Ipv4Packet): List<ByteArray>? {
         val datagram = UdpDatagram.parse(packet) ?: return null
         if (datagram.destinationPort != DNS_PORT) return null
 
@@ -52,11 +63,90 @@ class DnsPacketHandler(
     }
 }
 
-/** Crea el motor de una sesión, que depende de las direcciones elegidas para ese túnel. */
-class TunnelEngineFactory(private val logger: Logger) {
-    fun create(plan: TunAddressPlan): TunnelEngine {
-        val dns = DnsPacketHandler(DnsResponder(FakeDnsTable(plan.subnetBase)), logger)
-        return TunnelEngine(handlers = listOf(dns))
+/** Entrega cada segmento TCP a la pila, que responde por su cuenta a través de la interfaz. */
+class TcpPacketHandler(
+    private val stack: TunTcpStack,
+    private val fakeDns: FakeDnsTable,
+) : PacketHandler {
+    override suspend fun handle(packet: Ipv4Packet): List<ByteArray>? {
+        val segment = TcpSegment.parse(packet) ?: return null
+        // La consulta a la tabla se hace aquí, en el bucle del motor, que es su único usuario.
+        val host = fakeDns.hostFor(packet.destination)
+        if (host == null && fakeDns.contains(packet.destination)) {
+            // Dirección inventada que ya no corresponde a ningún nombre (se recicló o es de otra sesión):
+            // no hay a dónde conectar, así que se rechaza para que la app vuelva a resolver.
+            return if (segment.has(TcpFlags.RST)) emptyList() else listOf(reject(packet, segment))
+        }
+        stack.process(packet, segment, destinationHost = host)
+        return emptyList()
+    }
+
+    private fun reject(packet: Ipv4Packet, segment: TcpSegment): ByteArray {
+        val consumed = segment.payloadLength + if (segment.has(TcpFlags.SYN)) 1 else 0
+        return buildTcpPacket(
+            source = packet.destination,
+            destination = packet.source,
+            sourcePort = segment.destinationPort,
+            destinationPort = segment.sourcePort,
+            sequence = if (segment.has(TcpFlags.ACK)) segment.acknowledgment else 0,
+            acknowledgment = segment.sequence + consumed,
+            flags = TcpFlags.RST or TcpFlags.ACK,
+            window = 0,
+        )
+    }
+}
+
+/**
+ * Rechaza el UDP que el túnel no puede transportar (todo salvo DNS) con un aviso ICMP, para que
+ * las apps que lo intentan, como las que usan QUIC, pasen a TCP al instante en vez de esperar.
+ */
+class UdpRejectHandler : PacketHandler {
+    override suspend fun handle(packet: Ipv4Packet): List<ByteArray>? {
+        UdpDatagram.parse(packet) ?: return null
+        return listOfNotNull(buildIcmpPortUnreachable(packet))
+    }
+}
+
+/** Crea el motor de una sesión, que depende del túnel y del perfil concretos. */
+class TunnelEngineFactory(
+    private val connectors: List<ProxyConnector>,
+    private val randomBytes: RandomBytes,
+    private val timeSource: TimeSource,
+    private val logger: Logger,
+) {
+    /**
+     * @param output interfaz por la que la pila TCP devuelve sus paquetes a las apps.
+     * @param scope ámbito de la sesión: en él corren el temporizador TCP y los relés de cada conexión.
+     */
+    fun create(
+        plan: TunAddressPlan,
+        output: PacketWriter,
+        scope: CoroutineScope,
+        profile: ProxyProfile,
+        password: String,
+    ): TunnelEngine {
+        val fakeDns = FakeDnsTable(plan.subnetBase)
+        val connector = connectors.first { it.protocol == profile.protocol }
+        val relay = TunnelRelay(connector, profile, password, logger)
+
+        val start = timeSource.markNow()
+        val tcp = TunTcpStack(
+            output = output,
+            scope = scope,
+            nowMs = { start.elapsedNow().inWholeMilliseconds },
+            randomBytes = randomBytes,
+            onAccept = relay::serve,
+        )
+        tcp.start()
+
+        // El orden importa: DNS antes que el rechazo genérico de UDP.
+        return TunnelEngine(
+            listOf(
+                DnsPacketHandler(DnsResponder(fakeDns), logger),
+                TcpPacketHandler(tcp, fakeDns),
+                UdpRejectHandler(),
+            ),
+        )
     }
 }
 
@@ -70,8 +160,13 @@ class TunnelEngine(private val handlers: List<PacketHandler>) {
         while (true) {
             val bytes = tun.readPacket() ?: return
             val packet = Ipv4Packet.parse(bytes) ?: continue
-            val replies = handlers.firstNotNullOfOrNull { it.handle(packet) } ?: continue
+            val replies = firstReply(packet) ?: continue
             replies.forEach { tun.writePacket(it) }
         }
+    }
+
+    private suspend fun firstReply(packet: Ipv4Packet): List<ByteArray>? {
+        for (handler in handlers) handler.handle(packet)?.let { return it }
+        return null
     }
 }

@@ -25,12 +25,12 @@ class AndroidPlatformTunnel(
             .setSession(config.sessionName)
             .setMtu(config.mtu)
             .addAddress(config.address, ADDRESS_PREFIX)
-            .addRoute(config.virtualSubnet, TunConfig.VIRTUAL_SUBNET_PREFIX)
             .addDnsServer(config.dnsServer)
             // Lecturas bloqueantes: sin esto read() devuelve 0 al instante y habría que sondear.
             .setBlocking(true)
             // La propia app queda fuera del túnel: sus conexiones al proxy salen por la red real.
             .addDisallowedApplication(service.packageName)
+        config.routes.forEach { builder.addRoute(it.addressText, it.prefixLength) }
 
         // establish() devuelve null si la app dejó de ser la VPN preparada (otra app tomó el relevo).
         val descriptor = builder.establish()

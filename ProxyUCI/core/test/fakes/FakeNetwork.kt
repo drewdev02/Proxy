@@ -29,6 +29,13 @@ class FakeConnection(private val onWrite: (ByteArray) -> ByteArray?) : TcpConnec
         if (reply == null) closedByServer = true else if (reply.isNotEmpty()) pending += reply
     }
 
+    var outputShutDown = false
+        private set
+
+    override suspend fun shutdownOutput() {
+        outputShutDown = true
+    }
+
     override fun close() {
         closedByClient = true
     }

@@ -1,13 +1,14 @@
 package org.uci.proxy.core.port
 
 import kotlinx.coroutines.flow.StateFlow
+import org.uci.proxy.core.packet.Ipv4Route
 
 interface PacketReader {
     /** Siguiente paquete IP que sale de las apps. Devuelve null cuando la interfaz se cerró. */
     suspend fun readPacket(): ByteArray?
 }
 
-interface PacketWriter {
+fun interface PacketWriter {
     /** Entrega un paquete IP a las apps, como si llegara de la red. */
     suspend fun writePacket(packet: ByteArray)
 }
@@ -24,16 +25,12 @@ data class TunConfig(
     val sessionName: String,
     /** Dirección de la propia interfaz. */
     val address: String,
-    /** Red /16 que se enruta al túnel: de ahí salen las direcciones del DNS falso. */
-    val virtualSubnet: String,
-    /** Servidor DNS que se anuncia a las apps; está dentro de [virtualSubnet] y lo atiende el motor. */
+    /** Servidor DNS que se anuncia a las apps; está dentro de la subred virtual y lo atiende el motor. */
     val dnsServer: String,
     val mtu: Int,
-) {
-    companion object {
-        const val VIRTUAL_SUBNET_PREFIX = 16
-    }
-}
+    /** Destinos cuyo tráfico entra en el túnel: la subred virtual del DNS falso y todo el IPv4 público. */
+    val routes: List<Ipv4Route>,
+)
 
 class TunnelUnavailableException(message: String) : Exception(message)
 

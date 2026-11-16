@@ -1,0 +1,17 @@
+# Capa 4: con el túnel conectado (tunel-android.yaml), el navegador carga una página HTTPS a través del proxy.
+# Requiere el proxy de pruebas con salida real:
+#   python3 tools/test_proxy.py --auth ntlm --port 3128 --upstream
+# En su registro debe aparecer «CONNECT example.com:443 ... -> 200».
+appId: com.android.chrome
+---
+# Pantallas de bienvenida de Chrome, si es la primera vez que se abre.
+- tapOn:
+    text: "Stay signed out"
+    optional: true
+- tapOn:
+    text: "No thanks|Got it|Not now|No, thanks"
+    optional: true
+- openLink: https://example.com
+- extendedWaitUntil:
+    visible: "This domain is for use in documentation examples.*"
+    timeout: 40000

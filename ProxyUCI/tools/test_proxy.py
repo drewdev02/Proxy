@@ -219,16 +219,23 @@ class Handler(threading.Thread):
                 pass
             return
         with upstream:
-            sockets = [self.client, upstream]
-            while True:
-                readable, _, _ = select.select(sockets, [], [], 60)
+            # Cada sentido se cierra por separado: si un extremo deja de enviar, el otro aún puede responder.
+            open_sources = [self.client, upstream]
+            while open_sources:
+                readable, _, _ = select.select(open_sources, [], [], 60)
                 if not readable:
                     return
                 for source in readable:
+                    target = upstream if source is self.client else self.client
                     data = source.recv(65536)
-                    if not data:
-                        return
-                    (upstream if source is self.client else self.client).sendall(data)
+                    if data:
+                        target.sendall(data)
+                    else:
+                        open_sources.remove(source)
+                        try:
+                            target.shutdown(socket.SHUT_WR)
+                        except OSError:
+                            pass
 
 
 def main():

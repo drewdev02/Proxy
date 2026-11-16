@@ -1,11 +1,14 @@
 package org.uci.proxy.core.engine
 
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import org.uci.proxy.core.packet.NON_PUBLIC_RANGES
+import org.uci.proxy.core.packet.routesExcluding
 import org.uci.proxy.core.port.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.PlatformTunnel
@@ -39,6 +42,10 @@ class TunnelRunner(
     private val dispatchers: AppDispatchers,
     private val logger: Logger,
 ) {
+    // Todo el IPv4 público. Las redes privadas quedan fuera para que la red local y el propio
+    // proxy se sigan alcanzando directamente.
+    private val publicRoutes = routesExcluding(NON_PUBLIC_RANGES)
+
     /**
      * Suspende mientras el túnel esté activo. Termina cuando la interfaz se cierra o al cancelar,
      * y en ambos casos deja el estado en desconectado (o en fallo, si no llegó a arrancar).
@@ -49,6 +56,7 @@ class TunnelRunner(
             stateStore.set(TunnelState.Failed(TunnelFailure.PROFILE_NOT_FOUND))
             return
         }
+        val password = profiles.password(profileId)
 
         val plan = addressPlanner.plan()
         val tun = try {
@@ -56,9 +64,9 @@ class TunnelRunner(
                 TunConfig(
                     sessionName = profile.name,
                     address = plan.tunAddressText,
-                    virtualSubnet = plan.subnetText,
                     dnsServer = plan.dnsServerText,
                     mtu = MTU,
+                    routes = listOf(plan.subnet) + publicRoutes,
                 ),
             )
         } catch (e: TunnelUnavailableException) {
@@ -69,9 +77,10 @@ class TunnelRunner(
 
         logger.log(LogLevel.INFO, TAG, "Túnel activo en ${plan.tunAddressText}, DNS ${plan.dnsServerText}")
         stateStore.set(TunnelState.Connected(profileId))
-        val engine = engineFactory.create(plan)
         try {
             coroutineScope {
+                // En este ámbito viven también el temporizador TCP y los relés de cada conexión.
+                val engine = engineFactory.create(plan, output = tun, scope = this, profile = profile, password = password)
                 val loop = launch(dispatchers.background) { engine.run(tun) }
                 try {
                     loop.join()
@@ -81,6 +90,8 @@ class TunnelRunner(
                     tun.close()
                     throw e
                 }
+                // La interfaz se cerró sola: se detiene lo que quede en marcha para que el ámbito termine.
+                coroutineContext.cancelChildren()
             }
         } finally {
             tun.close()

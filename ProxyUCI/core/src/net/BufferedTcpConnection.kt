@@ -21,6 +21,8 @@ class BufferedTcpConnection(private val delegate: TcpConnection) : TcpConnection
 
     override suspend fun write(bytes: ByteArray) = delegate.write(bytes)
 
+    override suspend fun shutdownOutput() = delegate.shutdownOutput()
+
     override fun close() = delegate.close()
 
     /**

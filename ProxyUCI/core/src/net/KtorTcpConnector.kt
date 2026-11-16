@@ -43,6 +43,11 @@ private class KtorTcpConnection(private val socket: Socket) : TcpConnection {
         output.flush()
     }
 
+    override suspend fun shutdownOutput() = guarded("Error al cerrar el envío") {
+        // Cerrar el canal de escritura hace que el socket envíe su FIN sin cerrar la lectura.
+        output.flushAndClose()
+    }
+
     override fun close() {
         socket.close()
     }

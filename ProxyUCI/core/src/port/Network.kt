@@ -7,6 +7,12 @@ interface TcpConnection {
 
     suspend fun write(bytes: ByteArray)
 
+    /**
+     * Cierra solo el sentido de envío: el otro extremo ve el fin de los datos, pero aún puede responder.
+     * Hace falta para retransmitir fielmente un cierre a medias de la app.
+     */
+    suspend fun shutdownOutput()
+
     fun close()
 
     companion object {
