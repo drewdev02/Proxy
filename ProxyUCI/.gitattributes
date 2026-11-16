@@ -1,0 +1,2 @@
+# El wrapper de Windows necesita finales de línea CRLF para que cmd lo ejecute bien.
+*.bat text eol=crlf
