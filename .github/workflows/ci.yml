@@ -72,6 +72,12 @@ jobs:
           $admin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
           "Administrador: $admin"
           if (-not $admin) { throw "El ejecutor no corre como Administrador" }
+      - name: Los servidores de prueba siguen vivos
+        run: |
+          Get-Process python -ErrorAction SilentlyContinue | Format-Table Id, ProcessName, StartTime
+          netstat -ano | Select-String ":3128|:8000"
+          if (-not (Test-NetConnection 127.0.0.1 -Port 3128 -InformationLevel Quiet)) { throw "El proxy ya no escucha en 3128" }
+          if (-not (Test-NetConnection 127.0.0.1 -Port 8000 -InformationLevel Quiet)) { throw "El origen ya no escucha en 8000" }
       - name: Prueba del túnel
         env:
           PROXYUCI_E2E_WINDOWS: "1"

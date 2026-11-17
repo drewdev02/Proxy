@@ -65,6 +65,10 @@ class WindowsTunnelE2ETest {
         val originPort = System.getenv(ORIGIN_PORT)?.toInt() ?: 8000
         val expectedSha = requireNotNull(System.getenv(BIG_SHA)) { "Falta $BIG_SHA" }
 
+        // Antes de tocar la red: si los servidores de prueba no escuchan, el fallo no es del túnel.
+        assertTrue(canConnect(proxyPort), "el proxy de pruebas no escucha en 127.0.0.1:$proxyPort antes de crear el túnel")
+        assertTrue(canConnect(originPort), "el origen de pruebas no escucha en 127.0.0.1:$originPort antes de crear el túnel")
+
         // El registro de la app va a la salida estándar: sin él, un fallo del túnel no deja ninguna pista.
         val printLogger = module { single<Logger> { PrintLogger() } }
         val koin = startKoin { modules(platformModule, coreModule, tunnelModule, printLogger) }.koin
@@ -89,6 +93,7 @@ class WindowsTunnelE2ETest {
                 withTimeout(90.seconds) { stateStore.state.first { it is TunnelState.Connected || it is TunnelState.Failed } }
             }
             assertTrue(state is TunnelState.Connected, "el túnel no conectó: $state")
+            println("E2E-WINDOWS: con el túnel activo, proxy alcanzable=${canConnect(proxyPort)}, origen alcanzable=${canConnect(originPort)}")
 
             // 1. El DNS del sistema responde con una dirección falsa del túnel: el adaptador gana al DNS real.
             val (name, address) = resolveOrDiagnose()
@@ -144,6 +149,13 @@ class WindowsTunnelE2ETest {
         if (dnsServer != null) show("nslookup directo al DNS del túnel", "nslookup", name, dnsServer)
         show("Resolve-DnsName", "powershell", "-NoProfile", "-Command", "Resolve-DnsName $name -Type A -ErrorAction Continue | Out-String")
         throw AssertionError("Windows no resolvió $name por el DNS del túnel: $last")
+    }
+
+    private fun canConnect(port: Int): Boolean = try {
+        java.net.Socket().use { it.connect(java.net.InetSocketAddress("127.0.0.1", port), 2_000) }
+        true
+    } catch (e: java.io.IOException) {
+        false
     }
 
     private fun nativeDirectory(): Path =
