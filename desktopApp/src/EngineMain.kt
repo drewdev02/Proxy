@@ -110,6 +110,9 @@ fun runSelfTest(reportFile: String) {
         report.appendLine("plataforma=${platform.kind}")
         report.appendLine("java=${System.getProperty("java.version")} ${System.getProperty("java.vm.name")}")
         report.appendLine("arranque=${System.getProperty(WindowsElevatedEngineLauncher.LAUNCHER_PROPERTY)}")
+        // Con `./kotlin run`, este es el classpath exacto que Amper usa para ejecutar la app: tools/windows-exe lo
+        // aprovecha para empaquetar las mismas librerías (el jar ejecutable de Amper pierde las que se llaman igual).
+        report.appendLine("classpath=${System.getProperty("java.class.path")}")
         // Cargar la parte nativa de JNA: falla si no se pudo extraer o si falta algún módulo.
         report.appendLine("jna=${JnaProbe.pointerSize()} bytes por puntero")
         if (platform.kind == PlatformKind.WINDOWS) {
