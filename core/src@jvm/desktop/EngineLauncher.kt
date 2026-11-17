@@ -24,6 +24,12 @@ object EngineArguments {
     const val PORT = "--port"
     const val TOKEN_FILE = "--token-file"
 
+    /**
+     * Comprobación de que el programa empaquetado arranca (Java recortada, librerías, recursos): escribe el
+     * resultado en el archivo que sigue a esta opción y termina, sin abrir ventana ni tocar la red.
+     */
+    const val SELF_TEST = "--self-test"
+
     /** Solo para pruebas: segundos tras los que el motor se detiene solo. */
     const val MAX_SECONDS = "--max-seconds"
 

@@ -4,11 +4,13 @@ import kotlinx.coroutines.runBlocking
 import org.koin.core.context.startKoin
 import org.uci.proxy.core.desktop.EngineArguments
 import org.uci.proxy.core.desktop.EngineSession
+import org.uci.proxy.core.desktop.WindowsElevatedEngineLauncher
 import org.uci.proxy.core.di.coreModule
 import org.uci.proxy.core.di.platformModule
 import org.uci.proxy.core.di.tunnelModule
 import org.uci.proxy.core.engine.TunnelRunner
 import org.uci.proxy.core.packet.Ipv4Route
+import org.uci.proxy.core.platform.JnaProbe
 import org.uci.proxy.core.platform.ProcessCommandRunner
 import org.uci.proxy.core.platform.macos.JnaUtunOpener
 import org.uci.proxy.core.platform.macos.MacNetwork
@@ -27,6 +29,7 @@ import java.net.InetAddress
 import java.net.Socket
 import java.nio.file.Files
 import kotlin.io.path.Path
+import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.seconds
 
 private const val LOG_FILE = "--log-file"
@@ -90,6 +93,33 @@ fun runEngine(args: List<String>) {
 
     runBlocking {
         Socket(InetAddress.getLoopbackAddress(), port).use { session.serve(it, token) }
+    }
+}
+
+/**
+ * Comprobación del programa empaquetado: arranca el mismo grafo de dependencias que el motor, carga la librería
+ * nativa de JNA y, en Windows, extrae y verifica `wintun.dll`. Con una Java recortada, un módulo que falte
+ * aparece aquí y no cuando el usuario pulsa «Conectar». Escribe `OK` (o `FALLO` con el error) en [reportFile].
+ */
+fun runSelfTest(reportFile: String) {
+    val report = StringBuilder()
+    try {
+        val koin = startKoin { modules(platformModule, coreModule, tunnelModule) }.koin
+        koin.get<TunnelRunner>()
+        val platform = koin.get<PlatformInfo>()
+        report.appendLine("plataforma=${platform.kind}")
+        report.appendLine("java=${System.getProperty("java.version")} ${System.getProperty("java.vm.name")}")
+        report.appendLine("arranque=${System.getProperty(WindowsElevatedEngineLauncher.LAUNCHER_PROPERTY)}")
+        // Cargar la parte nativa de JNA: falla si no se pudo extraer o si falta algún módulo.
+        report.appendLine("jna=${JnaProbe.pointerSize()} bytes por puntero")
+        if (platform.kind == PlatformKind.WINDOWS) {
+            val dll = ResourceWintunDllLocator(Files.createTempDirectory("proxyuci-autoprueba")).locate()
+            report.appendLine("wintun=${dll.fileName} (${Files.size(dll)} bytes, huella verificada)")
+        }
+        Files.writeString(Path(reportFile), "OK\n$report")
+    } catch (error: Throwable) {
+        Files.writeString(Path(reportFile), "FALLO\n$report\n${error.stackTraceToString()}")
+        exitProcess(1)
     }
 }
 

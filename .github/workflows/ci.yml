@@ -87,6 +87,48 @@ jobs:
           }
           exit $code
 
+  # El ProxyUCI.exe de un solo archivo: la app y una Java recortada dentro (ver tools/windows-exe/). Se prueba
+  # ejecutándolo con --self-test, que arranca el mismo grafo del motor, carga JNA y extrae y verifica wintun.dll con
+  # la Java recortada: un módulo de Java que falte aparece aquí y no cuando el usuario pulsa «Conectar».
+  windows-exe:
+    name: ProxyUCI.exe (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - name: Poner el tar de Windows primero
+        run: Add-Content -Path $env:GITHUB_PATH -Value "C:\Windows\System32"
+      # El bytecode de la app es de Java 25, y jdeps y jlink tienen que ser de esa misma versión.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+      - name: Construir el .exe
+        run: ./tools/windows-exe/build-exe.ps1
+      - name: Autoprueba del .exe
+        run: |
+          $exe = (Resolve-Path build/exe/ProxyUCI.exe).Path
+          $report = Join-Path $env:RUNNER_TEMP "autoprueba.txt"
+          # La segunda vez ya no extrae nada: se ve en el tiempo.
+          foreach ($intento in 1, 2) {
+            Remove-Item $report -ErrorAction SilentlyContinue
+            $reloj = [Diagnostics.Stopwatch]::StartNew()
+            $proceso = Start-Process $exe -ArgumentList "--self-test", "`"$report`"" -Wait -PassThru
+            "Ejecución ${intento}: código $($proceso.ExitCode) en $([math]::Round($reloj.Elapsed.TotalSeconds, 1)) s"
+            if (Test-Path $report) { Get-Content $report } else { "(no se escribió el informe)" }
+            if ($proceso.ExitCode -ne 0 -or (Get-Content $report -TotalCount 1) -ne "OK") { throw "La autoprueba falló" }
+          }
+          if (-not ((Get-Content $report -Raw) -match [regex]::Escape("ProxyUCI.exe"))) { throw "La app no supo cuál es su .exe" }
+          Get-ChildItem (Join-Path $env:ProgramFiles "ProxyUCI/app") | Format-Table Name
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ProxyUCI-windows-x64
+          path: build/exe/ProxyUCI.exe
+          retention-days: 14
+
   # Que la app de escritorio compile en Windows, con las librerías nativas de Compose de ese sistema.
   desktop-build-windows:
     name: Compilar escritorio (Windows)

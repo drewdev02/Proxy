@@ -8,6 +8,11 @@ import org.uci.proxy.di.initKoin
 import kotlin.system.exitProcess
 
 fun main(args: Array<String>) {
+    EngineArguments.value(args.toList(), EngineArguments.SELF_TEST)?.let { reportFile ->
+        runSelfTest(reportFile)
+        exitProcess(0)
+    }
+
     // El mismo programa hace de motor cuando la ventana lo relanza con privilegios.
     if (EngineArguments.ENGINE in args) {
         runEngine(args.toList())
