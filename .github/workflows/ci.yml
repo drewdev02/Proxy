@@ -4,13 +4,9 @@ on:
   push:
   pull_request:
 
-# El proyecto vive en ProxyUCI/; si algún día se separa en su propio repositorio, este archivo pasa a
-# ProxyUCI/.github/workflows y se quita el directorio de trabajo.
-defaults:
-  run:
-    shell: bash
-    working-directory: ProxyUCI
-
+# En Windows se usa PowerShell y no el bash de Git: el wrapper `kotlin.bat` descarga su toolchain con `tar`, y el
+# `tar` de GNU que trae Git interpreta «C:\ruta» como «máquina:ruta» y falla. Además se pone System32 el primero
+# del PATH para que gane el `tar` de Windows (bsdtar).
 jobs:
   # Las mismas pruebas del núcleo en los tres sistemas de escritorio. El adaptador de Windows se prueba con
   # órdenes simuladas, así que corre también en Linux y macOS; lo que solo se puede ver en Windows va aparte.
@@ -18,15 +14,24 @@ jobs:
     name: Pruebas (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
+    # El proyecto vive en ProxyUCI/; si algún día se separa en su propio repositorio, este archivo pasa a
+    # ProxyUCI/.github/workflows y se quita el directorio de trabajo.
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+        working-directory: ProxyUCI
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { name: Linux, os: ubuntu-latest, kotlin: ./kotlin }
-          - { name: macOS, os: macos-latest, kotlin: ./kotlin }
-          - { name: Windows, os: windows-latest, kotlin: ./kotlin.bat }
+          - { name: Linux, os: ubuntu-latest, shell: bash, kotlin: ./kotlin }
+          - { name: macOS, os: macos-latest, shell: bash, kotlin: ./kotlin }
+          - { name: Windows, os: windows-latest, shell: pwsh, kotlin: ./kotlin.bat }
     steps:
       - uses: actions/checkout@v4
+      - name: Poner el tar de Windows primero
+        if: runner.os == 'Windows'
+        run: Add-Content -Path $env:GITHUB_PATH -Value "C:\Windows\System32"
       - name: Pruebas del núcleo
         run: ${{ matrix.kotlin }} test -m core --platform jvm
       - name: Pruebas de la interfaz
@@ -37,6 +42,12 @@ jobs:
     name: Compilar escritorio (Windows)
     runs-on: windows-latest
     timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: ProxyUCI
     steps:
       - uses: actions/checkout@v4
+      - name: Poner el tar de Windows primero
+        run: Add-Content -Path $env:GITHUB_PATH -Value "C:\Windows\System32"
       - run: ./kotlin.bat build -m desktopApp
