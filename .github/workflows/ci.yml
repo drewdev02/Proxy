@@ -37,6 +37,56 @@ jobs:
       - name: Pruebas de la interfaz
         run: ${{ matrix.kotlin }} test -m shared --platform jvm
 
+  # El túnel de verdad en Windows: adaptador Wintun real, `netsh` real, DNS del sistema y una descarga por el proxy
+  # de pruebas. Los ejecutores de Windows corren como Administrador, que es lo que pide Wintun. Solo entran en el
+  # túnel direcciones 192.0.2.0/24 (documentación) y la subred virtual: la conexión del ejecutor con GitHub no se toca.
+  windows-tunnel:
+    name: Túnel real (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: ProxyUCI
+    steps:
+      - uses: actions/checkout@v4
+      - name: Poner el tar de Windows primero
+        run: Add-Content -Path $env:GITHUB_PATH -Value "C:\Windows\System32"
+      - name: Servidores de prueba (origen HTTP y proxy NTLM)
+        run: |
+          $www = Join-Path $env:RUNNER_TEMP "www"
+          python tools/e2e_fixture.py $www
+          $sha = (Get-Content (Join-Path $www "big.sha")).Trim()
+          "PROXYUCI_E2E_BIG_SHA=$sha" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Start-Process python -ArgumentList "-m","http.server","8000","--bind","127.0.0.1","--directory",$www `
+            -WindowStyle Hidden -RedirectStandardOutput (Join-Path $env:RUNNER_TEMP "origen.log") -RedirectStandardError (Join-Path $env:RUNNER_TEMP "origen.err")
+          Start-Process python -ArgumentList "tools/test_proxy.py","--auth","ntlm","--port","3128","--upstream","--redirect","127.0.0.1:8000" `
+            -WindowStyle Hidden -RedirectStandardOutput (Join-Path $env:RUNNER_TEMP "proxy.log") -RedirectStandardError (Join-Path $env:RUNNER_TEMP "proxy.err")
+          Start-Sleep -Seconds 3
+          $size = (Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:8000/big.bin").RawContentLength
+          if ($size -ne 5242880) { throw "El origen sirve $size bytes" }
+          if (-not (Test-NetConnection 127.0.0.1 -Port 3128 -InformationLevel Quiet)) { throw "El proxy no escucha en 3128" }
+      - name: Administrador
+        run: |
+          $admin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+          "Administrador: $admin"
+          if (-not $admin) { throw "El ejecutor no corre como Administrador" }
+      - name: Prueba del túnel
+        env:
+          PROXYUCI_E2E_WINDOWS: "1"
+        run: ./kotlin.bat test -m core --platform jvm --include-classes 'org.uci.proxy.core.windows.WindowsTunnelE2ETest'
+      - name: Registro del proxy
+        if: always()
+        run: |
+          Get-Content (Join-Path $env:RUNNER_TEMP "proxy.log"), (Join-Path $env:RUNNER_TEMP "proxy.err") -ErrorAction SilentlyContinue | Select-Object -Last 40
+      - name: Estado de la red
+        if: failure()
+        run: |
+          route print -4
+          netsh interface ipv4 show interfaces
+          netsh interface ipv4 show dnsservers
+          ipconfig /all
+
   # Que la app de escritorio compile en Windows, con las librerías nativas de Compose de ese sistema.
   desktop-build-windows:
     name: Compilar escritorio (Windows)

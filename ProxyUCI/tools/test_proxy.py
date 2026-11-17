@@ -277,8 +277,13 @@ class Handler(threading.Thread):
         upstream = None
         if self.options.upstream:
             host, _, port = authority.rpartition(":")
+            if self.options.redirect:
+                # Pruebas de integración: todo CONNECT va al mismo servidor local, sea cual sea el destino pedido.
+                host, _, port = self.options.redirect.rpartition(":")
             try:
-                if self.options.bind_interface:
+                if self.options.redirect:
+                    upstream = socket.create_connection((host, int(port)), timeout=10)
+                elif self.options.bind_interface:
                     address = resolve_ipv4(host, self.options.dns, self.options.bind_interface)
                     upstream = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                     # Las direcciones locales (127.x) no salen por ninguna interfaz física.
@@ -332,6 +337,8 @@ def main():
     parser.add_argument("--bind-interface", metavar="IFAZ",
                         help="interfaz física (p. ej. en0) por la que sale el proxy; necesario cuando el túnel "
                              "corre en esta misma máquina, para que su salida no vuelva a entrar en él")
+    parser.add_argument("--redirect", metavar="HOST:PUERTO",
+                        help="con --upstream, enviar todos los CONNECT a este servidor local en vez de al destino pedido")
     parser.add_argument("--dns", help="servidor DNS real que usa el proxy con --bind-interface (por defecto, el del sistema)")
     options = parser.parse_args()
     if options.bind_interface and not options.dns:
