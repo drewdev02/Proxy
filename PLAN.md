@@ -6,8 +6,8 @@ módulo `expect`/`actual`. Todo el código sigue SOLID e inyección por construc
 
 Referencias de comportamiento:
 
-- `../superproxy/1/ANALISIS.md`: cómo lo hace Super Proxy en Android (VPN local, DNS falso, `CONNECT`).
-- `../superproxy/windows/src/*.cs`: port propio para Windows, con NTLMv2 y pila TCP en memoria. Es la base del
+- `superproxy/1/ANALISIS.md` (carpeta junto al proyecto, sin versionar): cómo lo hace Super Proxy en Android (VPN local, DNS falso, `CONNECT`).
+- `superproxy/windows/src/*.cs`: port propio para Windows, con NTLMv2 y pila TCP en memoria. Es la base del
   port a Kotlin.
 
 ---
@@ -49,7 +49,7 @@ El proyecto usa Kotlin Toolchain (Amper 0.13.0). Hoy `shared` mezcla interfaz y 
 porque la extensión de iOS no puede cargar Compose (límite de memoria, ver sección 7).
 
 ```
-ProxyUCI/
+./                             raíz del repositorio
 ├── core/                      kmp/lib sin Compose: motor + adaptadores
 │   ├── module.yaml            platforms: jvm, android, iosArm64, iosSimulatorArm64
 │   ├── src/                   código común (todo el núcleo)
@@ -520,7 +520,7 @@ Cambios en los módulos existentes:
 
 | Componente | Versión | Plataforma | Cómo se obtiene |
 |---|---|---|---|
-| `wintun.dll` (amd64) | 0.14, el mismo archivo de `superproxy/windows/bin` | Windows | Se empaqueta en los recursos de `desktopApp` |
+| `wintun.dll` (amd64 y arm64) | 0.14.1, del ZIP oficial de wintun.net, sin modificar y con su licencia | Windows | Recurso de `core` (`resources@jvm/native`); el motor la extrae y verifica su SHA-256 antes de cargarla |
 | `openvpn` | 2.6 o superior | Windows y macOS, modo "Otro País" | Lo instala el usuario (ProtonVPN, OpenVPN GUI, Homebrew o Tunnelblick) |
 | Xcode y perfil con Network Extensions | — | iOS | Cuenta Apple Developer |
 

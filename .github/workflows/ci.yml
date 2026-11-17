@@ -14,12 +14,9 @@ jobs:
     name: Pruebas (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
-    # El proyecto vive en ProxyUCI/; si algún día se separa en su propio repositorio, este archivo pasa a
-    # ProxyUCI/.github/workflows y se quita el directorio de trabajo.
     defaults:
       run:
         shell: ${{ matrix.shell }}
-        working-directory: ProxyUCI
     strategy:
       fail-fast: false
       matrix:
@@ -47,7 +44,6 @@ jobs:
     defaults:
       run:
         shell: pwsh
-        working-directory: ProxyUCI
     steps:
       - uses: actions/checkout@v4
       - name: Poner el tar de Windows primero
@@ -99,7 +95,6 @@ jobs:
     defaults:
       run:
         shell: pwsh
-        working-directory: ProxyUCI
     steps:
       - uses: actions/checkout@v4
       - name: Poner el tar de Windows primero
