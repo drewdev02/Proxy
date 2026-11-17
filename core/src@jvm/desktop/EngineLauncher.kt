@@ -30,6 +30,12 @@ object EngineArguments {
      */
     const val SELF_TEST = "--self-test"
 
+    /**
+     * Solo para pruebas: abre la ventana y, en cuanto se ha compuesto, escribe «listo» en el archivo que sigue
+     * a esta opción y sale. Un error no capturado se anota en `<archivo>.error`.
+     */
+    const val READY_FILE = "--ready-file"
+
     /** Solo para pruebas: segundos tras los que el motor se detiene solo. */
     const val MAX_SECONDS = "--max-seconds"
 

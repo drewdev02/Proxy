@@ -129,23 +129,28 @@ jobs:
         env:
           SKIKO_RENDER_API: SOFTWARE_COMPAT
         run: |
+          # Con --ready-file la app abre la ventana y, en cuanto se ha compuesto, escribe «listo» y sale. No se lee
+          # el título de la ventana desde fuera: los ejecutores no tienen un escritorio interactivo.
           $exe = (Resolve-Path build/exe/ProxyUCI.exe).Path
-          $proceso = Start-Process $exe -PassThru
-          Start-Sleep -Seconds 25
-          $javaw = Get-Process javaw -ErrorAction SilentlyContinue
-          $javaw | Format-Table Id, MainWindowTitle, Responding
-          $titulo = ($javaw | Where-Object { $_.MainWindowTitle } | Select-Object -First 1).MainWindowTitle
-          "Título de la ventana: '$titulo'"
-          $vivo = -not $proceso.HasExited
-          $javaw | Stop-Process -Force -ErrorAction SilentlyContinue
-          if (-not $proceso.HasExited) { $proceso | Stop-Process -Force }
-          if (-not $vivo) { throw "El .exe terminó antes de 25 s (código $($proceso.ExitCode)): la ventana no arrancó" }
-          if ($titulo -ne "ProxyUCI") { throw "El .exe sigue vivo, pero no se encontró la ventana «ProxyUCI»" }
+          $listo = Join-Path $env:RUNNER_TEMP "ventana-lista.txt"
+          Remove-Item $listo, "$listo.error" -ErrorAction SilentlyContinue
+          $proceso = Start-Process $exe -ArgumentList "--ready-file", "`"$listo`"" -PassThru
+          $salio = $proceso.WaitForExit(90000)
+          if (-not $salio) {
+            Get-Process javaw -ErrorAction SilentlyContinue | Format-Table Id, Responding
+            Get-Process javaw -ErrorAction SilentlyContinue | Stop-Process -Force
+            $proceso | Stop-Process -Force -ErrorAction SilentlyContinue
+          }
+          "Salió: $salio; código: $(if ($salio) { $proceso.ExitCode } else { 'n/a' })"
+          if (Test-Path "$listo.error") { "--- error no capturado en la app"; Get-Content "$listo.error" }
+          if (-not (Test-Path $listo) -or (Get-Content $listo -Raw) -ne "listo") {
+            throw "La ventana no llegó a componerse en 90 s"
+          }
+          "La ventana se compuso con la Java recortada"
       # Los servidores de prueba y la prueba van en el MISMO paso: los procesos que un paso deja en segundo plano
       # mueren al terminar ese paso.
       - name: Túnel real con el .exe como motor
-        env:
-          PROXYUCI_E2E_ORIGIN: "1"
+        if: ${{ !cancelled() }}
         run: |
           $www = Join-Path $env:RUNNER_TEMP "www"
           python tools/e2e_fixture.py $www
