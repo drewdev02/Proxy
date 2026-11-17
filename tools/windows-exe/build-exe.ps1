@@ -24,6 +24,8 @@ try {
     if (-not $env:JAVA_HOME) { throw "Falta JAVA_HOME (hace falta un JDK 25 con jlink y jdeps)" }
     $jdkBin = Join-Path $env:JAVA_HOME "bin"
 
+    # Rutas absolutas y con las barras de Windows: csc interpreta mal las relativas con «/».
+    $OutDir = [IO.Path]::GetFullPath((Join-Path $repo $OutDir))
     $work = Join-Path $OutDir "work"
     if (Test-Path $OutDir) { Remove-Item $OutDir -Recurse -Force }
     New-Item -ItemType Directory -Path $work | Out-Null
@@ -59,17 +61,19 @@ try {
     [IO.Compression.ZipFile]::CreateFromDirectory($payload, $zip, [IO.Compression.CompressionLevel]::Optimal, $false)
     $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
     $idFile = Join-Path $work "payload.id"
-    [IO.File]::WriteAllText((Resolve-Path $work).Path + "\payload.id", $hash)
+    [IO.File]::WriteAllText($idFile, $hash)
 
     # 5. El arranque, con el ZIP y la huella como recursos. Es el csc de .NET Framework, que ya viene con Windows.
-    $csc = Join-Path $env:WINDIR "Microsoft.NET/Framework64/v4.0.30319/csc.exe"
+    $csc = Join-Path $env:WINDIR "Microsoft.NET\Framework64\v4.0.30319\csc.exe"
     $exe = Join-Path $OutDir "ProxyUCI.exe"
+    $source = (Resolve-Path (Join-Path $repo "tools\windows-exe\Launcher.cs")).Path
+    $manifest = (Resolve-Path (Join-Path $repo "tools\windows-exe\app.manifest")).Path
     Invoke-Native "csc" {
         & $csc /nologo /target:winexe /platform:x64 /optimize+ "/out:$exe" `
-            "/win32manifest:tools/windows-exe/app.manifest" `
+            "/win32manifest:$manifest" `
             "/resource:$zip,payload.zip" "/resource:$idFile,payload.id" `
             /reference:System.IO.Compression.dll /reference:System.IO.Compression.FileSystem.dll `
-            tools/windows-exe/Launcher.cs
+            $source
     }
 
     $size = (Get-Item $exe).Length / 1MB
