@@ -339,7 +339,19 @@ tráfico sale por el proxy.
 **un solo `.exe`** que se autoextrae (JRE recortado, JAR y `wintun.dll` comprimidos dentro; la primera vez
 descomprime en una carpeta de caché y las siguientes arranca directo).
 
-> **Estado al 2026-11-17: escrito y probado solo con órdenes simuladas; sin probar en un Windows real.**
+> **Estado al 2026-11-17: el túnel funciona en un Windows real (ejecutor de GitHub Actions) con el adaptador
+> Wintun de verdad. Falta probar la ventana con el aviso de UAC y entregar el `.exe`.**
+>
+> Verificado en CI (`WindowsTunnelE2ETest`, como Administrador, rutas acotadas a `192.0.2.0/24`): se extrae y
+> carga `wintun.dll`; `netsh` da al adaptador `ProxyUCI` su IP /16, su DNS y la métrica 1; las rutas «en
+> vínculo» (`nexthop=0.0.0.0`) valen; Windows resuelve un nombre inventado a una dirección falsa del túnel; una
+> descarga de 5 MB por el proxy NTLM llega íntegra; al parar, el adaptador desaparece. La prueba encontró un
+> fallo real que las pruebas simuladas no veían: el archivo del token usaba permisos POSIX (ya corregido con una
+> lista de acceso).
+>
+> A vigilar: tras conectar, Windows tarda unos segundos (4 o 5 intentos de un segundo en CI) en empezar a usar el
+> DNS del adaptador; una app que consulte justo al conectar puede fallar un instante. Los procesos que un paso
+> de CI deja en segundo plano mueren al acabar el paso, por eso la prueba arranca sus servidores en su mismo paso.
 >
 > Hecho (259 pruebas del núcleo en JVM pasan en macOS; `desktopApp` compila):
 > - `WinNetwork` (`netsh` y `route`), `WinPlatformTunnel`, `JnaWintunOpener` y el extractor de la DLL con
@@ -350,13 +362,13 @@ descomprime en una carpeta de caché y las siguientes arranca directo).
 >   La licencia solo permite redistribuirla sin modificar y usándola por su API (`wintun.h`).
 > - `.github/workflows/ci.yml`: pruebas del núcleo en Linux, macOS y Windows, y compilación de escritorio en Windows.
 >
-> Sin verificar (hace falta Windows): que `wintun.dll` cree el adaptador, que `netsh interface ipv4 add route
-> ... nexthop=0.0.0.0` sirva como ruta «en vínculo», que Windows prefiera nuestro DNS por la métrica 1, la
-> elevación por UAC, y que la ruta de clases larga del entorno de desarrollo quepa en la línea de órdenes.
+> Sin verificar (CI no puede): la elevación por UAC desde la ventana, que la ruta de clases larga del entorno
+> de desarrollo quepa en la línea de órdenes de PowerShell, y el comportamiento con otras VPN o con el DNS de una
+> red real. Tampoco se ha probado con enrutado de todo el IPv4 público (CI lo acota para no cortar al ejecutor).
 >
-> Pendiente: el `.exe` autoextraíble; una prueba de integración con el adaptador real (con rutas acotadas
-> para no cortar la conexión del propio ejecutor de CI); endurecer la carpeta donde el motor elevado extrae
-> la DLL (hoy: carpeta nueva de nombre aleatorio en `ProgramData` y huella verificada antes de cargar).
+> Pendiente: el `.exe` autoextraíble; probar la app completa en la VM de Parallels (ventana + UAC); endurecer
+> la carpeta donde el motor elevado extrae la DLL (hoy: carpeta nueva de nombre aleatorio en `ProgramData` y
+> huella verificada antes de cargar).
 
 | Parte | Trabajo |
 |---|---|
