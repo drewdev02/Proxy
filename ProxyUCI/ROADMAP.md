@@ -335,7 +335,28 @@ tráfico sale por el proxy.
 
 ## Capa 6: navegación en Windows
 
-**Resultado:** lo mismo en Windows, igualando al `SuperProxyWin.exe` actual en modo Directo.
+**Resultado:** lo mismo en Windows, igualando al `SuperProxyWin.exe` actual en modo Directo, y entregado como
+**un solo `.exe`** que se autoextrae (JRE recortado, JAR y `wintun.dll` comprimidos dentro; la primera vez
+descomprime en una carpeta de caché y las siguientes arranca directo).
+
+> **Estado al 2026-11-17: escrito y probado solo con órdenes simuladas; sin probar en un Windows real.**
+>
+> Hecho (259 pruebas del núcleo en JVM pasan en macOS; `desktopApp` compila):
+> - `WinNetwork` (`netsh` y `route`), `WinPlatformTunnel`, `JnaWintunOpener` y el extractor de la DLL con
+>   comprobación de SHA-256, más el lanzador `WindowsElevatedEngineLauncher` (PowerShell `RunAs`, que pide
+>   el aviso de UAC y espera al motor). `EngineMain` y `DesktopAppModule` eligen según el sistema.
+> - Se sacaron a código común `CommandRunner` y `PollingTunDevice`, que ahora usan macOS y Windows.
+> - `wintun.dll` 0.14.1 (amd64 y arm64) del ZIP oficial de wintun.net, con su licencia, como recurso del núcleo.
+>   La licencia solo permite redistribuirla sin modificar y usándola por su API (`wintun.h`).
+> - `.github/workflows/ci.yml`: pruebas del núcleo en Linux, macOS y Windows, y compilación de escritorio en Windows.
+>
+> Sin verificar (hace falta Windows): que `wintun.dll` cree el adaptador, que `netsh interface ipv4 add route
+> ... nexthop=0.0.0.0` sirva como ruta «en vínculo», que Windows prefiera nuestro DNS por la métrica 1, la
+> elevación por UAC, y que la ruta de clases larga del entorno de desarrollo quepa en la línea de órdenes.
+>
+> Pendiente: el `.exe` autoextraíble; una prueba de integración con el adaptador real (con rutas acotadas
+> para no cortar la conexión del propio ejecutor de CI); endurecer la carpeta donde el motor elevado extrae
+> la DLL (hoy: carpeta nueva de nombre aleatorio en `ProgramData` y huella verificada antes de cargar).
 
 | Parte | Trabajo |
 |---|---|

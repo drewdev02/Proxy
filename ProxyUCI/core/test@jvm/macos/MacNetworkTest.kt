@@ -4,8 +4,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.uci.proxy.core.fakes.RecordingLogger
 import org.uci.proxy.core.packet.Ipv4Route
-import org.uci.proxy.core.platform.macos.CommandResult
-import org.uci.proxy.core.platform.macos.CommandRunner
+import org.uci.proxy.core.platform.CommandResult
+import org.uci.proxy.core.platform.CommandRunner
 import org.uci.proxy.core.platform.macos.MacNetwork
 import org.uci.proxy.core.platform.macos.MacNetworkException
 import org.uci.proxy.core.platform.macos.MacPlatformTunnel

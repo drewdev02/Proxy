@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+# El proyecto vive en ProxyUCI/; si algún día se separa en su propio repositorio, este archivo pasa a
+# ProxyUCI/.github/workflows y se quita el directorio de trabajo.
+defaults:
+  run:
+    shell: bash
+    working-directory: ProxyUCI
+
+jobs:
+  # Las mismas pruebas del núcleo en los tres sistemas de escritorio. El adaptador de Windows se prueba con
+  # órdenes simuladas, así que corre también en Linux y macOS; lo que solo se puede ver en Windows va aparte.
+  tests:
+    name: Pruebas (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Linux, os: ubuntu-latest, kotlin: ./kotlin }
+          - { name: macOS, os: macos-latest, kotlin: ./kotlin }
+          - { name: Windows, os: windows-latest, kotlin: ./kotlin.bat }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pruebas del núcleo
+        run: ${{ matrix.kotlin }} test -m core --platform jvm
+      - name: Pruebas de la interfaz
+        run: ${{ matrix.kotlin }} test -m shared --platform jvm
+
+  # Que la app de escritorio compile en Windows, con las librerías nativas de Compose de ese sistema.
+  desktop-build-windows:
+    name: Compilar escritorio (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./kotlin.bat build -m desktopApp

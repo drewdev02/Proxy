@@ -6,6 +6,7 @@ import com.sun.jna.Native
 import com.sun.jna.NativeLong
 import com.sun.jna.Pointer
 import com.sun.jna.ptr.IntByReference
+import org.uci.proxy.core.platform.PacketChannel
 
 /** Las funciones de libc que hacen falta para abrir y usar una interfaz utun. */
 @Suppress("FunctionName")
@@ -30,15 +31,8 @@ internal interface LibC : Library {
 }
 
 /** Una interfaz utun abierta: su nombre (por ejemplo "utun7") y el descriptor por el que pasan los paquetes. */
-interface UtunHandle {
+interface UtunHandle : PacketChannel {
     val name: String
-
-    /** Espera hasta [timeoutMs] y lee un paquete IP. Devuelve null si no llegó nada o si se cerró. */
-    fun read(timeoutMs: Int): ByteArray?
-
-    fun write(packet: ByteArray)
-
-    fun close()
 }
 
 fun interface UtunOpener {

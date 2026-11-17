@@ -2,8 +2,8 @@ package org.uci.proxy.core.platform.macos
 
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.yield
 import org.uci.proxy.core.packet.parseIpv4
+import org.uci.proxy.core.platform.PollingTunDevice
 import org.uci.proxy.core.port.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.PlatformTunnel
@@ -64,7 +64,8 @@ class MacPlatformTunnel(
             if (dnsDomains.isNotEmpty()) network.publishDnsResolver(config.dnsServer, dnsDomains)
 
             logger.log(LogLevel.INFO, TAG, "Interfaz ${utun.name} lista; DNS capturado para: ${describe(dnsDomains)}")
-            MacTunDevice(utun, ioDispatcher) { cleanUp(proxyBypass) }
+            // Al cerrar el descriptor el núcleo destruye la interfaz y, con ella, todas sus rutas.
+            PollingTunDevice(utun, ioDispatcher) { cleanUp(proxyBypass) }
         } catch (e: MacNetworkException) {
             utun.close()
             cleanUp(proxyBypass)
@@ -88,38 +89,5 @@ class MacPlatformTunnel(
 
         /** La cadena vacía es, para macOS, el dominio que casa con cualquier nombre. */
         val ALL_DOMAINS = listOf("")
-    }
-}
-
-private class MacTunDevice(
-    private val utun: UtunHandle,
-    private val ioDispatcher: CoroutineDispatcher,
-    private val onClose: () -> Unit,
-) : TunDevice {
-    @Volatile
-    private var closed = false
-
-    override suspend fun readPacket(): ByteArray? = withContext(ioDispatcher) {
-        while (!closed) {
-            utun.read(POLL_MS)?.let { return@withContext it }
-            yield()
-        }
-        null
-    }
-
-    override suspend fun writePacket(packet: ByteArray) = withContext(ioDispatcher) {
-        utun.write(packet)
-    }
-
-    override fun close() {
-        if (closed) return
-        closed = true
-        // Al cerrar el descriptor el núcleo destruye la interfaz y, con ella, todas sus rutas.
-        utun.close()
-        onClose()
-    }
-
-    private companion object {
-        const val POLL_MS = 250
     }
 }

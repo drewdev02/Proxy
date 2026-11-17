@@ -9,11 +9,17 @@ import org.uci.proxy.core.di.platformModule
 import org.uci.proxy.core.di.tunnelModule
 import org.uci.proxy.core.engine.TunnelRunner
 import org.uci.proxy.core.packet.Ipv4Route
+import org.uci.proxy.core.platform.ProcessCommandRunner
 import org.uci.proxy.core.platform.macos.JnaUtunOpener
 import org.uci.proxy.core.platform.macos.MacNetwork
 import org.uci.proxy.core.platform.macos.MacPlatformTunnel
-import org.uci.proxy.core.platform.macos.ProcessCommandRunner
+import org.uci.proxy.core.platform.windows.JnaWintunOpener
+import org.uci.proxy.core.platform.windows.ResourceWintunDllLocator
+import org.uci.proxy.core.platform.windows.WinNetwork
+import org.uci.proxy.core.platform.windows.WinPlatformTunnel
 import org.uci.proxy.core.port.Logger
+import org.uci.proxy.core.port.PlatformInfo
+import org.uci.proxy.core.port.PlatformKind
 import org.uci.proxy.core.profile.AppDispatchers
 import java.io.FileOutputStream
 import java.io.PrintStream
@@ -53,17 +59,26 @@ fun runEngine(args: List<String>) {
     } else {
         TunnelRunner(koin.get(), koin.get(), koin.get(), koin.get(), koin.get(), dispatchers, logger, publicRoutes = testRoutes)
     }
-    val tunnel = MacPlatformTunnel(
-        network = MacNetwork(ProcessCommandRunner()),
-        utunOpener = JnaUtunOpener(),
-        ioDispatcher = dispatchers.background,
-        logger = logger,
-        dnsDomains = when {
-            EngineArguments.NO_DNS_CAPTURE in args -> emptyList()
-            else -> EngineArguments.value(args, EngineArguments.DNS_DOMAINS)?.split(',')
-                ?: MacPlatformTunnel.ALL_DOMAINS
-        },
-    )
+    val tunnel = when (val kind = koin.get<PlatformInfo>().kind) {
+        PlatformKind.MACOS -> MacPlatformTunnel(
+            network = MacNetwork(ProcessCommandRunner()),
+            utunOpener = JnaUtunOpener(),
+            ioDispatcher = dispatchers.background,
+            logger = logger,
+            dnsDomains = when {
+                EngineArguments.NO_DNS_CAPTURE in args -> emptyList()
+                else -> EngineArguments.value(args, EngineArguments.DNS_DOMAINS)?.split(',')
+                    ?: MacPlatformTunnel.ALL_DOMAINS
+            },
+        )
+        PlatformKind.WINDOWS -> WinPlatformTunnel(
+            network = WinNetwork(ProcessCommandRunner()),
+            wintunOpener = JnaWintunOpener(ResourceWintunDllLocator(windowsNativeDirectory())),
+            ioDispatcher = dispatchers.background,
+            logger = logger,
+        )
+        else -> error("El motor no está disponible en ${kind.displayName}")
+    }
     val session = EngineSession(
         runner = runner,
         stateStore = koin.get(),
@@ -77,3 +92,11 @@ fun runEngine(args: List<String>) {
         Socket(InetAddress.getLoopbackAddress(), port).use { session.serve(it, token) }
     }
 }
+
+/**
+ * Carpeta donde el motor elevado extrae `wintun.dll`. Está bajo `ProgramData` y no bajo el perfil del
+ * usuario: el motor carga esa DLL con privilegios de Administrador, así que no debe salir de un
+ * lugar donde un proceso sin privilegios pueda sustituirla.
+ */
+private fun windowsNativeDirectory() =
+    Path(System.getenv("ProgramData") ?: "C:\\ProgramData").resolve("ProxyUCI").resolve("native")
