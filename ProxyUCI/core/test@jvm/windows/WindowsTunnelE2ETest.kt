@@ -88,7 +88,7 @@ class WindowsTunnelE2ETest {
 
             // 1. El DNS del sistema responde con una dirección falsa del túnel: el adaptador gana al DNS real.
             val name = "e2e-${System.nanoTime()}.uci.test"
-            val address = InetAddress.getByName(name)
+            val address = resolveOrDiagnose(name)
             assertTrue(address.hostAddress.startsWith("10."), "$name resolvió a ${address.hostAddress}, no a una dirección del túnel")
 
             // 2. Una descarga de 5 MB por esa dirección llega íntegra: Wintun, pila TCP, relé y proxy NTLM.
@@ -104,6 +104,37 @@ class WindowsTunnelE2ETest {
             scope.cancel()
             stopKoin()
         }
+    }
+
+    /**
+     * Resuelve [name] con el DNS del sistema, reintentando unos segundos: Windows puede tardar un instante en
+     * empezar a usar el servidor DNS de un adaptador recién configurado. Si no resuelve, vuelca el estado de la
+     * red **mientras el túnel sigue activo** (después de limpiar ya no habría nada que ver) y consulta al servidor
+     * DNS del túnel directamente, para distinguir «el túnel no responde» de «Windows no lo consulta».
+     */
+    private fun resolveOrDiagnose(name: String): InetAddress {
+        var last: Exception? = null
+        repeat(10) {
+            try {
+                return InetAddress.getByName(name)
+            } catch (e: java.net.UnknownHostException) {
+                last = e
+                Thread.sleep(1_000)
+            }
+        }
+        val runner = ProcessCommandRunner()
+        fun show(title: String, vararg command: String) =
+            println("E2E-DIAG [$title]\n" + runner.run(command.toList(), null).output.trim())
+        show("rutas", "route", "print", "-4")
+        show("interfaces", "netsh", "interface", "ipv4", "show", "interfaces")
+        show("DNS por interfaz", "netsh", "interface", "ipv4", "show", "dnsservers")
+        show("configuración", "ipconfig", "/all")
+        val dnsServer = runner.run(listOf("netsh", "interface", "ipv4", "show", "dnsservers", "name=${WinPlatformTunnel.ADAPTER_NAME}"), null)
+            .output.lineSequence().mapNotNull { Regex("""(\d+\.\d+\.\d+\.\d+)""").find(it)?.value }.firstOrNull()
+        println("E2E-DIAG servidor DNS del adaptador: $dnsServer")
+        if (dnsServer != null) show("nslookup directo al DNS del túnel", "nslookup", name, dnsServer)
+        show("Resolve-DnsName", "powershell", "-NoProfile", "-Command", "Resolve-DnsName $name -Type A -ErrorAction Continue | Out-String")
+        throw AssertionError("Windows no resolvió $name por el DNS del túnel: $last")
     }
 
     private fun nativeDirectory(): Path =
