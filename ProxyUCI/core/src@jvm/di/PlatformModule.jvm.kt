@@ -8,14 +8,18 @@ import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
 import org.uci.proxy.core.engine.UnavailableTunnel
 import org.uci.proxy.core.platform.FileKeyValueStore
+import org.uci.proxy.core.platform.JavaHostResolver
 import org.uci.proxy.core.platform.JavaSecureRandomBytes
+import org.uci.proxy.core.platform.JvmLocalAddresses
 import org.uci.proxy.core.platform.JvmAppDirectories
 import org.uci.proxy.core.platform.JvmPlatformInfo
 import org.uci.proxy.core.platform.MacKeychainSecretStore
 import org.uci.proxy.core.platform.Slf4jLogger
 import org.uci.proxy.core.platform.WindowsDpapiProtector
 import org.uci.proxy.core.port.GrantedLocalNetworkPermission
+import org.uci.proxy.core.port.HostResolver
 import org.uci.proxy.core.port.KeyValueStore
+import org.uci.proxy.core.port.LocalAddresses
 import org.uci.proxy.core.port.LocalNetworkPermission
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.PlatformInfo
@@ -40,8 +44,12 @@ actual val platformModule: Module = module {
     singleOf(::Slf4jLogger) { bind<Logger>() }
     singleOf(::JavaSecureRandomBytes) { bind<RandomBytes>() }
     singleOf(::GrantedLocalNetworkPermission) { bind<LocalNetworkPermission>() }
-    // El túnel de escritorio llega en las capas 5 y 6.
+    // Sin túnel por defecto. En macOS la app de escritorio lo sustituye en su propio módulo, que es
+    // donde se sabe cómo relanzar el programa como motor; el de Windows llega en la capa 6.
     singleOf(::UnavailableTunnel) { binds(listOf(TunnelControl::class, TunnelMonitor::class)) }
+    // Lo que necesita el proceso del motor además de tunnelModule.
+    singleOf(::JvmLocalAddresses) { bind<LocalAddresses>() }
+    single<HostResolver> { JavaHostResolver(get<AppDispatchers>().background) }
     single { JvmAppDirectories.fromSystem(get()) }
     single<KeyValueStore> { FileKeyValueStore(get<JvmAppDirectories>().dataDir.resolve("settings.properties")) }
     single<SecretStore> {

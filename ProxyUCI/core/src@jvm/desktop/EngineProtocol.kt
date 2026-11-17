@@ -1,0 +1,63 @@
+package org.uci.proxy.core.desktop
+
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import org.uci.proxy.core.model.ProxyProfile
+import org.uci.proxy.core.port.TunnelFailure
+import org.uci.proxy.core.port.TunnelState
+
+/*
+ * Protocolo entre la ventana de escritorio y el proceso del motor, que corre con privilegios
+ * porque crear la interfaz de red lo exige. Van por un socket local, una línea de texto por mensaje:
+ *
+ *   motor   -> ventana : <token>                    se identifica con el token que recibió al arrancar
+ *   ventana -> motor   : START <json de EngineStart>
+ *   motor   -> ventana : STATE connected | STATE disconnected | STATE failed <TunnelFailure>
+ *   ventana -> motor   : STOP
+ *
+ * Si cualquiera de los dos cierra el socket, el otro da el túnel por terminado. Así el motor nunca
+ * queda huérfano con privilegios si la ventana se cierra.
+ */
+
+@Serializable
+data class EngineStart(val profile: ProxyProfile, val password: String)
+
+object EngineProtocol {
+    private val json = Json { ignoreUnknownKeys = true }
+
+    const val STOP = "STOP"
+    private const val START_PREFIX = "START "
+    private const val STATE_PREFIX = "STATE "
+
+    fun encodeStart(start: EngineStart): String = START_PREFIX + json.encodeToString(EngineStart.serializer(), start)
+
+    /** @return null si [line] no es un START válido. */
+    fun decodeStart(line: String): EngineStart? {
+        if (!line.startsWith(START_PREFIX)) return null
+        return try {
+            json.decodeFromString(EngineStart.serializer(), line.removePrefix(START_PREFIX))
+        } catch (_: kotlinx.serialization.SerializationException) {
+            null
+        }
+    }
+
+    /** Solo se transmiten los estados que produce el motor; "conectando" lo pone la propia ventana. */
+    fun encodeState(state: TunnelState): String? = when (state) {
+        is TunnelState.Connected -> STATE_PREFIX + "connected"
+        TunnelState.Disconnected -> STATE_PREFIX + "disconnected"
+        is TunnelState.Failed -> STATE_PREFIX + "failed " + state.failure.name
+        is TunnelState.Connecting -> null
+    }
+
+    /** @param profileId el perfil con el que la ventana pidió conectar. */
+    fun decodeState(line: String, profileId: String): TunnelState? {
+        if (!line.startsWith(STATE_PREFIX)) return null
+        val parts = line.removePrefix(STATE_PREFIX).split(' ')
+        return when (parts[0]) {
+            "connected" -> TunnelState.Connected(profileId)
+            "disconnected" -> TunnelState.Disconnected
+            "failed" -> TunnelFailure.entries.firstOrNull { it.name == parts.getOrNull(1) }?.let(TunnelState::Failed)
+            else -> null
+        }
+    }
+}

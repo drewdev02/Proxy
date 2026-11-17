@@ -3,8 +3,9 @@
 #   python3 tools/test_proxy.py --auth ntlm --port 3128 --upstream
 # Deja el túnel conectado para comprobarlo desde fuera de la app:
 #   adb shell ping -c 1 cualquier.nombre.test   -> resuelve a una dirección 10.x.1.y
-#   adb shell 'printf "GET / HTTP/1.0\r\nHost: example.com\r\n\r\n" | nc -w 8 example.com 80 | head -1'
+#   adb shell '(printf "GET / HTTP/1.0\r\nHost: example.com\r\n\r\n"; sleep 6) | nc -w 10 example.com 80 | head -1'
 #                                               -> HTTP/1.x 200, servido a través del proxy
+#   (el sleep mantiene abierto el envío: si nc lo cierra nada más pedir, example.com no contesta, tampoco sin túnel)
 # Después se desconecta con tunel-android-desconectar.yaml.
 # El emulador debe tener la pantalla encendida. Borra los datos de la app al empezar.
 appId: org.uci.proxy

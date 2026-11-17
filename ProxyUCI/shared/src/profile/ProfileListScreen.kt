@@ -188,6 +188,7 @@ private fun TunnelFailure.message(): String = when (this) {
         "No se pudo conectar: la app necesita permiso para acceder a la red local y alcanzar el proxy."
     TunnelFailure.PROFILE_NOT_FOUND -> "No se pudo conectar: el perfil ya no existe."
     TunnelFailure.INTERFACE_UNAVAILABLE -> "No se pudo conectar: el sistema no permitió crear la conexión VPN."
+    TunnelFailure.PROXY_HOST_UNRESOLVED -> "No se pudo conectar: no se encuentra el servidor del perfil."
 }
 
 private fun ProxyProfile.summary(): String {

@@ -13,9 +13,11 @@ import org.uci.proxy.core.platform.AndroidLocalAddresses
 import org.uci.proxy.core.platform.AndroidLocalNetworkPermission
 import org.uci.proxy.core.platform.AndroidVpnConsent
 import org.uci.proxy.core.platform.AndroidPlatformInfo
+import org.uci.proxy.core.platform.JavaHostResolver
 import org.uci.proxy.core.platform.JavaSecureRandomBytes
 import org.uci.proxy.core.platform.LogcatLogger
 import org.uci.proxy.core.platform.SharedPreferencesKeyValueStore
+import org.uci.proxy.core.port.HostResolver
 import org.uci.proxy.core.port.KeyValueStore
 import org.uci.proxy.core.port.LocalAddresses
 import org.uci.proxy.core.port.LocalNetworkPermission
@@ -41,6 +43,7 @@ actual val platformModule: Module = module {
     single { AndroidLocalNetworkPermission(get<Context>(), ActivityPrompt()) } bind LocalNetworkPermission::class
     single { AndroidVpnConsent(get<Context>(), ActivityPrompt()) }
     singleOf(::AndroidLocalAddresses) { bind<LocalAddresses>() }
+    single<HostResolver> { JavaHostResolver(get<AppDispatchers>().background) }
     single<KeyValueStore> { SharedPreferencesKeyValueStore(get<Context>(), SETTINGS_FILE) }
     single<SecretStore> {
         EncryptedSecretStore(

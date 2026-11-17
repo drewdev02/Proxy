@@ -201,6 +201,9 @@ class TunnelRunnerTest {
     private val platformTunnel = FakePlatformTunnel()
     private val connector = FakeProxyConnector.connectingTo(FakeTunnelConnection())
 
+    /** Lo que "resuelve" el DNS real en estas pruebas. */
+    private val resolvedHosts = mutableMapOf("proxy.uci.cu" to "10.8.0.20")
+
     private fun TestScope.newRunner(): Pair<TunnelRunner, StoredProfileRepository> {
         val dispatchers = AppDispatchers(background = UnconfinedTestDispatcher(testScheduler))
         val repository = StoredProfileRepository(InMemoryKeyValueStore(), InMemorySecretStore(), dispatchers, logger)
@@ -208,6 +211,7 @@ class TunnelRunnerTest {
             profiles = repository,
             addressPlanner = TunAddressPlanner(localAddresses = { emptyList() }, randomBytes = { ByteArray(it) { 56 } }),
             engineFactory = TunnelEngineFactory(listOf(connector), { ByteArray(it) { 1 } }, testScheduler.timeSource, logger),
+            hostResolver = { host -> resolvedHosts[host] },
             stateStore = stateStore,
             dispatchers = dispatchers,
             logger = logger,
@@ -226,6 +230,28 @@ class TunnelRunnerTest {
         assertEquals("10.57.0.1", config.address)
         assertEquals("10.57.0.2", config.dnsServer)
         assertEquals(1500, config.mtu)
+        assertEquals("10.8.0.20", config.proxyAddress, "la dirección real del proxy, resuelta antes de levantar el túnel")
+        assertEquals(TunnelState.Connected("p1"), stateStore.state.value)
+        job.cancel()
+    }
+
+    @Test
+    fun `a proxy name that does not resolve fails before touching the network`() = runTest {
+        val (runner, repository) = newRunner()
+        repository.save(PROFILE, "")
+        resolvedHosts.clear()
+
+        runner.run(platformTunnel, PROFILE.id)
+
+        assertEquals(TunnelState.Failed(TunnelFailure.PROXY_HOST_UNRESOLVED), stateStore.state.value)
+        assertEquals(null, platformTunnel.config)
+    }
+
+    @Test
+    fun `a profile handed over directly runs without being stored`() = runTest(UnconfinedTestDispatcher()) {
+        val (runner, _) = newRunner()
+        val job = launch { runner.run(platformTunnel, PROFILE, password = "secreta") }
+
         assertEquals(TunnelState.Connected("p1"), stateStore.state.value)
         job.cancel()
     }

@@ -1,0 +1,328 @@
+package org.uci.proxy.core.desktop
+
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import org.uci.proxy.core.dns.dnsQuery
+import org.uci.proxy.core.engine.TunAddressPlanner
+import org.uci.proxy.core.engine.TunnelEngineFactory
+import org.uci.proxy.core.engine.TunnelRunner
+import org.uci.proxy.core.engine.TunnelStateStore
+import org.uci.proxy.core.fakes.FakePlatformTunnel
+import org.uci.proxy.core.fakes.FakeProxyConnector
+import org.uci.proxy.core.fakes.FakeTunnelConnection
+import org.uci.proxy.core.fakes.InMemoryKeyValueStore
+import org.uci.proxy.core.fakes.InMemorySecretStore
+import org.uci.proxy.core.fakes.RecordingLogger
+import org.uci.proxy.core.model.ProxyProfile
+import org.uci.proxy.core.model.ProxyProtocol
+import org.uci.proxy.core.packet.buildUdpPacket
+import org.uci.proxy.core.packet.parseIpv4
+import org.uci.proxy.core.port.TunnelFailure
+import org.uci.proxy.core.port.TunnelState
+import org.uci.proxy.core.profile.AppDispatchers
+import org.uci.proxy.core.profile.StoredProfileRepository
+import java.net.InetAddress
+import java.net.Socket
+import java.nio.file.Files
+import java.nio.file.Path
+import kotlin.io.path.exists
+import kotlin.test.AfterTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
+
+class EngineProtocolTest {
+    private val profile = ProxyProfile("p1", "UCI", "proxy.uci.cu", 3128, ProxyProtocol.HTTP, "andrey")
+
+    @Test
+    fun `a start order survives the round trip including awkward passwords`() {
+        val start = EngineStart(profile, password = "con espacios \"comillas\" ñ \\ y\nsalto")
+
+        val line = EngineProtocol.encodeStart(start)
+
+        assertFalse('\n' in line, "un mensaje es una sola línea")
+        assertEquals(start, EngineProtocol.decodeStart(line))
+    }
+
+    @Test
+    fun `lines that are not a valid start are rejected`() {
+        assertNull(EngineProtocol.decodeStart("STOP"))
+        assertNull(EngineProtocol.decodeStart("START {no es json"))
+        assertNull(EngineProtocol.decodeStart("START {}"))
+    }
+
+    @Test
+    fun `engine states survive the round trip`() {
+        fun roundTrip(state: TunnelState) = EngineProtocol.decodeState(EngineProtocol.encodeState(state)!!, "p1")
+
+        assertEquals(TunnelState.Connected("p1"), roundTrip(TunnelState.Connected("otro-id-del-motor")))
+        assertEquals(TunnelState.Disconnected, roundTrip(TunnelState.Disconnected))
+        TunnelFailure.entries.forEach { assertEquals(TunnelState.Failed(it), roundTrip(TunnelState.Failed(it))) }
+    }
+
+    @Test
+    fun `connecting is never sent and unknown lines are ignored`() {
+        assertNull(EngineProtocol.encodeState(TunnelState.Connecting("p1")))
+        assertNull(EngineProtocol.decodeState("STATE failed ALGO_NUEVO", "p1"))
+        assertNull(EngineProtocol.decodeState("cualquier cosa", "p1"))
+    }
+}
+
+class MacElevatedEngineLauncherTest {
+    @Test
+    fun `arguments are quoted for the shell and the whole line for AppleScript`() {
+        val command = MacElevatedEngineLauncher.osascriptCommand(
+            listOf("/Library/Java/bin/java", "-cp", "/Users/a b/app's \"libs\"/*", "org.uci.proxy.MainKt", "--engine"),
+        )
+
+        assertEquals(listOf("/usr/bin/osascript", "-e"), command.take(2))
+        assertEquals(
+            "do shell script \"'/Library/Java/bin/java' '-cp' '/Users/a b/app'\\\\''s \\\"libs\\\"/*' 'org.uci.proxy.MainKt' '--engine'\" " +
+                "with prompt \"ProxyUCI necesita permisos de administrador para crear la conexión de red.\" " +
+                "with administrator privileges",
+            command[2],
+        )
+    }
+
+    @Test
+    fun `shell quoting leaves nothing for the shell to interpret`() {
+        assertEquals("'\$HOME; rm -rf /'", MacElevatedEngineLauncher.shellQuote("\$HOME; rm -rf /"))
+        assertEquals("'it'\\''s'", MacElevatedEngineLauncher.shellQuote("it's"))
+    }
+
+    @Test
+    fun `option values are read by name`() {
+        val args = listOf("--engine", "--port", "5000", "--token-file", "/tmp/t")
+
+        assertEquals("5000", EngineArguments.value(args, EngineArguments.PORT))
+        assertEquals("/tmp/t", EngineArguments.value(args, EngineArguments.TOKEN_FILE))
+        assertNull(EngineArguments.value(args, EngineArguments.ROUTES))
+        assertNull(EngineArguments.value(listOf("--port"), EngineArguments.PORT))
+    }
+}
+
+/**
+ * La ventana y el motor de verdad, hablando por un socket local real. Lo único simulado es el
+ * lanzamiento con privilegios (el motor corre en este mismo proceso) y la interfaz de red.
+ */
+class DesktopTunnelIntegrationTest {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val dispatchers = AppDispatchers(background = Dispatchers.IO)
+    private val logger = RecordingLogger()
+    private val profile = ProxyProfile("p1", "UCI", "proxy.uci.cu", 3128, ProxyProtocol.HTTP, "andrey")
+    private val repository = StoredProfileRepository(InMemoryKeyValueStore(), InMemorySecretStore(), dispatchers, logger)
+
+    // Lado del motor.
+    private val platformTunnel = FakePlatformTunnel()
+    private val connector = FakeProxyConnector.connectingTo(FakeTunnelConnection())
+    private var receivedStart: EngineStart? = null
+    private var tokenFileSeen: Path? = null
+
+    /** Qué hace el "lanzamiento con privilegios" en cada prueba. */
+    private var launchBehaviour: (port: Int, tokenFile: Path) -> EngineProcess = ::launchInProcess
+
+    private fun engineSession(maxDuration: Duration? = null): EngineSession {
+        val stateStore = TunnelStateStore()
+        val runner = TunnelRunner(
+            profiles = repository,
+            addressPlanner = TunAddressPlanner(localAddresses = { emptyList() }, randomBytes = { ByteArray(it) { 56 } }),
+            engineFactory = TunnelEngineFactory(listOf(connector), { ByteArray(it) { 1 } }, TimeSource.Monotonic, logger),
+            hostResolver = { host -> "10.8.0.20".also { receivedHost = host } },
+            stateStore = stateStore,
+            dispatchers = dispatchers,
+            logger = logger,
+        )
+        return EngineSession(runner, stateStore, platformTunnel, Dispatchers.IO, logger, maxDuration)
+    }
+
+    private var receivedHost: String? = null
+    private var engineMaxDuration: Duration? = null
+
+    private fun launchInProcess(port: Int, tokenFile: Path): EngineProcess {
+        tokenFileSeen = tokenFile
+        val token = Files.readString(tokenFile)
+        val job = scope.launch {
+            Socket(InetAddress.getLoopbackAddress(), port).use { engineSession(engineMaxDuration).serve(it, token) }
+        }
+        return object : EngineProcess {
+            override val isAlive get() = job.isActive
+
+            override fun destroy() {
+                job.cancel()
+            }
+        }
+    }
+
+    private val controller = DesktopTunnelController(
+        profiles = repository,
+        launcher = EngineLauncher { port, tokenFile -> launchBehaviour(port, tokenFile) },
+        randomBytes = { ByteArray(it) { 7 } },
+        dispatchers = dispatchers,
+        logger = logger,
+        launchTimeout = 5.seconds,
+    )
+
+    @AfterTest
+    fun cleanUp() {
+        scope.cancel()
+    }
+
+    private suspend fun awaitState(predicate: (TunnelState) -> Boolean): TunnelState =
+        withTimeout(10.seconds) { controller.state.first(predicate) }
+
+    @Test
+    fun `connecting launches the engine, hands it the profile and reports connected`() = runBlocking {
+        repository.save(profile, "secreta")
+
+        controller.connect(profile.id)
+
+        assertEquals(TunnelState.Connected("p1"), awaitState { it is TunnelState.Connected })
+        assertEquals("UCI", platformTunnel.config?.sessionName)
+        assertEquals("proxy.uci.cu", receivedHost, "el motor recibió el perfil completo")
+        controller.disconnect()
+        awaitState { it == TunnelState.Disconnected }
+    }
+
+    @Test
+    fun `the tunnel run by the engine really works while connected`() = runBlocking {
+        repository.save(profile, "secreta")
+        controller.connect(profile.id)
+        awaitState { it is TunnelState.Connected }
+
+        val app = parseIpv4("10.57.0.1")!!
+        val dns = parseIpv4("10.57.0.2")!!
+        platformTunnel.tun.inject(buildUdpPacket(app, dns, 41000, 53, dnsQuery("uci.cu")))
+
+        withTimeout(5.seconds) { while (platformTunnel.tun.written.isEmpty()) kotlinx.coroutines.delay(20) }
+        controller.disconnect()
+        awaitState { it == TunnelState.Disconnected }
+    }
+
+    @Test
+    fun `disconnecting stops the engine and closes the interface`() = runBlocking {
+        repository.save(profile, "secreta")
+        controller.connect(profile.id)
+        awaitState { it is TunnelState.Connected }
+
+        controller.disconnect()
+
+        assertEquals(TunnelState.Disconnected, awaitState { it == TunnelState.Disconnected })
+        assertTrue(platformTunnel.tun.closed)
+    }
+
+    @Test
+    fun `the token file is private and removed when the session ends`() = runBlocking {
+        repository.save(profile, "secreta")
+        controller.connect(profile.id)
+        awaitState { it is TunnelState.Connected }
+        val tokenFile = tokenFileSeen!!
+        assertEquals("rw-------", java.nio.file.attribute.PosixFilePermissions.toString(Files.getPosixFilePermissions(tokenFile)))
+
+        controller.disconnect()
+        awaitState { it == TunnelState.Disconnected }
+
+        assertFalse(tokenFile.exists())
+    }
+
+    @Test
+    fun `an engine that cannot create the interface is reported as a failure`() = runBlocking {
+        repository.save(profile, "secreta")
+        platformTunnel.failWith = "no es root"
+
+        controller.connect(profile.id)
+
+        assertEquals(TunnelState.Failed(TunnelFailure.INTERFACE_UNAVAILABLE), awaitState { it is TunnelState.Failed })
+    }
+
+    @Test
+    fun `cancelling the administrator prompt is reported as permission denied`() = runBlocking {
+        repository.save(profile, "secreta")
+        // Como osascript cuando se cancela la contraseña: el proceso termina sin que el motor llegue a existir.
+        launchBehaviour = { _, _ ->
+            object : EngineProcess {
+                override val isAlive = false
+
+                override fun destroy() = Unit
+            }
+        }
+
+        controller.connect(profile.id)
+
+        assertEquals(TunnelState.Failed(TunnelFailure.VPN_PERMISSION_DENIED), awaitState { it is TunnelState.Failed })
+    }
+
+    @Test
+    fun `a local process that connects without the token is not trusted with the profile`() = runBlocking {
+        repository.save(profile, "secreta")
+        var intruderGot: String? = "sin respuesta"
+        launchBehaviour = { port, _ ->
+            val job = scope.launch {
+                Socket(InetAddress.getLoopbackAddress(), port).use { socket ->
+                    socket.getOutputStream().write("token-inventado\n".toByteArray())
+                    intruderGot = socket.getInputStream().bufferedReader().readLine()
+                }
+            }
+            object : EngineProcess {
+                override val isAlive get() = job.isActive
+
+                override fun destroy() = job.cancel()
+            }
+        }
+
+        controller.connect(profile.id)
+
+        awaitState { it is TunnelState.Failed }
+        kotlinx.coroutines.delay(200.milliseconds)
+        assertNull(intruderGot, "no recibió ni el perfil ni la contraseña")
+    }
+
+    @Test
+    fun `an engine that reaches its time limit disconnects on its own`() = runBlocking {
+        repository.save(profile, "secreta")
+        engineMaxDuration = 300.milliseconds
+
+        controller.connect(profile.id)
+        awaitState { it is TunnelState.Connected }
+
+        assertEquals(TunnelState.Disconnected, awaitState { it == TunnelState.Disconnected })
+        assertTrue(platformTunnel.tun.closed)
+    }
+
+    @Test
+    fun `connecting with an unknown profile fails without launching anything`() = runBlocking {
+        var launched = false
+        launchBehaviour = { port, file -> launched = true; launchInProcess(port, file) }
+
+        controller.connect("no-existe")
+
+        assertEquals(TunnelState.Failed(TunnelFailure.PROFILE_NOT_FOUND), controller.state.value)
+        assertFalse(launched)
+    }
+
+    @Test
+    fun `after a session ends a new one can be started`() = runBlocking {
+        repository.save(profile, "secreta")
+        controller.connect(profile.id)
+        awaitState { it is TunnelState.Connected }
+        controller.disconnect()
+        awaitState { it == TunnelState.Disconnected }
+
+        controller.connect(profile.id)
+
+        assertEquals(TunnelState.Connected("p1"), awaitState { it is TunnelState.Connected })
+        controller.disconnect()
+        awaitState { it == TunnelState.Disconnected }
+    }
+}

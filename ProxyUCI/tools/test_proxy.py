@@ -11,6 +11,10 @@ Uso:
     python3 tools/test_proxy.py --auth none --upstream
 
 Desde el emulador de Android el equipo anfitrión es 10.0.2.2; desde el simulador de iOS, 127.0.0.1.
+
+Para probar el túnel de escritorio en esta misma máquina, el proxy tiene que salir por la interfaz
+física sin pasar por el túnel:
+    python3 tools/test_proxy.py --auth ntlm --upstream --bind-interface en0
 Solo para desarrollo: escucha sin cifrar y no debe exponerse fuera del equipo.
 """
 
@@ -107,6 +111,74 @@ def verify_type3(message: bytes, server_challenge: bytes, user: str, password: s
     expected = hmac.new(key, server_challenge + blob, hashlib.md5).digest()
     ok = hmac.compare_digest(proof, expected)
     return ok, f"usuario '{sent_domain}\\{sent_user}', prueba {'correcta' if ok else 'incorrecta'}"
+
+
+IP_BOUND_IF = 25  # macOS: fuerza que el socket salga por una interfaz concreta, ignore lo que digan las rutas
+
+
+def bind_to_interface(sock: socket.socket, interface):
+    if interface:
+        sock.setsockopt(socket.IPPROTO_IP, IP_BOUND_IF, struct.pack("I", socket.if_nametoindex(interface)))
+
+
+def resolve_ipv4(name: str, dns_server: str, interface) -> str:
+    """Consulta A mínima por UDP, saliendo por [interface].
+
+    Hace falta cuando el túnel corre en esta misma máquina: el DNS del sistema devuelve entonces
+    direcciones inventadas, y el proxy necesita las reales.
+    """
+    try:
+        socket.inet_aton(name)
+        return name
+    except OSError:
+        pass
+    query_id = os.urandom(2)
+    question = b"".join(bytes([len(label)]) + label.encode() for label in name.strip(".").split(".")) + b"\x00"
+    query = query_id + b"\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00" + question + b"\x00\x01\x00\x01"
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        bind_to_interface(sock, interface)
+        # UDP se pierde con facilidad en redes malas (un punto de acceso móvil, por ejemplo): se reintenta.
+        sock.settimeout(1.5)
+        for attempt in range(4):
+            sock.sendto(query, (dns_server, 53))
+            try:
+                reply, _ = sock.recvfrom(4096)
+                break
+            except socket.timeout:
+                if attempt == 3:
+                    raise
+
+    def skip_name(position):
+        while True:
+            length = reply[position]
+            if length == 0:
+                return position + 1
+            if length & 0xC0:  # puntero de compresión: ocupa dos bytes y termina el nombre
+                return position + 2
+            position += 1 + length
+
+    answers = struct.unpack_from(">H", reply, 6)[0]
+    position = skip_name(12) + 4
+    for _ in range(answers):
+        position = skip_name(position)
+        record_type, _, _, length = struct.unpack_from(">HHIH", reply, position)
+        position += 10
+        if record_type == 1 and length == 4:
+            return socket.inet_ntoa(reply[position:position + 4])
+        position += length  # CNAME u otro registro: se sigue buscando el A
+    raise OSError(f"{name} no resuelve")
+
+
+def system_dns_server() -> str:
+    """Primer servidor DNS IPv4 del sistema (macOS)."""
+    import subprocess
+    output = subprocess.run(["scutil", "--dns"], capture_output=True, text=True).stdout
+    for line in output.splitlines():
+        if "nameserver[" in line:
+            address = line.split(":", 1)[1].strip()
+            if address.count(".") == 3:
+                return address
+    return "8.8.8.8"
 
 
 class Handler(threading.Thread):
@@ -206,7 +278,17 @@ class Handler(threading.Thread):
         if self.options.upstream:
             host, _, port = authority.rpartition(":")
             try:
-                upstream = socket.create_connection((host, int(port)), timeout=10)
+                if self.options.bind_interface:
+                    address = resolve_ipv4(host, self.options.dns, self.options.bind_interface)
+                    upstream = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    # Las direcciones locales (127.x) no salen por ninguna interfaz física.
+                    if not address.startswith("127."):
+                        bind_to_interface(upstream, self.options.bind_interface)
+                    upstream.settimeout(10)
+                    upstream.connect((address, int(port)))
+                    upstream.settimeout(None)
+                else:
+                    upstream = socket.create_connection((host, int(port)), timeout=10)
             except OSError as error:
                 self.log(f"{line} -> 502 ({error})")
                 self.respond("502 Bad Gateway", body=str(error).encode())
@@ -247,7 +329,14 @@ def main():
     parser.add_argument("--password", default="secreta7")
     parser.add_argument("--domain", default="UCI")
     parser.add_argument("--upstream", action="store_true", help="conectar de verdad con el destino en vez de simularlo")
+    parser.add_argument("--bind-interface", metavar="IFAZ",
+                        help="interfaz física (p. ej. en0) por la que sale el proxy; necesario cuando el túnel "
+                             "corre en esta misma máquina, para que su salida no vuelva a entrar en él")
+    parser.add_argument("--dns", help="servidor DNS real que usa el proxy con --bind-interface (por defecto, el del sistema)")
     options = parser.parse_args()
+    if options.bind_interface and not options.dns:
+        # Se lee al arrancar, antes de que exista el túnel.
+        options.dns = system_dns_server()
 
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)

@@ -15,6 +15,8 @@ val appModules: List<Module> = listOf(platformModule, coreModule, uiModule)
  * [config] permite añadir lo propio de la plataforma, como `androidContext`.
  */
 fun initKoin(config: KoinAppDeclaration? = null): KoinApplication = startKoin {
-    config?.invoke(this)
     modules(appModules)
+    // Después de los módulos comunes: lo que la app enlace en [config] sustituye a lo común,
+    // por ejemplo el túnel "no disponible" por el de verdad.
+    config?.invoke(this)
 }

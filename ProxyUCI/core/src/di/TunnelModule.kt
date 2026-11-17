@@ -15,7 +15,7 @@ import kotlin.time.TimeSource
 /**
  * Lo que necesita un proceso que ejecuta el túnel. Solo lo cargan esos procesos: hoy la app de
  * Android; más adelante la extensión de iOS y el proceso elevado de escritorio.
- * Requiere [coreModule] y que la plataforma enlace `LocalAddresses`.
+ * Requiere [coreModule] y que la plataforma enlace `LocalAddresses` y `HostResolver`.
  */
 val tunnelModule = module {
     singleOf(::TunnelStateStore) { bind<TunnelMonitor>() }
@@ -30,5 +30,16 @@ val tunnelModule = module {
             logger = get(),
         )
     }
-    singleOf(::TunnelRunner)
+    // Con get() explícitos: las rutas públicas usan el valor por defecto del constructor.
+    single {
+        TunnelRunner(
+            profiles = get(),
+            addressPlanner = get(),
+            engineFactory = get(),
+            hostResolver = get(),
+            stateStore = get(),
+            dispatchers = get(),
+            logger = get(),
+        )
+    }
 }

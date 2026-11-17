@@ -30,6 +30,11 @@ data class TunConfig(
     val mtu: Int,
     /** Destinos cuyo tráfico entra en el túnel: la subred virtual del DNS falso y todo el IPv4 público. */
     val routes: List<Ipv4Route>,
+    /**
+     * Dirección IPv4 del proxy. Las conexiones hacia ella deben salir por la red real, nunca por el
+     * túnel; cada plataforma lo garantiza a su manera.
+     */
+    val proxyAddress: String,
 )
 
 class TunnelUnavailableException(message: String) : Exception(message)
@@ -52,6 +57,9 @@ enum class TunnelFailure {
 
     /** El sistema no permitió crear la interfaz. */
     INTERFACE_UNAVAILABLE,
+
+    /** El nombre del servidor proxy no se pudo resolver a una dirección. */
+    PROXY_HOST_UNRESOLVED,
 }
 
 sealed interface TunnelState {
@@ -77,6 +85,17 @@ interface TunnelControl {
 /** Lo que la interfaz de usuario usa para observar. */
 interface TunnelMonitor {
     val state: StateFlow<TunnelState>
+}
+
+/**
+ * Resuelve el nombre del proxy con el DNS real, antes de levantar el túnel.
+ *
+ * Una vez activo el túnel el DNS del equipo devuelve direcciones inventadas, así que el motor
+ * tiene que conectar con el proxy por su dirección y no por su nombre.
+ */
+fun interface HostResolver {
+    /** @return la dirección IPv4 en notación con puntos, o null si el nombre no resuelve. */
+    suspend fun resolveIpv4(host: String): String?
 }
 
 /** Direcciones IPv4 de las interfaces de red del equipo, para no elegir una subred que ya esté en uso. */
