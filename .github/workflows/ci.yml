@@ -52,47 +52,44 @@ jobs:
       - uses: actions/checkout@v4
       - name: Poner el tar de Windows primero
         run: Add-Content -Path $env:GITHUB_PATH -Value "C:\Windows\System32"
-      - name: Servidores de prueba (origen HTTP y proxy NTLM)
-        run: |
-          $www = Join-Path $env:RUNNER_TEMP "www"
-          python tools/e2e_fixture.py $www
-          $sha = (Get-Content (Join-Path $www "big.sha")).Trim()
-          "PROXYUCI_E2E_BIG_SHA=$sha" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          Start-Process python -ArgumentList "-u","-m","http.server","8000","--bind","127.0.0.1","--directory",$www `
-            -WindowStyle Hidden -RedirectStandardOutput (Join-Path $env:RUNNER_TEMP "origen.log") -RedirectStandardError (Join-Path $env:RUNNER_TEMP "origen.err")
-          # -u: sin búfer; si no, Python no escribe su registro en el archivo hasta que acaba.
-          Start-Process python -ArgumentList "-u","tools/test_proxy.py","--auth","ntlm","--port","3128","--upstream","--redirect","127.0.0.1:8000" `
-            -WindowStyle Hidden -RedirectStandardOutput (Join-Path $env:RUNNER_TEMP "proxy.log") -RedirectStandardError (Join-Path $env:RUNNER_TEMP "proxy.err")
-          Start-Sleep -Seconds 3
-          $size = (Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:8000/big.bin").RawContentLength
-          if ($size -ne 5242880) { throw "El origen sirve $size bytes" }
-          if (-not (Test-NetConnection 127.0.0.1 -Port 3128 -InformationLevel Quiet)) { throw "El proxy no escucha en 3128" }
       - name: Administrador
         run: |
           $admin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
           "Administrador: $admin"
           if (-not $admin) { throw "El ejecutor no corre como Administrador" }
-      - name: Los servidores de prueba siguen vivos
-        run: |
-          Get-Process python -ErrorAction SilentlyContinue | Format-Table Id, ProcessName, StartTime
-          netstat -ano | Select-String ":3128|:8000"
-          if (-not (Test-NetConnection 127.0.0.1 -Port 3128 -InformationLevel Quiet)) { throw "El proxy ya no escucha en 3128" }
-          if (-not (Test-NetConnection 127.0.0.1 -Port 8000 -InformationLevel Quiet)) { throw "El origen ya no escucha en 8000" }
-      - name: Prueba del túnel
+      # Los servidores de prueba y la prueba van en el MISMO paso: en los ejecutores de Windows los procesos que un
+      # paso deja en segundo plano mueren al terminar ese paso (se comprobó: el paso siguiente ya no los encontraba).
+      - name: Prueba del túnel (con su origen HTTP y su proxy NTLM)
         env:
           PROXYUCI_E2E_WINDOWS: "1"
-        run: ./kotlin.bat test -m core --platform jvm --include-classes 'org.uci.proxy.core.windows.WindowsTunnelE2ETest'
-      - name: Registro del proxy
-        if: always()
         run: |
-          Get-Content (Join-Path $env:RUNNER_TEMP "proxy.log"), (Join-Path $env:RUNNER_TEMP "proxy.err") -ErrorAction SilentlyContinue | Select-Object -Last 40
-      - name: Estado de la red
-        if: failure()
-        run: |
-          route print -4
-          netsh interface ipv4 show interfaces
-          netsh interface ipv4 show dnsservers
-          ipconfig /all
+          $www = Join-Path $env:RUNNER_TEMP "www"
+          python tools/e2e_fixture.py $www
+          $env:PROXYUCI_E2E_BIG_SHA = (Get-Content (Join-Path $www "big.sha")).Trim()
+          $proxyLog = Join-Path $env:RUNNER_TEMP "proxy.log"
+          $proxyErr = Join-Path $env:RUNNER_TEMP "proxy.err"
+          $servers = @()
+          try {
+            $servers += Start-Process python -PassThru -WindowStyle Hidden `
+              -ArgumentList "-u","-m","http.server","8000","--bind","127.0.0.1","--directory",$www `
+              -RedirectStandardOutput (Join-Path $env:RUNNER_TEMP "origen.log") -RedirectStandardError (Join-Path $env:RUNNER_TEMP "origen.err")
+            # -u: sin búfer; si no, Python no escribe su registro en el archivo hasta que acaba.
+            $servers += Start-Process python -PassThru -WindowStyle Hidden `
+              -ArgumentList "-u","tools/test_proxy.py","--auth","ntlm","--port","3128","--upstream","--redirect","127.0.0.1:8000" `
+              -RedirectStandardOutput $proxyLog -RedirectStandardError $proxyErr
+            Start-Sleep -Seconds 3
+            $size = (Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:8000/big.bin").RawContentLength
+            if ($size -ne 5242880) { throw "El origen sirve $size bytes" }
+            if (-not (Test-NetConnection 127.0.0.1 -Port 3128 -InformationLevel Quiet)) { throw "El proxy no escucha en 3128" }
+
+            ./kotlin.bat test -m core --platform jvm --include-classes 'org.uci.proxy.core.windows.WindowsTunnelE2ETest'
+            $code = $LASTEXITCODE
+          } finally {
+            "--- registro del proxy de pruebas"
+            Get-Content $proxyLog, $proxyErr -ErrorAction SilentlyContinue | Select-Object -Last 40
+            $servers | ForEach-Object { Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue }
+          }
+          exit $code
 
   # Que la app de escritorio compile en Windows, con las librerías nativas de Compose de ese sistema.
   desktop-build-windows:
