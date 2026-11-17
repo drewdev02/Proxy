@@ -123,6 +123,55 @@ jobs:
           }
           if (-not ((Get-Content $report -Raw) -match [regex]::Escape("ProxyUCI.exe"))) { throw "La app no supo cuál es su .exe" }
           Get-ChildItem (Join-Path $env:ProgramFiles "ProxyUCI/app") | Format-Table Name
+      # La autoprueba no abre la interfaz: aquí se arranca la ventana de verdad con la Java recortada. Si faltara un
+      # módulo que Compose necesita, la Java muere en segundos. Sin tarjeta gráfica se usa el dibujado por software.
+      - name: Abrir la ventana del .exe
+        env:
+          SKIKO_RENDER_API: SOFTWARE_COMPAT
+        run: |
+          $exe = (Resolve-Path build/exe/ProxyUCI.exe).Path
+          $proceso = Start-Process $exe -PassThru
+          Start-Sleep -Seconds 25
+          $javaw = Get-Process javaw -ErrorAction SilentlyContinue
+          $javaw | Format-Table Id, MainWindowTitle, Responding
+          $titulo = ($javaw | Where-Object { $_.MainWindowTitle } | Select-Object -First 1).MainWindowTitle
+          "Título de la ventana: '$titulo'"
+          $vivo = -not $proceso.HasExited
+          $javaw | Stop-Process -Force -ErrorAction SilentlyContinue
+          if (-not $proceso.HasExited) { $proceso | Stop-Process -Force }
+          if (-not $vivo) { throw "El .exe terminó antes de 25 s (código $($proceso.ExitCode)): la ventana no arrancó" }
+          if ($titulo -ne "ProxyUCI") { throw "El .exe sigue vivo, pero no se encontró la ventana «ProxyUCI»" }
+      # Los servidores de prueba y la prueba van en el MISMO paso: los procesos que un paso deja en segundo plano
+      # mueren al terminar ese paso.
+      - name: Túnel real con el .exe como motor
+        env:
+          PROXYUCI_E2E_ORIGIN: "1"
+        run: |
+          $www = Join-Path $env:RUNNER_TEMP "www"
+          python tools/e2e_fixture.py $www
+          $env:PROXYUCI_E2E_BIG_SHA = (Get-Content (Join-Path $www "big.sha")).Trim()
+          $env:PROXYUCI_E2E_EXE = (Resolve-Path build/exe/ProxyUCI.exe).Path
+          $proxyLog = Join-Path $env:RUNNER_TEMP "proxy-exe.log"
+          $proxyErr = Join-Path $env:RUNNER_TEMP "proxy-exe.err"
+          $servers = @()
+          try {
+            $servers += Start-Process python -PassThru -WindowStyle Hidden `
+              -ArgumentList "-u","-m","http.server","8000","--bind","127.0.0.1","--directory",$www `
+              -RedirectStandardOutput (Join-Path $env:RUNNER_TEMP "origen-exe.log") -RedirectStandardError (Join-Path $env:RUNNER_TEMP "origen-exe.err")
+            $servers += Start-Process python -PassThru -WindowStyle Hidden `
+              -ArgumentList "-u","tools/test_proxy.py","--auth","ntlm","--port","3128","--upstream","--redirect","127.0.0.1:8000" `
+              -RedirectStandardOutput $proxyLog -RedirectStandardError $proxyErr
+            Start-Sleep -Seconds 3
+            if (-not (Test-NetConnection 127.0.0.1 -Port 3128 -InformationLevel Quiet)) { throw "El proxy no escucha en 3128" }
+
+            ./kotlin.bat test -m core --platform jvm --include-classes 'org.uci.proxy.core.windows.WindowsPackagedExeE2ETest'
+            $code = $LASTEXITCODE
+          } finally {
+            "--- registro del proxy de pruebas"
+            Get-Content $proxyLog, $proxyErr -ErrorAction SilentlyContinue | Select-Object -Last 40
+            $servers | ForEach-Object { Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue }
+          }
+          exit $code
       - uses: actions/upload-artifact@v4
         with:
           name: ProxyUCI-windows-x64
