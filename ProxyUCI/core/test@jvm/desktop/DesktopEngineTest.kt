@@ -228,7 +228,7 @@ class DesktopTunnelIntegrationTest {
         controller.connect(profile.id)
         awaitState { it is TunnelState.Connected }
         val tokenFile = tokenFileSeen!!
-        assertEquals("rw-------", java.nio.file.attribute.PosixFilePermissions.toString(Files.getPosixFilePermissions(tokenFile)))
+        assertOnlyOwnerCanAccess(tokenFile)
 
         controller.disconnect()
         awaitState { it == TunnelState.Disconnected }

@@ -23,7 +23,6 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.net.SocketTimeoutException
 import java.nio.file.Files
-import java.nio.file.attribute.PosixFilePermissions
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.TimeSource
@@ -88,7 +87,7 @@ class DesktopTunnelController(
     private fun runSession(profileId: String, start: EngineStart) {
         var failure: TunnelFailure? = null
         val token = randomBytes.next(TOKEN_BYTES).joinToString("") { "%02x".format(it) }
-        val tokenFile = Files.createTempFile("proxyuci-", ".token", PosixFilePermissions.asFileAttribute(OWNER_ONLY))
+        val tokenFile = PrivateFile.createTemp("proxyuci-", ".token")
         var engine: EngineProcess? = null
         try {
             Files.writeString(tokenFile, token)
@@ -172,6 +171,5 @@ class DesktopTunnelController(
         const val TAG = "DesktopTunnel"
         const val TOKEN_BYTES = 32
         const val ACCEPT_POLL_MS = 500
-        val OWNER_ONLY = PosixFilePermissions.fromString("rw-------")
     }
 }
