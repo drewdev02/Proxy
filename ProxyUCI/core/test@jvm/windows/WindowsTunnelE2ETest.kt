@@ -87,8 +87,7 @@ class WindowsTunnelE2ETest {
             assertTrue(state is TunnelState.Connected, "el túnel no conectó: $state")
 
             // 1. El DNS del sistema responde con una dirección falsa del túnel: el adaptador gana al DNS real.
-            val name = "e2e-${System.nanoTime()}.uci.test"
-            val address = resolveOrDiagnose(name)
+            val (name, address) = resolveOrDiagnose()
             assertTrue(address.hostAddress.startsWith("10."), "$name resolvió a ${address.hostAddress}, no a una dirección del túnel")
 
             // 2. Una descarga de 5 MB por esa dirección llega íntegra: Wintun, pila TCP, relé y proxy NTLM.
@@ -112,11 +111,17 @@ class WindowsTunnelE2ETest {
      * red **mientras el túnel sigue activo** (después de limpiar ya no habría nada que ver) y consulta al servidor
      * DNS del túnel directamente, para distinguir «el túnel no responde» de «Windows no lo consulta».
      */
-    private fun resolveOrDiagnose(name: String): InetAddress {
+    private fun resolveOrDiagnose(): Pair<String, InetAddress> {
+        // Java recuerda 10 s los nombres que no resolvieron: cada intento usa un nombre nuevo para no repetir ese fallo.
+        java.security.Security.setProperty("networkaddress.cache.negative.ttl", "0")
         var last: Exception? = null
-        repeat(10) {
+        var name = ""
+        repeat(10) { attempt ->
+            name = "e2e-${System.nanoTime()}.uci.test"
             try {
-                return InetAddress.getByName(name)
+                val address = InetAddress.getByName(name)
+                println("E2E-WINDOWS: $name resolvió a ${address.hostAddress} en el intento ${attempt + 1}")
+                return name to address
             } catch (e: java.net.UnknownHostException) {
                 last = e
                 Thread.sleep(1_000)
