@@ -13,6 +13,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.koin.core.context.startKoin
 import org.koin.core.context.stopKoin
+import org.koin.dsl.module
 import org.uci.proxy.core.di.coreModule
 import org.uci.proxy.core.di.platformModule
 import org.uci.proxy.core.di.tunnelModule
@@ -26,6 +27,7 @@ import org.uci.proxy.core.platform.windows.JnaWintunOpener
 import org.uci.proxy.core.platform.windows.ResourceWintunDllLocator
 import org.uci.proxy.core.platform.windows.WinNetwork
 import org.uci.proxy.core.platform.windows.WinPlatformTunnel
+import org.uci.proxy.core.port.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.profile.AppDispatchers
@@ -63,7 +65,9 @@ class WindowsTunnelE2ETest {
         val originPort = System.getenv(ORIGIN_PORT)?.toInt() ?: 8000
         val expectedSha = requireNotNull(System.getenv(BIG_SHA)) { "Falta $BIG_SHA" }
 
-        val koin = startKoin { modules(platformModule, coreModule, tunnelModule) }.koin
+        // El registro de la app va a la salida estándar: sin él, un fallo del túnel no deja ninguna pista.
+        val printLogger = module { single<Logger> { PrintLogger() } }
+        val koin = startKoin { modules(platformModule, coreModule, tunnelModule, printLogger) }.koin
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         try {
             val dispatchers = koin.get<AppDispatchers>()
@@ -168,6 +172,10 @@ class WindowsTunnelE2ETest {
 
     private fun listing(): String =
         ProcessCommandRunner().run(listOf("netsh", "interface", "ipv4", "show", "interfaces"), null).output
+
+    private class PrintLogger : Logger {
+        override fun log(level: LogLevel, tag: String, message: String) = println("APP $level $tag: $message")
+    }
 
     private companion object {
         const val ENABLE = "PROXYUCI_E2E_WINDOWS"

@@ -58,9 +58,10 @@ jobs:
           python tools/e2e_fixture.py $www
           $sha = (Get-Content (Join-Path $www "big.sha")).Trim()
           "PROXYUCI_E2E_BIG_SHA=$sha" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          Start-Process python -ArgumentList "-m","http.server","8000","--bind","127.0.0.1","--directory",$www `
+          Start-Process python -ArgumentList "-u","-m","http.server","8000","--bind","127.0.0.1","--directory",$www `
             -WindowStyle Hidden -RedirectStandardOutput (Join-Path $env:RUNNER_TEMP "origen.log") -RedirectStandardError (Join-Path $env:RUNNER_TEMP "origen.err")
-          Start-Process python -ArgumentList "tools/test_proxy.py","--auth","ntlm","--port","3128","--upstream","--redirect","127.0.0.1:8000" `
+          # -u: sin búfer; si no, Python no escribe su registro en el archivo hasta que acaba.
+          Start-Process python -ArgumentList "-u","tools/test_proxy.py","--auth","ntlm","--port","3128","--upstream","--redirect","127.0.0.1:8000" `
             -WindowStyle Hidden -RedirectStandardOutput (Join-Path $env:RUNNER_TEMP "proxy.log") -RedirectStandardError (Join-Path $env:RUNNER_TEMP "proxy.err")
           Start-Sleep -Seconds 3
           $size = (Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:8000/big.bin").RawContentLength
