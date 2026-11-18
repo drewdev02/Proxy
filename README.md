@@ -19,6 +19,10 @@ Use the run configurations provided by the run widget in your IDE's toolbar. You
 
 Run the project's tests with `./kotlin test`, or `./kotlin test -m <module>` for a single module.
 
+### Releases
+
+Pushing a `vX.Y.Z` tag builds and publishes the Android APK, the Windows `.exe` and the macOS `.dmg`. See [PUBLICAR.md](./PUBLICAR.md) (in Spanish) for how to publish, rehearse and set up the Android signing secrets.
+
 ---
 
 Learn more about [Kotlin Multiplatform](https://www.jetbrains.com/help/kotlin-multiplatform-dev/get-started.html), [Kotlin Toolchain](https://kotlin-toolchain.org/dev/), [Compose Multiplatform](https://kotlinlang.org/compose-multiplatform/).
