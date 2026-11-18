@@ -3,8 +3,30 @@
 Se autentica contra un proxy institucional (HTTP con NTLMv2 o Basic, o SOCKS5) y manda todo el tráfico del dispositivo
 por él, con una VPN local. Está hecho en Kotlin Multiplatform para Android, macOS, Windows e iOS.
 
-Funciona en Android, macOS y Windows. En iOS solo están los perfiles y «Probar proxy»; el túnel falta. Todo está probado
-contra un proxy de pruebas propio (`tools/test_proxy.py`), no contra el de la UCI.
+Funciona en Android, macOS y Windows. En iOS solo están los perfiles y «Probar proxy»; el túnel falta.
+
+## Cómo funciona
+
+```mermaid
+flowchart TD
+    app["Cualquier app"] -->|paquetes IP| tun["Interfaz TUN<br/>VpnService, utun o Wintun"]
+    tun --> motor["Motor"]
+    motor -->|consulta DNS| dns["DNS falso<br/>nombre a 10.x.1.y"]
+    dns -.->|IP falsa| app
+    motor -->|TCP| pila["Pila TCP<br/>en espacio de usuario"]
+    motor -->|otro UDP| icmp["Rechazo ICMP"]
+    pila --> rele["Relé<br/>averigua el destino"]
+    rele -->|"CONNECT con NTLMv2 o Basic, o SOCKS5"| proxy["Proxy institucional"]
+    proxy --> internet(("Internet"))
+```
+
+La app abre conexiones como siempre y el sistema las manda a la interfaz TUN. El motor lee los paquetes: contesta él
+mismo las consultas DNS con una dirección falsa por cada nombre, y termina las conexiones TCP con su propia pila. El
+relé sabe a qué nombre iba cada conexión por esa dirección falsa (o, si la app usó una IP directa, por el SNI o el
+`Host`) y abre el túnel hacia ese destino a través del proxy, autenticándose.
+
+En el escritorio la ventana no tiene privilegios: lanza el motor, que sí puede crear la interfaz, con el diálogo de
+administrador de macOS o el aviso de UAC de Windows, y habla con él por un socket local.
 
 ## Descargas
 
