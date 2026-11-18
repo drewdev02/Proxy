@@ -16,6 +16,7 @@ import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.PacketWriter
 import org.uci.proxy.core.port.RandomBytes
 import org.uci.proxy.core.port.TunDevice
+import org.uci.proxy.core.proxy.IpNamer
 import org.uci.proxy.core.proxy.ProxyConnector
 import org.uci.proxy.core.settings.AppSettings
 import org.uci.proxy.core.tcp.TunTcpStack
@@ -131,7 +132,7 @@ class TunnelEngineFactory(
         val connector = connectors.first { it.protocol == profile.protocol }
         val health = ProxyHealth(timeSource)
         val checks = ConnectivityChecks(settings.answerConnectivityChecks, health)
-        val relay = TunnelRelay(connector, profile, password, logger, health, checks)
+        val relay = TunnelRelay(connector, profile, password, logger, health, checks, IpNamer(settings))
 
         val start = timeSource.markNow()
         val tcp = TunTcpStack(

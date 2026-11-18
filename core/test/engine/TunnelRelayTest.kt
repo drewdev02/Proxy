@@ -12,9 +12,12 @@ import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.ProxyProtocol
 import org.uci.proxy.core.packet.TcpFlags
 import org.uci.proxy.core.packet.parseIpv4
+import org.uci.proxy.core.proxy.IpNamer
 import org.uci.proxy.core.proxy.ProxyConnectResult
 import org.uci.proxy.core.proxy.ProxyFailure
 import org.uci.proxy.core.proxy.ProxyTarget
+import org.uci.proxy.core.settings.AppSettings
+import org.uci.proxy.core.settings.IpNameService
 import org.uci.proxy.core.tcp.TcpTestClient
 import org.uci.proxy.core.tcp.text
 import kotlin.test.Test
@@ -33,9 +36,10 @@ class TunnelRelayTest {
         serverPort: Int = 443,
         answerChecks: Boolean = false,
         health: ProxyHealth = ProxyHealth(testScheduler.timeSource),
+        namer: IpNamer = IpNamer(AppSettings()),
     ): TcpTestClient {
         val checks = ConnectivityChecks(answerChecks, health)
-        val relay = TunnelRelay(connector, profile, password = "secreta", logger = RecordingLogger(), health, checks)
+        val relay = TunnelRelay(connector, profile, password = "secreta", logger = RecordingLogger(), health, checks, namer)
         return TcpTestClient(this, serverIp = parseIpv4(serverIp)!!, serverPort = serverPort, onAccept = relay::serve)
     }
 
@@ -131,9 +135,9 @@ class TunnelRelayTest {
     }
 
     @Test
-    fun `when the proxy refuses the sslip name the IP itself is tried`() = runTest {
+    fun `when the proxy refuses every name the IP itself is tried`() = runTest {
         val connector = FakeProxyConnector { target ->
-            if (target.host.endsWith(".sslip.io")) {
+            if (target.host.endsWith(".sslip.io") || target.host.endsWith(".nip.io")) {
                 ProxyConnectResult.Failed(ProxyFailure.Refused("HTTP/1.1 403 Forbidden"))
             } else {
                 ProxyConnectResult.Connected(tunnel)
@@ -145,10 +149,60 @@ class TunnelRelayTest {
         app.sendData("SSH-2.0-OpenSSH_9.6\r\n")
 
         assertEquals(
-            listOf(ProxyTarget("93-184-216-34.sslip.io", 443), ProxyTarget("93.184.216.34", 443)),
+            listOf(ProxyTarget("93-184-216-34.sslip.io", 443), ProxyTarget("93.184.216.34.nip.io", 443), ProxyTarget("93.184.216.34", 443)),
             connector.targets,
         )
         assertEquals("SSH-2.0-OpenSSH_9.6\r\n", tunnel.writtenText)
+    }
+
+    @Test
+    fun `the next service is tried when the proxy refuses the first one`() = runTest {
+        val connector = FakeProxyConnector { target ->
+            if (target.host.endsWith(".nip.io")) ProxyConnectResult.Connected(tunnel) else ProxyConnectResult.Failed(ProxyFailure.Refused("403"))
+        }
+        val app = appThrough(connector)
+        app.handshake()
+
+        app.sendData("SSH-2.0-OpenSSH_9.6\r\n")
+
+        assertEquals(
+            listOf(ProxyTarget("93-184-216-34.sslip.io", 443), ProxyTarget("93.184.216.34.nip.io", 443)),
+            connector.targets,
+        )
+    }
+
+    @Test
+    fun `a service the user switched off is never asked`() = runTest {
+        val connector = FakeProxyConnector.failingWith(ProxyFailure.Refused("403"))
+        val settings = AppSettings(nameServices = listOf(IpNameService.SSLIP.copy(enabled = false), IpNameService.NIP))
+        val app = appThrough(connector, namer = IpNamer(settings))
+        app.handshake()
+
+        app.sendData("SSH-2.0-OpenSSH_9.6\r\n")
+
+        assertEquals(listOf(ProxyTarget("93.184.216.34.nip.io", 443), ProxyTarget("93.184.216.34", 443)), connector.targets)
+    }
+
+    @Test
+    fun `with names turned off the IP goes as it is`() = runTest {
+        val connector = FakeProxyConnector.connectingTo(tunnel)
+        val app = appThrough(connector, namer = IpNamer(AppSettings(nameByIp = false)))
+        app.handshake()
+
+        app.sendData("SSH-2.0-OpenSSH_9.6\r\n")
+
+        assertEquals(listOf(ProxyTarget("93.184.216.34", 443)), connector.targets)
+    }
+
+    @Test
+    fun `a timeout or a network failure does not try the next service`() = runTest {
+        val connector = FakeProxyConnector.failingWith(ProxyFailure.Unreachable("sin ruta"))
+        val app = appThrough(connector)
+        app.handshake()
+
+        app.sendData("SSH-2.0-OpenSSH_9.6\r\n")
+
+        assertEquals(1, connector.targets.size, "solo un rechazo del proxy justifica otro nombre")
     }
 
     @Test

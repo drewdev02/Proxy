@@ -196,7 +196,7 @@ class DesktopTunnelIntegrationTest {
             stateStore = stateStore,
             dispatchers = dispatchers,
             logger = engineLogger,
-            vpnExit = VpnExit { proxy, password, vpn ->
+            vpnExit = VpnExit { proxy, password, vpn, _ ->
                 receivedVpn = Triple(proxy, password, vpn)
                 vpnResult
             },

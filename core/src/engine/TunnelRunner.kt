@@ -96,7 +96,7 @@ class TunnelRunner(
         }
         val resolvedProfile = profile.copy(host = proxyAddress)
         if (vpn != null) {
-            runThroughVpn(platformTunnel, profile, resolvedProfile, password, vpn)
+            runThroughVpn(platformTunnel, profile, resolvedProfile, password, vpn, settings)
             return
         }
 
@@ -154,6 +154,7 @@ class TunnelRunner(
         resolvedProfile: ProxyProfile,
         password: String,
         vpn: VpnStart,
+        settings: AppSettings,
     ) {
         val exit = vpnExit
         if (exit == null) {
@@ -161,7 +162,7 @@ class TunnelRunner(
             stateStore.set(TunnelState.Failed(TunnelFailure.VPN_PROFILE_INVALID))
             return
         }
-        val session = when (val result = exit.connect(resolvedProfile, password, vpn)) {
+        val session = when (val result = exit.connect(resolvedProfile, password, vpn, settings)) {
             is VpnConnectResult.Connected -> result.session
             is VpnConnectResult.Failed -> {
                 stateStore.set(TunnelState.Failed(result.failure))

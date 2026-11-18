@@ -20,6 +20,7 @@ import org.uci.proxy.core.packet.parseIpv4
 import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.profile.AppDispatchers
+import org.uci.proxy.core.settings.AppSettings
 import org.uci.proxy.core.profile.StoredProfileRepository
 import org.uci.proxy.core.vpn.OpenVpnPush
 import org.uci.proxy.core.vpn.VpnConnectResult
@@ -71,8 +72,10 @@ class TunnelVpnTest {
 
     private var result: VpnConnectResult = VpnConnectResult.Connected(FakeVpnSession())
     private val exitCalls = mutableListOf<Triple<ProxyProfile, String, VpnStart>>()
-    private val exit = VpnExit { proxy, password, vpn ->
+    private var exitSettings: AppSettings? = null
+    private val exit = VpnExit { proxy, password, vpn, settings ->
         exitCalls += Triple(proxy, password, vpn)
+        exitSettings = settings
         result
     }
 
@@ -105,6 +108,16 @@ class TunnelVpnTest {
         assertEquals("10.8.0.20", proxy.host, "la dirección real del proxy")
         assertEquals("proxypass", password)
         assertEquals(start, vpn)
+        job.cancel()
+    }
+
+    @Test
+    fun `the settings reach the VPN exit so it knows how to name public IPs`() = runTest(UnconfinedTestDispatcher()) {
+        val (runner, _) = newRunner()
+        val settings = AppSettings(nameByIp = false, tryRawIp = false)
+        val job = launch { runner.run(platformTunnel, profile, "x", settings = settings, vpn = start) }
+
+        assertEquals(settings, exitSettings)
         job.cancel()
     }
 

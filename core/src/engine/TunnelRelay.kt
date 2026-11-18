@@ -13,10 +13,10 @@ import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.TcpConnection
 import org.uci.proxy.core.port.TcpException
 import org.uci.proxy.core.proxy.ProxyConnectResult
+import org.uci.proxy.core.proxy.IpNamer
 import org.uci.proxy.core.proxy.ProxyConnector
 import org.uci.proxy.core.proxy.ProxyFailure
 import org.uci.proxy.core.proxy.ProxyTarget
-import org.uci.proxy.core.proxy.sslipNameFor
 import org.uci.proxy.core.tcp.TunTcpConnection
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -34,6 +34,7 @@ class TunnelRelay(
     private val logger: Logger,
     private val health: ProxyHealth,
     private val checks: ConnectivityChecks,
+    private val namer: IpNamer,
     private val connectTimeout: Duration = 15.seconds,
 ) {
     /** Atiende una conexión de principio a fin. No lanza: cualquier fallo corta la conexión de la app. */
@@ -61,7 +62,7 @@ class TunnelRelay(
                 return
             }
 
-            proxy = connect(target, app.destinationAddress)
+            proxy = connect(target)
             if (proxy == null) {
                 app.abort()
                 return
@@ -85,14 +86,18 @@ class TunnelRelay(
         }
     }
 
-    private suspend fun connect(target: ProxyTarget, address: Int): TcpConnection? {
-        // El Squid de la UCI rechaza los `CONNECT` a una IP pública escrita tal cual: por eso se prueba primero con el
-        // nombre sslip.io equivalente, como hace SuperProxy, y solo si ese se rechaza se prueba la IP.
-        val named = sslipNameFor(target.host)?.let { target.copy(host = it) }
-        var result = withTimeoutOrNull(connectTimeout) { connector.connect(profile, password, named ?: target) }
-        val refused = (result as? ProxyConnectResult.Failed)?.failure is ProxyFailure.Refused
-        if (refused && named != null) {
-            result = withTimeoutOrNull(connectTimeout) { connector.connect(profile, password, target) }
+    private suspend fun connect(target: ProxyTarget): TcpConnection? {
+        // El Squid de la UCI rechaza los `CONNECT` a una IP pública escrita tal cual: se prueba por nombre, con cada
+        // servicio activo por orden, y solo si todos se rechazan (y así se pidió) con la IP.
+        var result: ProxyConnectResult? = null
+        for (attempt in namer.attempts(target.host)) {
+            result = withTimeoutOrNull(connectTimeout) { connector.connect(profile, password, target.copy(host = attempt.host)) }
+            if (result is ProxyConnectResult.Connected) {
+                namer.succeeded(attempt)
+                break
+            }
+            // Solo un rechazo del proxy justifica probar otro nombre; un tiempo agotado o un fallo de red no.
+            if ((result as? ProxyConnectResult.Failed)?.failure !is ProxyFailure.Refused) break
         }
 
         return when (result) {

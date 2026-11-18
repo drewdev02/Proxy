@@ -34,4 +34,89 @@ class StoredSettingsRepositoryTest {
 
         assertEquals(AppSettings(), StoredSettingsRepository(store).settings.value)
     }
+
+    private fun reopened() = StoredSettingsRepository(store)
+
+    @Test
+    fun `names for public IPs are on by default with sslip and nip in that order`() {
+        val settings = reopened().settings.value
+
+        assertTrue(settings.nameByIp)
+        assertTrue(settings.tryRawIp)
+        assertEquals(listOf("sslip", "nip"), settings.nameServices.map { it.id })
+        assertTrue(settings.nameServices.all { it.enabled && it.builtIn })
+    }
+
+    @Test
+    fun `the two switches are published and survive a restart`() {
+        val repository = reopened()
+
+        repository.setNameByIp(false)
+        repository.setTryRawIp(false)
+
+        assertFalse(reopened().settings.value.nameByIp)
+        assertFalse(reopened().settings.value.tryRawIp)
+        assertFalse(repository.settings.value.nameByIp)
+    }
+
+    @Test
+    fun `a service can be switched off and its choice survives a restart`() {
+        reopened().setNameServiceEnabled("sslip", false)
+
+        val services = reopened().settings.value.nameServices
+        assertFalse(services.single { it.id == "sslip" }.enabled)
+        assertTrue(services.single { it.id == "nip" }.enabled)
+    }
+
+    @Test
+    fun `a service moves up and down the list but not past the ends`() {
+        val repository = reopened()
+
+        repository.moveNameService("nip", -1)
+        assertEquals(listOf("nip", "sslip"), repository.settings.value.nameServices.map { it.id })
+        assertEquals(listOf("nip", "sslip"), reopened().settings.value.nameServices.map { it.id })
+
+        repository.moveNameService("nip", -1)
+        assertEquals(listOf("nip", "sslip"), repository.settings.value.nameServices.map { it.id }, "ya está arriba")
+
+        repository.moveNameService("nip", 1)
+        repository.moveNameService("nip", 1)
+        assertEquals(listOf("sslip", "nip"), repository.settings.value.nameServices.map { it.id })
+    }
+
+    @Test
+    fun `moving or switching a service that does not exist changes nothing`() {
+        val repository = reopened()
+
+        repository.moveNameService("no-existe", 1)
+        repository.setNameServiceEnabled("no-existe", false)
+
+        assertEquals(IpNameService.BUILT_IN, repository.settings.value.nameServices)
+    }
+
+    @Test
+    fun `restoring puts the services back as they come from the factory`() {
+        val repository = reopened()
+        repository.moveNameService("nip", -1)
+        repository.setNameServiceEnabled("sslip", false)
+
+        repository.resetNameServices()
+
+        assertEquals(IpNameService.BUILT_IN, repository.settings.value.nameServices)
+        assertEquals(IpNameService.BUILT_IN, reopened().settings.value.nameServices)
+    }
+
+    @Test
+    fun `a stored list that makes no sense falls back to the factory services`() {
+        store.putString(StoredSettingsRepository.NAME_SERVICES_KEY, "esto no es json")
+
+        assertEquals(IpNameService.BUILT_IN, reopened().settings.value.nameServices)
+    }
+
+    @Test
+    fun `a factory service that a stored list lacks is added at the end`() {
+        store.putString(StoredSettingsRepository.NAME_SERVICES_KEY, """[{"id":"nip","name":"nip.io","template":"{ip}.nip.io","builtIn":true}]""")
+
+        assertEquals(listOf("nip", "sslip"), reopened().settings.value.nameServices.map { it.id })
+    }
 }

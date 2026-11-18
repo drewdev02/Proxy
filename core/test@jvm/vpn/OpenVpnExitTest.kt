@@ -11,6 +11,8 @@ import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.proxy.ProxyConnectResult
 import org.uci.proxy.core.proxy.ProxyFailure
 import org.uci.proxy.core.proxy.ProxyTarget
+import org.uci.proxy.core.settings.AppSettings
+import org.uci.proxy.core.settings.IpNameService
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -60,6 +62,8 @@ class OpenVpnExitTest {
     )
 
     private fun start(text: String) = VpnStart(text, "vpnuser", "vpnpass")
+
+    private suspend fun VpnExit.connect(proxy: ProxyProfile, password: String, vpn: VpnStart) = connect(proxy, password, vpn, AppSettings())
 
     @Test
     fun `a profile that cannot be used is reported without touching the network`() = runTest {
@@ -116,7 +120,55 @@ class OpenVpnExitTest {
 
         exit(connector).connect(proxy, "x", start(ovpn(remotes = "remote $publicIp 443")))
 
-        assertEquals(listOf(ProxyTarget("149-22-82-28.sslip.io", 443), ProxyTarget(publicIp, 443)), connector.targets)
+        assertEquals(
+            listOf(ProxyTarget("149-22-82-28.sslip.io", 443), ProxyTarget("149.22.82.28.nip.io", 443), ProxyTarget(publicIp, 443)),
+            connector.targets,
+            "cada servicio activo por orden y la IP al final",
+        )
+    }
+
+    @Test
+    fun `the next service is tried when the proxy refuses the first one`() = runTest {
+        val closed = FakeTunnelConnection().also { it.end() }
+        val connector = FakeProxyConnector { target ->
+            if (target.host.endsWith(".nip.io")) ProxyConnectResult.Connected(closed) else ProxyConnectResult.Failed(ProxyFailure.Refused("403"))
+        }
+
+        exit(connector).connect(proxy, "x", start(ovpn(remotes = "remote $publicIp 443")))
+
+        assertEquals(listOf(ProxyTarget("149-22-82-28.sslip.io", 443), ProxyTarget("149.22.82.28.nip.io", 443)), connector.targets)
+    }
+
+    @Test
+    fun `the service that worked is asked first for the next server`() = runTest {
+        val closed = FakeTunnelConnection().also { it.end() }
+        val connector = FakeProxyConnector { target ->
+            if (target.host.endsWith(".nip.io")) ProxyConnectResult.Connected(closed) else ProxyConnectResult.Failed(ProxyFailure.Refused("403"))
+        }
+
+        exit(connector).connect(proxy, "x", start(ovpn(remotes = "remote $publicIp 443\nremote 149.22.82.29 443")))
+
+        // El primer servidor abrió por nip.io (aunque luego falló el handshake): el segundo ya empieza por ahí.
+        assertEquals("149.22.82.29.nip.io", connector.targets[2].host)
+    }
+
+    @Test
+    fun `the settings decide which services are asked and whether the address is`() = runTest {
+        val connector = FakeProxyConnector.failingWith(ProxyFailure.Refused("403"))
+        val settings = AppSettings(tryRawIp = false, nameServices = listOf(IpNameService.NIP, IpNameService.SSLIP.copy(enabled = false)))
+
+        exit(connector).connect(proxy, "x", start(ovpn(remotes = "remote $publicIp 443")), settings)
+
+        assertEquals(listOf(ProxyTarget("149.22.82.28.nip.io", 443)), connector.targets)
+    }
+
+    @Test
+    fun `with names turned off the server is asked for by address`() = runTest {
+        val connector = FakeProxyConnector.failingWith(ProxyFailure.Refused("403"))
+
+        exit(connector).connect(proxy, "x", start(ovpn(remotes = "remote $publicIp 443")), AppSettings(nameByIp = false))
+
+        assertEquals(listOf(ProxyTarget(publicIp, 443)), connector.targets)
     }
 
     @Test

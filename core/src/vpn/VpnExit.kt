@@ -6,11 +6,13 @@ import org.uci.proxy.core.port.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.RandomBytes
 import org.uci.proxy.core.port.TunnelFailure
+import org.uci.proxy.core.settings.AppSettings
+import org.uci.proxy.core.proxy.IpNamer
+import org.uci.proxy.core.proxy.NameAttempt
 import org.uci.proxy.core.proxy.ProxyConnectResult
 import org.uci.proxy.core.proxy.ProxyConnector
 import org.uci.proxy.core.proxy.ProxyFailure
 import org.uci.proxy.core.proxy.ProxyTarget
-import org.uci.proxy.core.proxy.sslipNameFor
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -34,8 +36,11 @@ sealed interface VpnConnectResult {
 
 /** Abre la sesión VPN de un perfil, llegando al servidor a través de su proxy. */
 fun interface VpnExit {
-    /** @param proxy el perfil con la dirección del proxy ya resuelta. */
-    suspend fun connect(proxy: ProxyProfile, proxyPassword: String, vpn: VpnStart): VpnConnectResult
+    /**
+     * @param proxy el perfil con la dirección del proxy ya resuelta.
+     * @param settings los ajustes, que dicen cómo se piden al proxy las IP públicas (por nombre, y con qué servicios).
+     */
+    suspend fun connect(proxy: ProxyProfile, proxyPassword: String, vpn: VpnStart, settings: AppSettings): VpnConnectResult
 }
 
 /**
@@ -49,7 +54,7 @@ class OpenVpnExit(
     private val logger: Logger,
     private val connectTimeout: Duration = 20.seconds,
 ) : VpnExit {
-    override suspend fun connect(proxy: ProxyProfile, proxyPassword: String, vpn: VpnStart): VpnConnectResult {
+    override suspend fun connect(proxy: ProxyProfile, proxyPassword: String, vpn: VpnStart, settings: AppSettings): VpnConnectResult {
         val config = try {
             parseOvpn(vpn.ovpn)
         } catch (e: OvpnConfigException) {
@@ -64,20 +69,27 @@ class OpenVpnExit(
         val ordered = if (config.remoteRandom) config.remotes.shuffled(randomSource()) else config.remotes
         val remotes = ordered.sortedBy { if (it.port == PREFERRED_PORT) 0 else 1 }
 
+        val namer = IpNamer(settings)
         var proxyRefused = false
         var handshakeFailed = false
         for (remote in remotes.take(MAX_ATTEMPTS)) {
-            // La IP del servidor, escrita tal cual, la rechaza el Squid de la UCI (403): se pide por su nombre sslip.io.
-            val proxyHost = sslipNameFor(remote.host) ?: remote.host
-            logger.log(LogLevel.INFO, TAG, "Conectando con el servidor VPN ${remote.host}:${remote.port} a través del proxy" +
-                if (proxyHost != remote.host) " (vía $proxyHost)" else "")
-            var result = withTimeoutOrNull(connectTimeout) { connector.connect(proxy, proxyPassword, ProxyTarget(proxyHost, remote.port)) }
-            // Si el proxy no acepta el nombre sslip.io (no lo resuelve, o lo bloquea), se prueba la IP tal cual.
-            if (proxyHost != remote.host && (result as? ProxyConnectResult.Failed)?.failure is ProxyFailure.Refused) {
-                result = withTimeoutOrNull(connectTimeout) { connector.connect(proxy, proxyPassword, ProxyTarget(remote.host, remote.port)) }
+            // La IP del servidor, escrita tal cual, la rechaza el Squid de la UCI (403): se pide por nombre, con cada servicio
+            // activo por orden, y solo si todos se rechazan (y así se pidió) con la IP.
+            var result: ProxyConnectResult? = null
+            var used: NameAttempt? = null
+            for (attempt in namer.attempts(remote.host)) {
+                logger.log(
+                    LogLevel.INFO, TAG,
+                    "Conectando con el servidor VPN ${remote.host}:${remote.port} a través del proxy" +
+                        if (attempt.host != remote.host) " (vía ${attempt.host})" else "",
+                )
+                result = withTimeoutOrNull(connectTimeout) { connector.connect(proxy, proxyPassword, ProxyTarget(attempt.host, remote.port)) }
+                used = attempt
+                if (result is ProxyConnectResult.Connected) break
+                if ((result as? ProxyConnectResult.Failed)?.failure !is ProxyFailure.Refused) break
             }
             val connection = when (result) {
-                is ProxyConnectResult.Connected -> result.connection
+                is ProxyConnectResult.Connected -> result.connection.also { used?.let(namer::succeeded) }
                 is ProxyConnectResult.Failed -> {
                     logger.log(LogLevel.WARN, TAG, "El proxy no abrió ${remote.host}:${remote.port}: ${result.failure}")
                     if (result.failure.isAuthentication()) return VpnConnectResult.Failed(TunnelFailure.PROXY_AUTH_FAILED)
@@ -126,6 +138,6 @@ class OpenVpnExit(
 
 /** Para las plataformas donde el cliente VPN no está disponible (iOS): el túnel falla con un motivo claro. */
 object UnavailableVpnExit : VpnExit {
-    override suspend fun connect(proxy: ProxyProfile, proxyPassword: String, vpn: VpnStart) =
+    override suspend fun connect(proxy: ProxyProfile, proxyPassword: String, vpn: VpnStart, settings: AppSettings) =
         VpnConnectResult.Failed(TunnelFailure.VPN_PROFILE_INVALID)
 }
