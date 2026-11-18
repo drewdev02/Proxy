@@ -65,6 +65,31 @@ class ProfileEditorViewModelTest : MainDispatcherTest() {
     }
 
     @Test
+    fun `starting again for the same profile keeps what the user typed`() {
+        // El sistema recrea la actividad al rotar el móvil y la pantalla vuelve a pedir el arranque.
+        val viewModel = newViewModel()
+        viewModel.start(uci.id)
+        viewModel.onDraftChange(validDraft)
+        viewModel.onPasswordChange("clave")
+
+        viewModel.start(uci.id)
+
+        assertEquals(validDraft, viewModel.uiState.value.draft)
+        assertEquals("clave", viewModel.uiState.value.password)
+    }
+
+    @Test
+    fun `starting again for a new profile keeps the draft`() {
+        val viewModel = newViewModel()
+        viewModel.start(profileId = null)
+        viewModel.onDraftChange(validDraft)
+
+        viewModel.start(profileId = null)
+
+        assertEquals(validDraft, viewModel.uiState.value.draft)
+    }
+
+    @Test
     fun `saving a valid new profile stores it with a generated id`() {
         val viewModel = newViewModel()
         viewModel.start(profileId = null)

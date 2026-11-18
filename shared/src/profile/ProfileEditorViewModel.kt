@@ -59,8 +59,20 @@ class ProfileEditorViewModel(
 
     private var editingId: String? = null
 
-    /** Prepara el formulario: vacío si [profileId] es null, o con los datos del perfil a editar. */
+    /** Para qué perfil se preparó el formulario (null dentro de [Started] es «perfil nuevo»); null si aún no se preparó. */
+    private var started: Started? = null
+
+    private data class Started(val profileId: String?)
+
+    /**
+     * Prepara el formulario: vacío si [profileId] es null, o con los datos del perfil a editar.
+     *
+     * Pedir lo mismo otra vez no hace nada. La pantalla lo pide al aparecer, y vuelve a aparecer cuando el sistema recrea
+     * la actividad (al rotar el móvil, por ejemplo) mientras este view model sigue vivo con lo que el usuario escribió.
+     */
     fun start(profileId: String?) {
+        if (started == Started(profileId)) return
+        started = Started(profileId)
         val existing = profileId?.let { id -> repository.profiles.value.firstOrNull { it.id == id } }
         editingId = existing?.id
         state.value = ProfileEditorUiState(
@@ -94,8 +106,8 @@ class ProfileEditorViewModel(
     }
 
     /**
-     * La pantalla ya reaccionó al guardado y se cerró. Sin esto, [ProfileEditorUiState.saved] seguiría
-     * a true en este view model, que se reutiliza, y la siguiente apertura del formulario se cerraría sola.
+     * La pantalla ya reaccionó al guardado y se cerró. Sin esto, [ProfileEditorUiState.saved] seguiría a true y, si el
+     * sistema recreara la actividad antes de que este view model se descarte, la pantalla volvería a cerrarse.
      */
     fun onSavedHandled() {
         state.update { it.copy(saved = false) }

@@ -4,13 +4,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
+import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.runtime.rememberNavBackStack
+import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
+import androidx.navigation3.ui.NavDisplay
 import org.jetbrains.compose.reload.DevelopmentEntryPoint
 import org.koin.compose.viewmodel.koinViewModel
 import org.uci.proxy.home.HomeViewModel
+import org.uci.proxy.navigation.Route
+import org.uci.proxy.navigation.routesConfiguration
 import org.uci.proxy.profile.ProfileEditorScreen
 import org.uci.proxy.profile.ProfileEditorViewModel
 import org.uci.proxy.profile.ProfileListScreen
@@ -18,30 +22,37 @@ import org.uci.proxy.profile.ProfileListViewModel
 import org.uci.proxy.profile.TunnelUiModel
 import org.uci.proxy.tunnel.TunnelViewModel
 
-private sealed interface Screen {
-    data object ProfileList : Screen
-
-    /** [profileId] null significa perfil nuevo. */
-    data class ProfileEditor(val profileId: String?) : Screen
-}
-
 /** Requiere que la app haya llamado antes a [org.uci.proxy.di.initKoin]. */
 @Composable
 @DevelopmentEntryPoint
 fun App() {
     MaterialTheme {
-        var screen by remember { mutableStateOf<Screen>(Screen.ProfileList) }
+        val backStack = rememberNavBackStack(routesConfiguration, Route.ProfileList)
 
-        when (val current = screen) {
-            Screen.ProfileList -> ProfileListRoute(
-                onAdd = { screen = Screen.ProfileEditor(profileId = null) },
-                onEdit = { screen = Screen.ProfileEditor(profileId = it) },
-            )
-            is Screen.ProfileEditor -> ProfileEditorRoute(
-                profileId = current.profileId,
-                onClose = { screen = Screen.ProfileList },
-            )
-        }
+        NavDisplay(
+            backStack = backStack,
+            // También atiende el botón y el gesto de atrás del sistema.
+            onBack = { backStack.removeLastOrNull() },
+            // Un ViewModel por pantalla: se descarta al salir de ella, y no se arrastra el estado de la vez anterior.
+            entryDecorators = listOf(
+                rememberSaveableStateHolderNavEntryDecorator(),
+                rememberViewModelStoreNavEntryDecorator(),
+            ),
+            entryProvider = entryProvider {
+                entry<Route.ProfileList> {
+                    ProfileListRoute(
+                        onAdd = { backStack.add(Route.ProfileEditor(profileId = null)) },
+                        onEdit = { backStack.add(Route.ProfileEditor(profileId = it)) },
+                    )
+                }
+                entry<Route.ProfileEditor> { route ->
+                    ProfileEditorRoute(
+                        profileId = route.profileId,
+                        onClose = { backStack.removeLastOrNull() },
+                    )
+                }
+            },
+        )
     }
 }
 

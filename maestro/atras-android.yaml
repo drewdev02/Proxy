@@ -1,0 +1,20 @@
+# Navegación en Android: el botón atrás del sistema vuelve a la lista y el editor se abre limpio.
+appId: org.uci.proxy
+---
+- launchApp:
+    clearState: true
+- tapOn: "Nuevo perfil"
+- assertVisible: "Probar proxy"
+# Atrás del sistema desde el editor: vuelve a la lista, no cierra la app.
+- pressKey: Back
+- assertVisible: "Perfiles de proxy"
+- assertVisible: "Nuevo perfil"
+# Y el editor se abre limpio después de haber escrito algo y salir con atrás.
+- tapOn: "Nuevo perfil"
+- tapOn: "Nombre"
+- inputText: "Borrador"
+- hideKeyboard
+- pressKey: Back
+- assertVisible: "Perfiles de proxy"
+- tapOn: "Nuevo perfil"
+- assertNotVisible: "Borrador"

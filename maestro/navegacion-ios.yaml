@@ -1,0 +1,22 @@
+# Navegación en iOS: Cancelar vuelve a la lista, y el editor se abre limpio después de escribir algo y salir.
+# El gesto de atrás (deslizar desde el borde izquierdo) no se ha podido probar con Maestro: su deslizamiento
+# sintético no lo activa. Hay que comprobarlo a mano en un dispositivo.
+appId: org.uci.proxy.ProxyUCI
+---
+- launchApp:
+    clearState: true
+- tapOn: "Nuevo perfil"
+- assertVisible: "Probar proxy"
+- tapOn: "Cancelar"
+- assertVisible: "Perfiles de proxy"
+- tapOn: "Nuevo perfil"
+- tapOn: "Nombre"
+- inputText: "Borrador"
+# El teclado tapa los botones: se desplaza el formulario hasta ver «Cancelar».
+- scrollUntilVisible:
+    element: "Cancelar"
+    direction: DOWN
+- tapOn: "Cancelar"
+- assertVisible: "Perfiles de proxy"
+- tapOn: "Nuevo perfil"
+- assertNotVisible: "Borrador"

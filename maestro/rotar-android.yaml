@@ -1,0 +1,20 @@
+# Navegación en Android: rotar el móvil con el editor abierto conserva la pantalla y lo escrito.
+# Se lanza con la rotación automática desactivada (adb shell settings put system accelerometer_rotation 0).
+appId: org.uci.proxy
+---
+- launchApp:
+    clearState: true
+- tapOn: "Nuevo perfil"
+- tapOn: "Nombre"
+- inputText: "Rotación"
+- hideKeyboard
+- assertVisible: "Protocolo"
+# Rotar recrea la actividad: la pantalla en la que se estaba y lo escrito tienen que sobrevivir.
+# («Protocolo» solo existe en el editor; «Probar proxy» queda bajo el pliegue en horizontal.)
+- setOrientation: LANDSCAPE_LEFT
+- assertVisible: "Protocolo"
+- assertVisible: "Rotación"
+- setOrientation: PORTRAIT
+- assertVisible: "Protocolo"
+- assertVisible: "Rotación"
+- assertVisible: "Probar proxy"

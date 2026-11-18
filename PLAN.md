@@ -465,6 +465,8 @@ parseo de paquetes son código propio en común.
 | `io.insert-koin:koin-core` | 4.2.2 | `core`, común | Módulos de DI (`coreModule`, `platformModule`) |
 | `io.insert-koin:koin-compose` | 4.2.2 | `shared`, común | Koin en el árbol de Compose |
 | `io.insert-koin:koin-compose-viewmodel` | 4.2.2 | `shared`, común | `viewModelOf` y `koinViewModel()` |
+| `org.jetbrains.androidx.navigation3:navigation3-ui` | 1.2.0 | `shared`, común | Navegación entre pantallas (Navigation 3, la librería que recomienda Google, en la versión de JetBrains). Cada pantalla es una ruta serializable (`Route`) y la pila se guarda al recrear la actividad. En iOS las rutas hay que registrarlas (`routesConfiguration`) |
+| `org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-navigation3` | 2.11.0 | `shared`, común | Un `ViewModel` por pantalla, que se descarta al salir de ella |
 | `io.insert-koin:koin-android` | 4.2.2 | `androidApp` | `androidContext()` para los adaptadores de Android |
 | `io.insert-koin:koin-test` | 4.2.2 | `core` y `shared`, pruebas | `verify()` de los módulos |
 | `org.slf4j:slf4j-api` | 2.0.18 | `core`, solo `jvm` | API de registro; es la versión que usa Logback 1.6.2 |
