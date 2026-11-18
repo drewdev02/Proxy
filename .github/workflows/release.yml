@@ -100,7 +100,7 @@ jobs:
           Copy-Item build/exe/ProxyUCI.exe "dist/ProxyUCI-${{ needs.version.outputs.version }}-windows-x64.exe"
       - uses: actions/upload-artifact@v7
         with:
-          name: windows
+          name: release-windows
           path: dist/*
           if-no-files-found: error
 
@@ -137,7 +137,7 @@ jobs:
           echo "La ventana se compuso con la Java recortada"
       - uses: actions/upload-artifact@v7
         with:
-          name: macos
+          name: release-macos
           path: build/dmg/*.dmg
           if-no-files-found: error
 
@@ -207,7 +207,7 @@ jobs:
           ls -l dist
       - uses: actions/upload-artifact@v7
         with:
-          name: android
+          name: release-android
           path: dist/*
           if-no-files-found: error
 
@@ -220,8 +220,11 @@ jobs:
       id-token: write
       attestations: write
     steps:
+      # Solo los artefactos de publicación: la ejecución también trae los del ci.yml que corre antes (como el
+      # ProxyUCI.exe sin versión de su trabajo de Windows), y no deben acabar en la Release.
       - uses: actions/download-artifact@v8
         with:
+          pattern: release-*
           path: dist
           merge-multiple: true
       # Este trabajo corre también en los ensayos manuales, para ejercitar la descarga y las sumas; solo la atestación y
@@ -234,6 +237,9 @@ jobs:
             cantidad="$(ls $patron 2>/dev/null | wc -l)"
             [ "$cantidad" = 1 ] || { echo "::error::Se esperaba un archivo $patron y hay $cantidad"; exit 1; }
           done
+          # Y nada más: un archivo de sobra acabaría adjunto a la Release.
+          total="$(ls | wc -l)"
+          [ "$total" = 3 ] || { echo "::error::Se esperaban exactamente 3 archivos y hay $total"; exit 1; }
       - name: Sumas de verificación
         run: |
           cd dist
