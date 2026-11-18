@@ -32,6 +32,8 @@ class TunnelRelay(
     private val profile: ProxyProfile,
     private val password: String,
     private val logger: Logger,
+    private val health: ProxyHealth,
+    private val checks: ConnectivityChecks,
     private val connectTimeout: Duration = 15.seconds,
 ) {
     /** Atiende una conexión de principio a fin. No lanza: cualquier fallo corta la conexión de la app. */
@@ -39,11 +41,25 @@ class TunnelRelay(
         var proxy: TcpConnection? = null
         try {
             // La app conectó a una IP sin pasar por el DNS falso: sus primeros bytes suelen decir a qué servidor va.
-            val firstBytes = if (app.destinationHost == null) withTimeoutOrNull(SNIFF_WAIT) { app.read() } else null
-            val host = app.destinationHost
+            val named = app.destinationHost
+            val firstBytes = when {
+                named == null -> withTimeoutOrNull(SNIFF_WAIT) { app.read() }
+                // Una posible comprobación de conectividad: se lee la petición para ver si de verdad lo es.
+                checks.mightBeCheck(named, app.destinationPort) -> withTimeoutOrNull(CHECK_WAIT) { app.read() }
+                else -> null
+            }
+            val host = named
                 ?: firstBytes?.let(::sniffHostname)
                 ?: formatIpv4(app.destinationAddress)
             val target = ProxyTarget(host, app.destinationPort)
+
+            val reply = firstBytes?.let { checks.replyFor(host, app.destinationPort, it) }
+            if (reply != null) {
+                logger.log(LogLevel.DEBUG, TAG, "Comprobación de conectividad contestada en local: $host")
+                app.write(reply)
+                app.finish()
+                return
+            }
 
             proxy = connect(target, app.destinationAddress)
             if (proxy == null) {
@@ -81,7 +97,10 @@ class TunnelRelay(
         }
 
         return when (result) {
-            is ProxyConnectResult.Connected -> result.connection
+            is ProxyConnectResult.Connected -> {
+                health.markSuccess()
+                result.connection
+            }
             is ProxyConnectResult.Failed -> {
                 logger.log(LogLevel.WARN, TAG, "El proxy no abrió ${target.host}:${target.port}: ${result.failure}")
                 null
@@ -129,6 +148,7 @@ class TunnelRelay(
         const val TAG = "Relay"
         const val SSLIP_SUFFIX = ".sslip.io"
         val SNIFF_WAIT = 200.milliseconds
+        val CHECK_WAIT = 1.seconds
         val DOWNLOAD_GRACE = 8.seconds
         val UPLOAD_GRACE = 1500.milliseconds
     }

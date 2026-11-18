@@ -22,6 +22,8 @@ import org.uci.proxy.core.fakes.RecordingLogger
 import org.uci.proxy.core.log.BufferedLogger
 import org.uci.proxy.core.log.LogBuffer
 import org.uci.proxy.core.log.LogEntry
+import org.uci.proxy.core.settings.AppSettings
+import org.uci.proxy.core.settings.StoredSettingsRepository
 import org.uci.proxy.core.port.LogLevel
 import kotlin.time.Clock
 import org.uci.proxy.core.model.ProxyProfile
@@ -59,6 +61,16 @@ class EngineProtocolTest {
 
         assertFalse('\n' in line, "un mensaje es una sola línea")
         assertEquals(start, EngineProtocol.decodeStart(line))
+    }
+
+    @Test
+    fun `the settings travel with the start order and default to on when absent`() {
+        val off = EngineStart(profile, "x", AppSettings(answerConnectivityChecks = false))
+
+        assertEquals(off, EngineProtocol.decodeStart(EngineProtocol.encodeStart(off)))
+
+        val withoutSettings = EngineProtocol.encodeStart(EngineStart(profile, "x")).replace(Regex(""","settings":\{[^}]*\}"""), "")
+        assertTrue(EngineProtocol.decodeStart(withoutSettings)!!.settings.answerConnectivityChecks)
     }
 
     @Test
@@ -197,6 +209,7 @@ class DesktopTunnelIntegrationTest {
         dispatchers = dispatchers,
         logger = logger,
         logBuffer = windowLogs,
+        settings = StoredSettingsRepository(InMemoryKeyValueStore()),
         launchTimeout = 5.seconds,
     )
 

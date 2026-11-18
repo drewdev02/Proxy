@@ -21,6 +21,7 @@ import org.uci.proxy.core.engine.TunnelRunner
 import org.uci.proxy.core.platform.AndroidPlatformTunnel
 import org.uci.proxy.core.platform.TunnelServiceContract
 import org.uci.proxy.core.profile.AppDispatchers
+import org.uci.proxy.core.settings.SettingsRepository
 
 /**
  * Servicio de VPN: punto de entrada que crea el sistema. Solo traduce las órdenes de Android
@@ -30,6 +31,7 @@ class ProxyVpnService : VpnService() {
     // Punto de entrada que crea el sistema: aquí sí se obtienen las dependencias de Koin directamente.
     private val runner: TunnelRunner by inject()
     private val dispatchers: AppDispatchers by inject()
+    private val settings: SettingsRepository by inject()
 
     private val scope by lazy { CoroutineScope(SupervisorJob() + dispatchers.background) }
     // Lo tocan el hilo principal (órdenes) y el de fondo (fin del túnel).
@@ -54,7 +56,7 @@ class ProxyVpnService : VpnService() {
         tunnelJob?.cancel()
         val job = scope.launch(start = CoroutineStart.LAZY) {
             try {
-                runner.run(AndroidPlatformTunnel(this@ProxyVpnService, dispatchers.background), profileId)
+                runner.run(AndroidPlatformTunnel(this@ProxyVpnService, dispatchers.background), profileId, settings.settings.value)
             } finally {
                 // El túnel terminó, por orden o porque el sistema cerró la interfaz. Si ya hay otro
                 // túnel en marcha, la notificación y el servicio son suyos y no se tocan.

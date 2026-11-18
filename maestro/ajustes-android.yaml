@@ -1,0 +1,14 @@
+# Ajustes: la pantalla se abre desde la lista, el interruptor de las comprobaciones de conexión está activado
+# por defecto, se puede apagar y la preferencia se conserva al salir y volver a entrar.
+appId: org.uci.proxy
+---
+- launchApp:
+    clearState: true
+- tapOn: "Ajustes"
+- assertVisible: "Contestar las comprobaciones de conexión"
+- assertVisible: ".*Se aplica al conectar la próxima vez.*"
+- tapOn: "Contestar las comprobaciones de conexión"
+- tapOn: "Volver"
+- assertVisible: "Perfiles de proxy"
+- tapOn: "Ajustes"
+- assertVisible: "Contestar las comprobaciones de conexión"

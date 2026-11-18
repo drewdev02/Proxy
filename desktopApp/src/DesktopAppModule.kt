@@ -33,6 +33,7 @@ fun desktopAppModule(platformInfo: PlatformInfo) = module {
                 dispatchers = get(),
                 logger = get(),
                 logBuffer = get(),
+                settings = get(),
             )
         } binds arrayOf(TunnelControl::class, TunnelMonitor::class)
     }

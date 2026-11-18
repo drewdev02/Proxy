@@ -21,6 +21,10 @@ internal sealed interface Route : NavKey {
     @Serializable
     data class ProfileEditor(val profileId: String?) : Route
 
+    /** Las preferencias del usuario. */
+    @Serializable
+    data object Settings : Route
+
     /** El registro en vivo. */
     @Serializable
     data object Logs : Route

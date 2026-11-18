@@ -10,6 +10,7 @@ import org.uci.proxy.core.desktop.EngineLauncher
 import org.uci.proxy.core.desktop.EngineProcess
 import org.uci.proxy.core.fakes.InMemoryKeyValueStore
 import org.uci.proxy.core.fakes.InMemorySecretStore
+import org.uci.proxy.core.settings.StoredSettingsRepository
 import org.uci.proxy.core.log.LogBuffer
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.ProxyProtocol
@@ -74,6 +75,7 @@ class WindowsPackagedExeE2ETest {
             dispatchers = dispatchers,
             logger = logger,
             logBuffer = LogBuffer(),
+            settings = StoredSettingsRepository(InMemoryKeyValueStore()),
             launchTimeout = 120.seconds,
         )
 

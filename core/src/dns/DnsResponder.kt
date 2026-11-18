@@ -14,7 +14,11 @@ data class DnsQuestion(val name: String, val type: Int)
  * - Cualquier otro tipo (AAAA, HTTPS, SRV…): respuesta vacía sin error, para que el sistema
  *   use enseguida el registro A y el tráfico entre al túnel por IPv4.
  */
-class DnsResponder(private val table: FakeDnsTable) {
+class DnsResponder(
+    private val table: FakeDnsTable,
+    /** Nombres con una dirección propia en vez de la inventada: los que el sistema usa para comprobar la conectividad. */
+    private val addressOverride: (String) -> Int? = { null },
+) {
     /**
      * @param query mensaje DNS tal como llega en el datagrama UDP.
      * @return el mensaje de respuesta, o null si [query] no es una consulta válida.
@@ -39,7 +43,7 @@ class DnsResponder(private val table: FakeDnsTable) {
             response.writeU16(answer + 4, CLASS_IN)
             response.writeInt(answer + 6, TTL_SECONDS)
             response.writeU16(answer + 10, 4)
-            response.writeInt(answer + 12, table.addressFor(question.first.name))
+            response.writeInt(answer + 12, addressOverride(question.first.name) ?: table.addressFor(question.first.name))
         }
         return response
     }

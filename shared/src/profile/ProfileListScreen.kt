@@ -62,6 +62,7 @@ fun ProfileListScreen(
     onAdd: () -> Unit,
     onEdit: (String) -> Unit,
     onOpenLogs: () -> Unit,
+    onOpenSettings: () -> Unit,
     onDelete: (String) -> Unit,
     onDismissDeleteError: () -> Unit,
     onConnect: (String) -> Unit,
@@ -73,7 +74,10 @@ fun ProfileListScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Perfiles de proxy") },
-                actions = { TextButton(onClick = onOpenLogs) { Text("Registro") } },
+                actions = {
+                    TextButton(onClick = onOpenSettings) { Text("Ajustes") }
+                    TextButton(onClick = onOpenLogs) { Text("Registro") }
+                },
             )
         },
         floatingActionButton = {
@@ -220,6 +224,7 @@ private fun ProfileListScreenPreview() {
             onAdd = {},
             onEdit = {},
             onOpenLogs = {},
+            onOpenSettings = {},
             onDelete = {},
             onDismissDeleteError = {},
             onConnect = {},

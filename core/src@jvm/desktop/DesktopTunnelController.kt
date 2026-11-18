@@ -17,6 +17,7 @@ import org.uci.proxy.core.port.TunnelMonitor
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.profile.AppDispatchers
 import org.uci.proxy.core.profile.ProfileRepository
+import org.uci.proxy.core.settings.SettingsRepository
 import java.io.IOException
 import java.io.PrintWriter
 import java.net.InetAddress
@@ -43,6 +44,8 @@ class DesktopTunnelController(
     private val logger: Logger,
     /** Donde la ventana junta sus mensajes de registro con los que le manda el motor. */
     private val logBuffer: LogBuffer,
+    /** Los ajustes que se llevan al motor al conectar: él corre en otro proceso y no puede leerlos. */
+    private val settings: SettingsRepository,
     private val launchTimeout: Duration = 3.minutes,
 ) : TunnelControl, TunnelMonitor {
     override val isAvailable = true
@@ -70,7 +73,7 @@ class DesktopTunnelController(
             mutableState.value = TunnelState.Failed(TunnelFailure.PROFILE_NOT_FOUND)
             return
         }
-        val start = EngineStart(profile, profiles.password(profileId))
+        val start = EngineStart(profile, profiles.password(profileId), settings.settings.value)
         mutableState.value = TunnelState.Connecting(profileId)
         stopRequested = false
         session = scope.launch { runSession(profileId, start) }

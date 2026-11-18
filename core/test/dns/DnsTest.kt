@@ -104,6 +104,18 @@ class DnsResponderTest {
     }
 
     @Test
+    fun `a name with its own address is answered with it instead of the fake one`() {
+        val own = 0x836BFFFF.toInt()
+        val special = DnsResponder(table) { name -> if (name == "dns.msftncsi.com") own else null }
+
+        val special1 = assertNotNull(special.respond(dnsQuery("dns.msftncsi.com")))
+        val normal = assertNotNull(special.respond(dnsQuery("www.uci.cu")))
+
+        assertEquals(own, special1.readInt(special1.size - 4))
+        assertEquals(table.addressFor("www.uci.cu"), normal.readInt(normal.size - 4))
+    }
+
+    @Test
     fun `an AAAA query gets an empty answer without error`() {
         val query = dnsQuery("www.uci.cu", type = 28)
 

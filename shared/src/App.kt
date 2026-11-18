@@ -21,6 +21,7 @@ import org.uci.proxy.profile.ProfileEditorViewModel
 import org.uci.proxy.profile.ProfileListScreen
 import org.uci.proxy.profile.ProfileListViewModel
 import org.uci.proxy.profile.TunnelUiModel
+import org.uci.proxy.settings.SettingsRoute
 import org.uci.proxy.tunnel.TunnelViewModel
 
 /** Requiere que la app haya llamado antes a [org.uci.proxy.di.initKoin]. */
@@ -45,7 +46,11 @@ fun App() {
                         onAdd = { backStack.add(Route.ProfileEditor(profileId = null)) },
                         onEdit = { backStack.add(Route.ProfileEditor(profileId = it)) },
                         onOpenLogs = { backStack.add(Route.Logs) },
+                        onOpenSettings = { backStack.add(Route.Settings) },
                     )
+                }
+                entry<Route.Settings> {
+                    SettingsRoute(onBack = { backStack.removeLastOrNull() })
                 }
                 entry<Route.Logs> {
                     LogsRoute(onBack = { backStack.removeLastOrNull() })
@@ -62,7 +67,7 @@ fun App() {
 }
 
 @Composable
-private fun ProfileListRoute(onAdd: () -> Unit, onEdit: (String) -> Unit, onOpenLogs: () -> Unit) {
+private fun ProfileListRoute(onAdd: () -> Unit, onEdit: (String) -> Unit, onOpenLogs: () -> Unit, onOpenSettings: () -> Unit) {
     val viewModel = koinViewModel<ProfileListViewModel>()
     val home = koinViewModel<HomeViewModel>()
     val tunnel = koinViewModel<TunnelViewModel>()
@@ -78,6 +83,7 @@ private fun ProfileListRoute(onAdd: () -> Unit, onEdit: (String) -> Unit, onOpen
         onAdd = onAdd,
         onEdit = onEdit,
         onOpenLogs = onOpenLogs,
+        onOpenSettings = onOpenSettings,
         onDelete = viewModel::delete,
         onDismissDeleteError = viewModel::dismissDeleteError,
         onConnect = tunnel::connect,

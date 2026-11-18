@@ -27,10 +27,19 @@ class TunnelRelayTest {
     private val profile = ProxyProfile("p1", "UCI", "proxy.uci.cu", 3128, ProxyProtocol.HTTP, "andrey")
     private val tunnel = FakeTunnelConnection()
 
-    private fun TestScope.appThrough(connector: FakeProxyConnector, serverIp: String = "93.184.216.34"): TcpTestClient {
-        val relay = TunnelRelay(connector, profile, password = "secreta", logger = RecordingLogger())
-        return TcpTestClient(this, serverIp = parseIpv4(serverIp)!!, onAccept = relay::serve)
+    private fun TestScope.appThrough(
+        connector: FakeProxyConnector,
+        serverIp: String = "93.184.216.34",
+        serverPort: Int = 443,
+        answerChecks: Boolean = false,
+        health: ProxyHealth = ProxyHealth(testScheduler.timeSource),
+    ): TcpTestClient {
+        val checks = ConnectivityChecks(answerChecks, health)
+        val relay = TunnelRelay(connector, profile, password = "secreta", logger = RecordingLogger(), health, checks)
+        return TcpTestClient(this, serverIp = parseIpv4(serverIp)!!, serverPort = serverPort, onAccept = relay::serve)
     }
+
+    private val androidCheck = "GET /generate_204 HTTP/1.1\r\nHost: connectivitycheck.gstatic.com\r\n\r\n"
 
     @Test
     fun `a connection to a fake DNS address is opened by name with the profile credentials`() = runTest {
@@ -202,5 +211,78 @@ class TunnelRelayTest {
         advanceTimeBy(16_000)
 
         assertTrue(app.drain().last().has(TcpFlags.RST))
+    }
+
+    @Test
+    fun `a connectivity check is answered locally when the proxy has worked recently`() = runTest {
+        val health = ProxyHealth(testScheduler.timeSource).also { it.markSuccess() }
+        val connector = FakeProxyConnector.connectingTo(tunnel)
+        val app = appThrough(connector, serverPort = 80, answerChecks = true, health = health)
+        app.handshake(destinationHost = "connectivitycheck.gstatic.com")
+
+        app.sendData(androidCheck)
+        runCurrent()
+
+        assertTrue(connector.targets.isEmpty(), "no se molesta al proxy")
+        assertTrue(app.drain().joinToString("") { it.text() }.startsWith("HTTP/1.1 204 No Content"))
+    }
+
+    @Test
+    fun `a connectivity check goes to the proxy when it has not worked yet`() = runTest {
+        val connector = FakeProxyConnector.connectingTo(tunnel)
+        val app = appThrough(connector, serverPort = 80, answerChecks = true)
+        app.handshake(destinationHost = "connectivitycheck.gstatic.com")
+
+        app.sendData(androidCheck)
+        runCurrent()
+
+        assertEquals(listOf(ProxyTarget("connectivitycheck.gstatic.com", 80)), connector.targets)
+        assertEquals(androidCheck, tunnel.writtenText, "la petición leída para reconocerla también se reenvía")
+    }
+
+    @Test
+    fun `a connectivity check goes to the proxy when the setting is off`() = runTest {
+        val health = ProxyHealth(testScheduler.timeSource).also { it.markSuccess() }
+        val connector = FakeProxyConnector.connectingTo(tunnel)
+        val app = appThrough(connector, serverPort = 80, answerChecks = false, health = health)
+        app.handshake(destinationHost = "connectivitycheck.gstatic.com")
+
+        app.sendData(androidCheck)
+        runCurrent()
+
+        assertEquals(1, connector.targets.size)
+    }
+
+    @Test
+    fun `other requests to a check host are not answered locally`() = runTest {
+        val health = ProxyHealth(testScheduler.timeSource).also { it.markSuccess() }
+        val connector = FakeProxyConnector.connectingTo(tunnel)
+        val app = appThrough(connector, serverPort = 80, answerChecks = true, health = health)
+        app.handshake(destinationHost = "www.google.com")
+
+        app.sendData("GET /search?q=uci HTTP/1.1\r\nHost: www.google.com\r\n\r\n")
+        runCurrent()
+
+        assertEquals(listOf(ProxyTarget("www.google.com", 80)), connector.targets)
+    }
+
+    @Test
+    fun `a connection the proxy opens makes it count as working`() = runTest {
+        val health = ProxyHealth(testScheduler.timeSource)
+        val app = appThrough(FakeProxyConnector.connectingTo(tunnel), health = health)
+
+        app.handshake(destinationHost = "www.uci.cu")
+
+        assertTrue(health.isHealthy())
+    }
+
+    @Test
+    fun `a connection the proxy refuses does not make it count as working`() = runTest {
+        val health = ProxyHealth(testScheduler.timeSource)
+        val app = appThrough(FakeProxyConnector.failingWith(ProxyFailure.Refused("HTTP/1.1 403 Forbidden")), health = health)
+
+        app.handshake(destinationHost = "bloqueado.example")
+
+        assertFalse(health.isHealthy())
     }
 }

@@ -20,6 +20,7 @@ import org.uci.proxy.home.HomeViewModel
 import org.uci.proxy.logs.LogsViewModel
 import org.uci.proxy.profile.ProfileEditorViewModel
 import org.uci.proxy.profile.ProfileListViewModel
+import org.uci.proxy.settings.SettingsViewModel
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -52,6 +53,11 @@ class AppModulesTest {
     @Test
     fun `tunnel view model resolves from the app modules`() {
         assertNotNull(koin.get<TunnelViewModel>())
+    }
+
+    @Test
+    fun `settings view model resolves from the app modules`() {
+        assertNotNull(koin.get<SettingsViewModel>())
     }
 
     @Test

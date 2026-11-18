@@ -20,6 +20,8 @@ import org.uci.proxy.core.proxy.NtlmAuthScheme
 import org.uci.proxy.core.proxy.ProxyTarget
 import org.uci.proxy.core.proxy.ProxyTester
 import org.uci.proxy.core.proxy.Socks5Connector
+import org.uci.proxy.core.settings.SettingsRepository
+import org.uci.proxy.core.settings.StoredSettingsRepository
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 
@@ -35,6 +37,7 @@ val coreModule = module {
     single<IdGenerator> { RandomIdGenerator() }
     singleOf(::ProfileValidator)
     singleOf(::StoredProfileRepository) { bind<ProfileRepository>() }
+    singleOf(::StoredSettingsRepository) { bind<SettingsRepository>() }
 
     single { SelectorManager(get<AppDispatchers>().background) }
     singleOf(::KtorTcpConnector) { bind<TcpConnector>() }

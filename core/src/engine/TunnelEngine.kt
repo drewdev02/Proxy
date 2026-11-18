@@ -17,6 +17,7 @@ import org.uci.proxy.core.port.PacketWriter
 import org.uci.proxy.core.port.RandomBytes
 import org.uci.proxy.core.port.TunDevice
 import org.uci.proxy.core.proxy.ProxyConnector
+import org.uci.proxy.core.settings.AppSettings
 import org.uci.proxy.core.tcp.TunTcpStack
 import kotlin.time.TimeSource
 
@@ -124,10 +125,13 @@ class TunnelEngineFactory(
         scope: CoroutineScope,
         profile: ProxyProfile,
         password: String,
+        settings: AppSettings = AppSettings(),
     ): TunnelEngine {
         val fakeDns = FakeDnsTable(plan.subnetBase)
         val connector = connectors.first { it.protocol == profile.protocol }
-        val relay = TunnelRelay(connector, profile, password, logger)
+        val health = ProxyHealth(timeSource)
+        val checks = ConnectivityChecks(settings.answerConnectivityChecks, health)
+        val relay = TunnelRelay(connector, profile, password, logger, health, checks)
 
         val start = timeSource.markNow()
         val tcp = TunTcpStack(
@@ -142,7 +146,7 @@ class TunnelEngineFactory(
         // El orden importa: DNS antes que el rechazo genérico de UDP.
         return TunnelEngine(
             listOf(
-                DnsPacketHandler(DnsResponder(fakeDns), logger),
+                DnsPacketHandler(DnsResponder(fakeDns, checks::dnsAddressFor), logger),
                 TcpPacketHandler(tcp, fakeDns),
                 UdpRejectHandler(),
             ),
