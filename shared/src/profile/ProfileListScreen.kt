@@ -199,11 +199,18 @@ private fun TunnelFailure.message(): String = when (this) {
     TunnelFailure.PROFILE_NOT_FOUND -> "No se pudo conectar: el perfil ya no existe."
     TunnelFailure.INTERFACE_UNAVAILABLE -> "No se pudo conectar: el sistema no permitió crear la conexión VPN."
     TunnelFailure.PROXY_HOST_UNRESOLVED -> "No se pudo conectar: no se encuentra el servidor del perfil."
+    TunnelFailure.PROXY_AUTH_FAILED -> "No se pudo conectar: el proxy rechazó el usuario o la contraseña."
+    TunnelFailure.VPN_PROFILE_INVALID ->
+        "No se pudo conectar: el archivo .ovpn del perfil no sirve. Debe ser OpenVPN sobre TCP; vuelve a elegirlo."
+    TunnelFailure.VPN_SERVER_UNREACHABLE -> "No se pudo conectar: el proxy no dejó llegar al servidor VPN."
+    TunnelFailure.VPN_AUTH_FAILED -> "No se pudo conectar: el servidor VPN rechazó el usuario o la contraseña."
+    TunnelFailure.VPN_HANDSHAKE_FAILED -> "No se pudo conectar: el servidor VPN no completó el acuerdo de claves."
 }
 
 private fun ProxyProfile.summary(): String {
     val user = if (username.isEmpty()) "" else " · $username"
-    return "${protocol.label} · $host:$port$user"
+    val exit = vpn?.let { " · VPN ${it.fileName}" }.orEmpty()
+    return "${protocol.label} · $host:$port$user$exit"
 }
 
 internal val ProxyProtocol.label: String

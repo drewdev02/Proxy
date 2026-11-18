@@ -30,7 +30,7 @@ fun main(args: Array<String>) {
     }
     application {
         Window(onCloseRequest = ::exitApplication, title = "ProxyUCI") {
-            App()
+            App(filePicker = AwtFilePicker())
             // Solo para pruebas: avisa de que la ventana ya se compuso y sale. Un ejecutor de CI no tiene un
             // escritorio interactivo del que leer el título de la ventana, así que lo dice la propia app.
             if (readyFile != null) {

@@ -22,7 +22,7 @@ orden de entrega**.
 | 6 | Navegación en Windows | Lo mismo en el PC | | | | ✔ |
 | 7 | Navegación en iOS | Lo mismo en el iPhone | | ✔ | | |
 | 8 | Actividad | Ver tráfico, estado y registro de eventos | ✔ | ✔ | ✔ | ✔ |
-| 9 | Otro País | Salir por un `.ovpn` encadenado al proxy | | | ✔ | ✔ |
+| 9 | Otro País | Salir por un `.ovpn` encadenado al proxy, opcional por perfil | ✔ | | ✔ | ✔ |
 | 10 | Resistencia | Cambiar de red o cerrar mal sin quedarse sin Internet | ✔ | ✔ | ✔ | ✔ |
 
 Las capas 0 a 2 no necesitan ninguna VPN y corren en las cuatro plataformas. Sirven para dejar probados
@@ -434,24 +434,34 @@ el simulador.
 
 **Demo:** descargar un archivo y ver los contadores moverse en cada plataforma.
 
-## Capa 9: Otro País (escritorio)
+## Capa 9: Otro País (macOS, Windows y Android)
 
-**Resultado:** en macOS y Windows se elige el modo "Otro País", se selecciona un `.ovpn` con sus credenciales, y
-la IP pública pasa a ser la del país elegido, todo encadenado a través del proxy institucional.
+**Resultado:** un perfil puede, opcionalmente, cargar un archivo `.ovpn` con las credenciales de su VPN; al
+conectar, el tráfico sale por ese servidor y la IP pública pasa a ser la del país elegido, todo a través del proxy
+institucional. Sin archivo, el perfil conecta directo como siempre.
 
-| Parte | Trabajo |
-|---|---|
-| Interfaz | Selector de modo de salida (solo si `supportedModes` lo incluye), selector de archivo y credenciales OpenVPN |
-| Núcleo | `LocalConnectProxy`, `OvpnConfigRewriter`, `ExitMode.OtherCountry` |
-| Adaptadores | `OpenVpnRunner` en `src@jvm`: localizar el binario, lanzarlo desde el motor elevado, limpieza del proceso y DNS por sistema |
-| Inyección | Enlaces en el `platformModule` de `jvm`; móvil no declara el modo |
+**Decisión de diseño:** el cliente OpenVPN va **dentro de la app**, escrito en Kotlin, y no se lanza un `openvpn`
+instalado aparte. Así no hay nada que instalar, ni procesos hijos que limpiar, ni DNS que restaurar, y el mismo código
+sirve en Android, macOS y Windows (los tres son JVM). No hace falta un proxy local: el servidor VPN se alcanza con un
+`CONNECT` al proxy, con los mismos conectores que el resto de la app.
 
-**Validaciones que resuelve:** `openvpn` de Homebrew conectando por un proxy HTTP local en macOS.
+| Parte | Trabajo | Hecho |
+|---|---|---|
+| Interfaz | Sección «Salir por otro país (VPN)» en el editor del perfil, con selector de archivo del sistema (oculta en iOS) | ✔ |
+| Núcleo | `OvpnConfig` (lector del `.ovpn`), `OpenVpnClient` (`tls-crypt`, canal de control, AES-GCM), `OpenVpnExit`, camino VPN de `TunnelRunner` | ✔ |
+| Adaptadores | `JcaOpenVpnCrypto` y `SslEngineTlsSession` (compartidos por escritorio y Android con el alias `jvmAndAndroid`), `AwtFilePicker`, selector de Android | ✔ |
+| Almacenamiento | El `.ovpn` y la contraseña de la VPN, por perfil, en el almacén seguro de cada sistema | ✔ |
 
-**Pruebas:** reescritura sobre perfiles `.ovpn` reales; proxy local contra el proxy falso con NTLM.
+**Alcance del cliente:** OpenVPN sobre TCP, `tls-crypt`, usuario y contraseña, AES-GCM y servidores que empujan
+`peer-id`. Se rechazan al cargar, con un mensaje claro, los perfiles solo UDP, con `tls-auth`, `tls-crypt-v2`,
+certificado de cliente o compresión. No renegocia claves: si el servidor lo pide, la sesión termina y hay que reconectar.
 
-**Demo:** con un `.ovpn` de ProtonVPN en ambos sistemas; al desconectar no queda ningún proceso `openvpn` ni DNS
-cambiado.
+**Pruebas:** contra el `openvpn` oficial (`tools/ovpn_test_server.sh`: certificados propios, TCP, `tls-crypt`), que corre
+en CI en Linux y macOS; pruebas unitarias del lector, del PRF y de los canales; y el camino del túnel con una sesión
+simulada. Verificado a mano en el emulador de Android con un proxy NTLM y un servidor de ProtonVPN real: la IP pública
+vista desde el emulador fue la del servidor VPN (Canadá), distinta de la del equipo.
+
+> Pendiente: comprobarlo en macOS y Windows reales con la red de la UCI.
 
 ## Capa 10: resistencia
 

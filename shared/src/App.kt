@@ -3,6 +3,11 @@ package org.uci.proxy
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import org.uci.proxy.files.FilePicker
+import org.uci.proxy.files.LocalFilePicker
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
@@ -27,7 +32,11 @@ import org.uci.proxy.tunnel.TunnelViewModel
 /** Requiere que la app haya llamado antes a [org.uci.proxy.di.initKoin]. */
 @Composable
 @DevelopmentEntryPoint
-fun App() {
+fun App() = App(filePicker = null)
+
+/** @param filePicker el selector de archivos del sistema, o null donde no lo hay (iOS): sin él no se ofrece la VPN. */
+@Composable
+fun App(filePicker: FilePicker?) = CompositionLocalProvider(LocalFilePicker provides filePicker) {
     MaterialTheme {
         val backStack = rememberNavBackStack(routesConfiguration, Route.ProfileList)
 
@@ -105,8 +114,16 @@ private fun ProfileEditorRoute(profileId: String?, onClose: () -> Unit) {
         }
     }
 
+    val picker = LocalFilePicker.current
+    val scope = rememberCoroutineScope()
+
     ProfileEditorScreen(
         state = state,
+        vpnAvailable = picker != null,
+        onVpnEnabledChange = viewModel::onVpnEnabledChange,
+        onVpnPickFile = { scope.launch { picker?.pickText()?.let { viewModel.onVpnFileChosen(it.name, it.text) } } },
+        onVpnUsernameChange = viewModel::onVpnUsernameChange,
+        onVpnPasswordChange = viewModel::onVpnPasswordChange,
         onDraftChange = viewModel::onDraftChange,
         onPasswordChange = viewModel::onPasswordChange,
         onTest = viewModel::testProxy,

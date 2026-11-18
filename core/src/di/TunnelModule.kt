@@ -10,6 +10,10 @@ import org.uci.proxy.core.engine.TunnelStateStore
 import org.uci.proxy.core.port.TunnelMonitor
 import org.uci.proxy.core.proxy.HttpConnectConnector
 import org.uci.proxy.core.proxy.Socks5Connector
+import org.uci.proxy.core.vpn.OpenVpnClient
+import org.uci.proxy.core.vpn.OpenVpnExit
+import org.uci.proxy.core.vpn.VpnExit
+import kotlin.time.Clock
 import kotlin.time.TimeSource
 
 /**
@@ -30,6 +34,20 @@ val tunnelModule = module {
             logger = get(),
         )
     }
+    single<VpnExit> {
+        OpenVpnExit(
+            client = OpenVpnClient(
+                crypto = get(),
+                tls = get(),
+                random = get(),
+                logger = get(),
+                nowSeconds = { get<Clock>().now().epochSeconds },
+            ),
+            connectors = listOf(get<HttpConnectConnector>(), get<Socks5Connector>()),
+            random = get(),
+            logger = get(),
+        )
+    }
     // Con get() explícitos: las rutas públicas usan el valor por defecto del constructor.
     single {
         TunnelRunner(
@@ -40,6 +58,7 @@ val tunnelModule = module {
             stateStore = get(),
             dispatchers = get(),
             logger = get(),
+            vpnExit = get(),
         )
     }
 }

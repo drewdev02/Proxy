@@ -2,6 +2,10 @@ product:
   type: kmp/lib
   platforms: [ jvm, android, iosArm64, iosSimulatorArm64 ]
 
+# Código que comparten escritorio y Android: ambos son JVM y tienen las mismas APIs de criptografía y TLS.
+aliases:
+  jvmAndAndroid: [ jvm, android ]
+
 # Núcleo sin Compose: lo enlaza también la extensión de iOS, que tiene un límite de memoria estricto.
 dependencies:
   - $libs.koin.core: exported

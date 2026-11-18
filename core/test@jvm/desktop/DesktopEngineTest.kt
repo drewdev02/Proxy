@@ -28,6 +28,11 @@ import org.uci.proxy.core.port.LogLevel
 import kotlin.time.Clock
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.ProxyProtocol
+import org.uci.proxy.core.vpn.VpnStart
+import org.uci.proxy.core.vpn.VpnExit
+import org.uci.proxy.core.vpn.VpnConnectResult
+import org.uci.proxy.core.model.VpnSecrets
+import org.uci.proxy.core.model.VpnProfile
 import org.uci.proxy.core.packet.buildUdpPacket
 import org.uci.proxy.core.packet.parseIpv4
 import org.uci.proxy.core.port.TunnelFailure
@@ -43,6 +48,7 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration
@@ -71,6 +77,16 @@ class EngineProtocolTest {
 
         val withoutSettings = EngineProtocol.encodeStart(EngineStart(profile, "x")).replace(Regex(""","settings":\{[^}]*\}"""), "")
         assertTrue(EngineProtocol.decodeStart(withoutSettings)!!.settings.answerConnectivityChecks)
+    }
+
+    @Test
+    fun `a start order carries the VPN along`() {
+        val start = EngineStart(profile, "x", vpn = VpnStart("client\nremote 192.0.2.1 443\n<ca>\n...\n</ca>\n", "usuario", "con \"comillas\" y ñ"))
+
+        val line = EngineProtocol.encodeStart(start)
+
+        assertFalse('\n' in line)
+        assertEquals(start, EngineProtocol.decodeStart(line))
     }
 
     @Test
@@ -180,10 +196,16 @@ class DesktopTunnelIntegrationTest {
             stateStore = stateStore,
             dispatchers = dispatchers,
             logger = engineLogger,
+            vpnExit = VpnExit { proxy, password, vpn ->
+                receivedVpn = Triple(proxy, password, vpn)
+                vpnResult
+            },
         )
         return EngineSession(runner, stateStore, platformTunnel, Dispatchers.IO, engineLogger, engineLogs, maxDuration)
     }
 
+    private var receivedVpn: Triple<ProxyProfile, String, VpnStart>? = null
+    private var vpnResult: VpnConnectResult = VpnConnectResult.Failed(TunnelFailure.VPN_AUTH_FAILED)
     private var receivedHost: String? = null
     private var engineMaxDuration: Duration? = null
 
@@ -242,6 +264,33 @@ class DesktopTunnelIntegrationTest {
         assertEquals(2_000, warning.epochMillis)
         controller.disconnect()
         awaitState { it == TunnelState.Disconnected }
+    }
+
+    @Test
+    fun `a profile with a VPN sends its file and credentials to the engine and a failure comes back by name`() = runBlocking {
+        val withVpn = profile.copy(vpn = VpnProfile("pais.ovpn", "vpnuser"))
+        repository.save(withVpn, "proxypass", VpnSecrets("client\n", "vpnpass"))
+
+        controller.connect(withVpn.id)
+        val state = awaitState { it is TunnelState.Failed }
+
+        val (proxy, proxyPassword, vpn) = assertNotNull(receivedVpn)
+        assertEquals("proxypass", proxyPassword)
+        assertEquals(VpnStart("client\n", "vpnuser", "vpnpass"), vpn)
+        assertEquals("10.8.0.20", proxy.host, "el motor resolvió el proxy antes de abrir la VPN")
+        assertEquals(TunnelState.Failed(TunnelFailure.VPN_AUTH_FAILED), state)
+    }
+
+    @Test
+    fun `a profile whose VPN file is missing fails in the window without launching the engine`() = runBlocking {
+        val withVpn = profile.copy(vpn = VpnProfile("pais.ovpn", "vpnuser"))
+        repository.save(withVpn, "proxypass", vpn = null)
+
+        controller.connect(withVpn.id)
+
+        assertEquals(TunnelState.Failed(TunnelFailure.VPN_PROFILE_INVALID), controller.state.value)
+        assertNull(receivedVpn)
+        assertNull(tokenFileSeen, "no se lanzó el motor, que pediría privilegios para nada")
     }
 
     @Test

@@ -105,6 +105,17 @@ class WinNetworkTest {
     }
 
     @Test
+    fun `the adapter takes the netmask the VPN server pushed`() {
+        network.configureAdapter("ProxyUCI", "10.8.0.6", "10.8.0.1", 1500, mask = "255.255.255.0")
+
+        assertEquals(
+            "netsh interface ip set address name=ProxyUCI source=static addr=10.8.0.6 mask=255.255.255.0 gateway=none",
+            runner.changes.first(),
+        )
+        assertFailsWith<IllegalArgumentException> { network.configureAdapter("ProxyUCI", "10.8.0.6", "10.8.0.1", 1500, mask = "255.255.255.0 & calc") }
+    }
+
+    @Test
     fun `routes go through the adapter or through the real gateway`() {
         network.addRouteThroughAdapter(Ipv4Route.parse("8.0.0.0/7"), "ProxyUCI")
         network.addHostRouteThroughGateway("200.55.1.2", "192.168.1.1")

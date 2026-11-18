@@ -7,6 +7,7 @@ import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.settings.AppSettings
+import org.uci.proxy.core.vpn.VpnStart
 
 /*
  * Protocolo entre la ventana de escritorio y el proceso del motor, que corre con privilegios
@@ -23,7 +24,13 @@ import org.uci.proxy.core.settings.AppSettings
  */
 
 @Serializable
-data class EngineStart(val profile: ProxyProfile, val password: String, val settings: AppSettings = AppSettings())
+data class EngineStart(
+    val profile: ProxyProfile,
+    val password: String,
+    val settings: AppSettings = AppSettings(),
+    /** Si el perfil sale por una VPN, el archivo y las credenciales de esta. */
+    val vpn: VpnStart? = null,
+)
 
 /** Un mensaje de registro del motor. El nivel viaja por su nombre: un nivel que la ventana no conozca no la rompe. */
 @Serializable

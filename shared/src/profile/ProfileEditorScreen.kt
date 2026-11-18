@@ -22,6 +22,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.Alignment
+import androidx.compose.material3.Switch
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
@@ -41,6 +45,12 @@ fun ProfileEditorScreen(
     onTest: () -> Unit,
     onSave: () -> Unit,
     onCancel: () -> Unit,
+    /** False donde no hay selector de archivos (iOS): la sección de la VPN no se muestra. */
+    vpnAvailable: Boolean = false,
+    onVpnEnabledChange: (Boolean) -> Unit = {},
+    onVpnPickFile: () -> Unit = {},
+    onVpnUsernameChange: (String) -> Unit = {},
+    onVpnPasswordChange: (String) -> Unit = {},
 ) {
     val draft = state.draft
     Scaffold(
@@ -117,6 +127,16 @@ fun ProfileEditorScreen(
                 )
             }
 
+            if (vpnAvailable) {
+                VpnSection(
+                    state = state,
+                    onEnabledChange = onVpnEnabledChange,
+                    onPickFile = onVpnPickFile,
+                    onUsernameChange = onVpnUsernameChange,
+                    onPasswordChange = onVpnPasswordChange,
+                )
+            }
+
             if (state.saveFailed) {
                 Text(
                     "No se pudo guardar el perfil. Inténtalo de nuevo.",
@@ -128,6 +148,65 @@ fun ProfileEditorScreen(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 TextButton(onClick = onCancel, enabled = !state.isBusy) { Text("Cancelar") }
                 Button(onClick = onSave, enabled = !state.isBusy) { Text("Guardar") }
+            }
+        }
+    }
+}
+
+/** «Salir por otro país»: encadena una VPN OpenVPN tras el proxy. Opcional: apagada, el perfil sale directo. */
+@Composable
+private fun VpnSection(
+    state: ProfileEditorUiState,
+    onEnabledChange: (Boolean) -> Unit,
+    onPickFile: () -> Unit,
+    onUsernameChange: (String) -> Unit,
+    onPasswordChange: (String) -> Unit,
+) {
+    val vpn = state.vpn
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .toggleable(value = vpn.enabled, role = Role.Switch, onValueChange = onEnabledChange),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("Salir por otro país (VPN)", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Carga un archivo .ovpn y el tráfico saldrá por ese servidor, pasando por el proxy. " +
+                        "Solo perfiles OpenVPN sobre TCP.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(checked = vpn.enabled, onCheckedChange = null)
+        }
+
+        if (vpn.enabled) {
+            OutlinedButton(onClick = onPickFile, enabled = !state.isBusy, modifier = Modifier.fillMaxWidth()) {
+                Text(if (vpn.fileName.isEmpty()) "Elegir archivo .ovpn" else "Archivo: ${vpn.fileName} (cambiar)")
+            }
+            val fileError = vpn.fileError
+                ?: "Elige un archivo .ovpn.".takeIf { ProfileField.VPN_FILE in state.errors }
+            fileError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
+
+            if (vpn.needsCredentials) {
+                ProfileTextField(
+                    label = "Usuario de la VPN",
+                    value = vpn.username,
+                    onValueChange = onUsernameChange,
+                    error = "Escribe el usuario de la VPN.".takeIf { ProfileField.VPN_USERNAME in state.errors },
+                )
+                OutlinedTextField(
+                    value = vpn.password,
+                    onValueChange = onPasswordChange,
+                    label = { Text("Contraseña de la VPN") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
     }

@@ -47,7 +47,7 @@ class WinPlatformTunnel(
 
         var proxyBypass: String? = null
         try {
-            network.configureAdapter(ADAPTER_NAME, config.address, config.dnsServer, config.mtu)
+            network.configureAdapter(ADAPTER_NAME, config.address, config.dnsServer, config.mtu, config.netmask)
 
             // Si el proxy cae dentro de lo que se enruta al túnel, necesita una ruta propia por la red real.
             val proxy = parseIpv4(config.proxyAddress)

@@ -315,27 +315,28 @@ Comportamientos que se conservan del port en C# y del análisis:
 
 IPv6 queda fuera del túnel, igual que en Super Proxy. Las cuatro plataformas entran en la versión 1.
 
-### Modo "Otro País" (escritorio)
+### Modo «Otro País» (macOS, Windows y Android)
 
-En este modo la app no abre su propia TUN: la crea OpenVPN. El papel del núcleo es otro:
+Es opcional por perfil: sin archivo `.ovpn`, el perfil conecta directo. Con él, la app es también el cliente OpenVPN:
+no lanza ningún programa externo.
 
-1. `LocalConnectProxy` (común) escucha en `127.0.0.1:<puerto>` y reenvía cada `CONNECT` al proxy institucional
-   con NTLMv2 o Basic, usando los mismos conectores del modo Directo.
-2. `OvpnConfigRewriter` (común) genera una copia temporal del `.ovpn`: `proto tcp-client`, solo remotos TCP 443,
-   `http-proxy 127.0.0.1 <puerto>`, cifrados con alternativa, y credenciales en un archivo temporal que se borra
-   al autenticar.
-3. `OpenVpnRunner` (`src@jvm`) localiza el binario, lo lanza desde el proceso `--engine` elevado, sigue su
-   salida para reportar el estado y garantiza que muere con la app.
+```
+Apps → interfaz TUN de ProxyUCI → [cifrado OpenVPN] → conexión TCP al servidor VPN (abierta con CONNECT por el proxy)
+```
 
-| | Windows | macOS |
-|---|---|---|
-| Binario | `openvpn.exe` de ProtonVPN, OpenVPN GUI o `PATH` | `openvpn` de Homebrew o el incluido en Tunnelblick |
-| Limpieza del proceso hijo | Job Object | Grupo de procesos, señal al salir |
-| DNS | `block-outside-dns` | Esa opción no existe; el DNS que empuja el servidor se aplica con `networksetup` y se restaura al parar |
-| Adaptador | `tap-windows6` u `ovpn-dco` | `utun`, lo crea OpenVPN |
+1. `OvpnConfig` (común) lee el `.ovpn`: servidores TCP, la autoridad `<ca>` y la clave `<tls-crypt>`. Lo que el cliente
+   no implementa se rechaza al cargar.
+2. `OpenVpnClient` (común) hace el handshake: envoltura `tls-crypt`, canal de control con acuses, TLS dentro de los
+   paquetes de control (puerto `TlsSession`), intercambio «key method 2» con usuario y contraseña, derivación de claves
+   con el PRF de TLS 1.0 y canal de datos con AES-GCM. Las primitivas de criptografía y el TLS los aporta cada
+   plataforma (`OpenVpnCrypto`, `TlsSessionFactory`); escritorio y Android comparten la implementación Java con el
+   alias `jvmAndAndroid`, e iOS enlaza versiones «no disponible».
+3. `OpenVpnExit` abre la sesión probando los servidores del archivo, cada uno con un `CONNECT` al proxy.
+4. `TunnelRunner` crea la interfaz **después** del handshake, con la dirección, la máscara, el DNS y el MTU que empuja el
+   servidor, y pasa los paquetes IPv4 tal cual entre la interfaz y la VPN. No usa la pila TCP ni el DNS falso.
 
-iOS y Android no tienen este modo: no pueden lanzar un proceso `openvpn`. `supportedModes` lo oculta en la
-interfaz.
+El archivo y la contraseña de la VPN viajan de la ventana al motor en la orden de arranque (`EngineStart.vpn`), porque el
+motor de escritorio corre en otro proceso. iOS no tiene este modo y la interfaz oculta la sección.
 
 ---
 

@@ -9,6 +9,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import org.uci.proxy.core.model.ProxyProfile
+import org.uci.proxy.core.model.VpnSecrets
 import org.uci.proxy.core.port.KeyValueStore
 import org.uci.proxy.core.port.LogLevel
 import org.uci.proxy.core.port.Logger
@@ -29,9 +30,15 @@ class StoredProfileRepository(
 
     override val profiles: StateFlow<List<ProxyProfile>> = state.asStateFlow()
 
-    override suspend fun save(profile: ProxyProfile, password: String) = write {
-        // Primero el secreto: si el almacén seguro falla, la lista no queda apuntando a un perfil a medias.
+    override suspend fun save(profile: ProxyProfile, password: String, vpn: VpnSecrets?) = write {
+        // Primero los secretos: si el almacén seguro falla, la lista no queda apuntando a un perfil a medias.
         if (password.isEmpty()) secretStore.remove(passwordKey(profile.id)) else secretStore.put(passwordKey(profile.id), password)
+        if (profile.vpn == null || vpn == null) {
+            removeVpnSecrets(profile.id)
+        } else {
+            secretStore.put(vpnFileKey(profile.id), vpn.ovpn)
+            if (vpn.password.isEmpty()) secretStore.remove(vpnPasswordKey(profile.id)) else secretStore.put(vpnPasswordKey(profile.id), vpn.password)
+        }
 
         val current = state.value
         val updated = if (current.any { it.id == profile.id }) {
@@ -45,10 +52,21 @@ class StoredProfileRepository(
     override suspend fun delete(id: String) = write {
         persist(state.value.filterNot { it.id == id })
         secretStore.remove(passwordKey(id))
+        removeVpnSecrets(id)
     }
 
     override suspend fun password(id: String): String = withContext(dispatchers.background) {
         secretStore.get(passwordKey(id)).orEmpty()
+    }
+
+    override suspend fun vpnSecrets(id: String): VpnSecrets? = withContext(dispatchers.background) {
+        val ovpn = secretStore.get(vpnFileKey(id)) ?: return@withContext null
+        VpnSecrets(ovpn, secretStore.get(vpnPasswordKey(id)).orEmpty())
+    }
+
+    private fun removeVpnSecrets(id: String) {
+        secretStore.remove(vpnFileKey(id))
+        secretStore.remove(vpnPasswordKey(id))
     }
 
     private suspend fun write(block: () -> Unit) = withContext(dispatchers.background) {
@@ -71,6 +89,10 @@ class StoredProfileRepository(
     }
 
     private fun passwordKey(id: String) = "profile.$id.password"
+
+    private fun vpnFileKey(id: String) = "profile.$id.vpn-file"
+
+    private fun vpnPasswordKey(id: String) = "profile.$id.vpn-password"
 
     private companion object {
         const val TAG = "ProfileRepository"

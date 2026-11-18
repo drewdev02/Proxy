@@ -9,6 +9,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.uci.proxy.core.model.ProxyProfile
+import org.uci.proxy.core.model.VpnProfile
+import org.uci.proxy.core.model.VpnSecrets
 import org.uci.proxy.core.port.LocalNetworkPermission
 import org.uci.proxy.core.port.LogLevel
 import org.uci.proxy.core.port.Logger
@@ -20,6 +22,8 @@ import org.uci.proxy.core.profile.ProfileValidation
 import org.uci.proxy.core.profile.ProfileValidator
 import org.uci.proxy.core.proxy.ProxyTestResult
 import org.uci.proxy.core.proxy.ProxyTester
+import org.uci.proxy.core.vpn.OvpnConfigException
+import org.uci.proxy.core.vpn.parseOvpn
 
 sealed interface ProxyTestUiState {
     data object Idle : ProxyTestUiState
@@ -32,6 +36,20 @@ sealed interface ProxyTestUiState {
     data object LocalNetworkDenied : ProxyTestUiState
 }
 
+/** La VPN del perfil («Otro País») tal como se edita. Con [enabled] en false el perfil sale directo por el proxy. */
+data class VpnDraft(
+    val enabled: Boolean = false,
+    val fileName: String = "",
+    /** El contenido del archivo ya leído; vacío si no se eligió uno válido. */
+    val ovpn: String = "",
+    val username: String = "",
+    val password: String = "",
+    /** Por qué no sirve el archivo elegido, para mostrarlo. */
+    val fileError: String? = null,
+    /** Si el servidor VPN pide usuario y contraseña (casi todos los comerciales sí). */
+    val needsCredentials: Boolean = true,
+)
+
 data class ProfileEditorUiState(
     val isNew: Boolean = true,
     val draft: ProfileDraft = ProfileDraft(),
@@ -42,6 +60,7 @@ data class ProfileEditorUiState(
     /** Pasa a true cuando el perfil quedó guardado; la pantalla lo usa para cerrarse. */
     val saved: Boolean = false,
     val test: ProxyTestUiState = ProxyTestUiState.Idle,
+    val vpn: VpnDraft = VpnDraft(),
 ) {
     val isBusy: Boolean get() = isSaving || test == ProxyTestUiState.Running
 }
@@ -78,12 +97,25 @@ class ProfileEditorViewModel(
         state.value = ProfileEditorUiState(
             isNew = existing == null,
             draft = existing?.toDraft() ?: ProfileDraft(),
+            vpn = existing?.vpn?.let { VpnDraft(enabled = true, fileName = it.fileName, username = it.username) } ?: VpnDraft(),
         )
         if (existing != null) {
             viewModelScope.launch {
                 val password = guarded("leer la contraseña") { repository.password(existing.id) }.orEmpty()
-                // Si entretanto se abrió otro perfil, esta contraseña ya no corresponde al formulario.
-                if (editingId == existing.id) state.update { it.copy(password = password) }
+                val secrets = if (existing.vpn != null) guarded("leer la VPN") { repository.vpnSecrets(existing.id) } else null
+                // Si entretanto se abrió otro perfil, estos datos ya no corresponden al formulario.
+                if (editingId == existing.id) {
+                    state.update {
+                        it.copy(
+                            password = password,
+                            vpn = if (secrets == null) it.vpn else it.vpn.copy(
+                                ovpn = secrets.ovpn,
+                                password = secrets.password,
+                                needsCredentials = needsCredentials(secrets.ovpn),
+                            ),
+                        )
+                    }
+                }
             }
         }
     }
@@ -103,6 +135,35 @@ class ProfileEditorViewModel(
 
     fun onPasswordChange(password: String) {
         state.update { it.copy(password = password, saveFailed = false, test = it.test.afterEdit()) }
+    }
+
+    fun onVpnEnabledChange(enabled: Boolean) {
+        state.update { it.copy(vpn = it.vpn.copy(enabled = enabled), errors = it.errors - VPN_FIELDS, saveFailed = false) }
+    }
+
+    /** La persona eligió un archivo `.ovpn`: se comprueba enseguida, para avisar antes de guardar y no al conectar. */
+    fun onVpnFileChosen(fileName: String, text: String) {
+        val vpn = try {
+            val config = parseOvpn(text)
+            state.value.vpn.copy(
+                enabled = true,
+                fileName = fileName,
+                ovpn = text,
+                fileError = null,
+                needsCredentials = config.needsCredentials,
+            )
+        } catch (e: OvpnConfigException) {
+            state.value.vpn.copy(fileName = fileName, ovpn = "", fileError = e.message)
+        }
+        state.update { it.copy(vpn = vpn, errors = it.errors - ProfileField.VPN_FILE, saveFailed = false) }
+    }
+
+    fun onVpnUsernameChange(username: String) {
+        state.update { it.copy(vpn = it.vpn.copy(username = username), errors = it.errors - ProfileField.VPN_USERNAME, saveFailed = false) }
+    }
+
+    fun onVpnPasswordChange(password: String) {
+        state.update { it.copy(vpn = it.vpn.copy(password = password), saveFailed = false) }
     }
 
     /**
@@ -139,12 +200,21 @@ class ProfileEditorViewModel(
         val current = state.value
         if (current.isBusy) return
 
-        when (val validation = validator.validate(editingId ?: idGenerator.newId(), current.draft)) {
-            is ProfileValidation.Invalid -> state.update { it.copy(errors = validation.errors) }
-            is ProfileValidation.Valid -> {
+        val validation = validator.validate(editingId ?: idGenerator.newId(), current.draft)
+        val vpn = current.vpn
+        val vpnErrors = buildSet {
+            if (vpn.enabled && vpn.ovpn.isBlank()) add(ProfileField.VPN_FILE)
+            if (vpn.enabled && vpn.needsCredentials && vpn.username.isBlank()) add(ProfileField.VPN_USERNAME)
+        }
+        when {
+            validation is ProfileValidation.Invalid -> state.update { it.copy(errors = validation.errors + vpnErrors) }
+            vpnErrors.isNotEmpty() -> state.update { it.copy(errors = vpnErrors) }
+            validation is ProfileValidation.Valid -> {
                 state.update { it.copy(errors = emptySet(), isSaving = true, saveFailed = false) }
                 viewModelScope.launch {
-                    val ok = guarded("guardar el perfil") { repository.save(validation.profile, current.password) } != null
+                    val profile = validation.profile.copy(vpn = if (vpn.enabled) VpnProfile(vpn.fileName, vpn.username.trim()) else null)
+                    val secrets = if (vpn.enabled) VpnSecrets(vpn.ovpn, vpn.password) else null
+                    val ok = guarded("guardar el perfil") { repository.save(profile, current.password, secrets) } != null
                     state.update { it.copy(isSaving = false, saved = ok, saveFailed = !ok) }
                 }
             }
@@ -167,6 +237,12 @@ class ProfileEditorViewModel(
         if (old.port != new.port) add(ProfileField.PORT)
     }
 
+    private fun needsCredentials(ovpn: String): Boolean = try {
+        parseOvpn(ovpn).needsCredentials
+    } catch (_: OvpnConfigException) {
+        true
+    }
+
     private fun ProxyProfile.toDraft() = ProfileDraft(
         name = name,
         host = host,
@@ -180,6 +256,7 @@ class ProfileEditorViewModel(
 
     private companion object {
         const val TAG = "ProfileEditor"
+        val VPN_FIELDS = setOf(ProfileField.VPN_FILE, ProfileField.VPN_USERNAME)
 
         // La prueba no guarda nada: el perfil temporal solo necesita un id cualquiera.
         const val TEST_PROFILE_ID = "prueba"

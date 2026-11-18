@@ -16,3 +16,7 @@ __pycache__/
 keystore.properties
 *.keystore
 *.jks
+
+# Perfiles de VPN y capturas con credenciales: nunca al repositorio.
+*.ovpn
+Pasted *.png

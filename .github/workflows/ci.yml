@@ -31,6 +31,13 @@ jobs:
       - name: Poner el tar de Windows primero
         if: runner.os == 'Windows'
         run: Add-Content -Path $env:GITHUB_PATH -Value "C:\Windows\System32"
+      # El cliente OpenVPN propio se prueba contra el `openvpn` oficial (tools/ovpn_test_server.sh). En Windows no se
+      # instala: esas pruebas se saltan solas si no lo encuentran.
+      - name: OpenVPN de referencia
+        if: runner.os != 'Windows'
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then sudo apt-get update -qq && sudo apt-get install -y -qq openvpn; else brew install openvpn; fi
+          command -v openvpn || ls /opt/homebrew/sbin/openvpn /usr/local/sbin/openvpn 2>/dev/null
       - name: Pruebas del núcleo
         run: ${{ matrix.kotlin }} test -m core --platform jvm
       - name: Pruebas de la interfaz

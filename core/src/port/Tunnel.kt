@@ -35,6 +35,8 @@ data class TunConfig(
      * túnel; cada plataforma lo garantiza a su manera.
      */
     val proxyAddress: String,
+    /** Máscara de la dirección de la interfaz. Con la VPN la fija el servidor; sin ella, la subred virtual (/16). */
+    val netmask: String = "255.255.0.0",
 )
 
 class TunnelUnavailableException(message: String) : Exception(message)
@@ -60,6 +62,21 @@ enum class TunnelFailure {
 
     /** El nombre del servidor proxy no se pudo resolver a una dirección. */
     PROXY_HOST_UNRESOLVED,
+
+    /** El proxy rechazó el usuario o la contraseña del perfil. */
+    PROXY_AUTH_FAILED,
+
+    /** El archivo `.ovpn` del perfil no sirve (UDP, otra función no admitida) o falta. */
+    VPN_PROFILE_INVALID,
+
+    /** No se pudo llegar al servidor VPN a través del proxy. */
+    VPN_SERVER_UNREACHABLE,
+
+    /** El servidor VPN rechazó el usuario o la contraseña. */
+    VPN_AUTH_FAILED,
+
+    /** El handshake con el servidor VPN falló por otro motivo. */
+    VPN_HANDSHAKE_FAILED,
 }
 
 sealed interface TunnelState {

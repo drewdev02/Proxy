@@ -18,6 +18,7 @@ import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.profile.AppDispatchers
 import org.uci.proxy.core.profile.ProfileRepository
 import org.uci.proxy.core.settings.SettingsRepository
+import org.uci.proxy.core.vpn.VpnStart
 import java.io.IOException
 import java.io.PrintWriter
 import java.net.InetAddress
@@ -73,7 +74,16 @@ class DesktopTunnelController(
             mutableState.value = TunnelState.Failed(TunnelFailure.PROFILE_NOT_FOUND)
             return
         }
-        val start = EngineStart(profile, profiles.password(profileId), settings.settings.value)
+        val vpn = profile.vpn?.let { vpnProfile ->
+            val secrets = profiles.vpnSecrets(profileId)
+            if (secrets == null) {
+                logger.log(LogLevel.ERROR, TAG, "El perfil tiene una VPN pero no se pudo leer su archivo")
+                mutableState.value = TunnelState.Failed(TunnelFailure.VPN_PROFILE_INVALID)
+                return
+            }
+            VpnStart(secrets.ovpn, vpnProfile.username, secrets.password)
+        }
+        val start = EngineStart(profile, profiles.password(profileId), settings.settings.value, vpn)
         mutableState.value = TunnelState.Connecting(profileId)
         stopRequested = false
         session = scope.launch { runSession(profileId, start) }

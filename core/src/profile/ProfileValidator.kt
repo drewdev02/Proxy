@@ -12,7 +12,7 @@ data class ProfileDraft(
     val username: String = "",
 )
 
-enum class ProfileField { NAME, HOST, PORT }
+enum class ProfileField { NAME, HOST, PORT, VPN_FILE, VPN_USERNAME }
 
 sealed interface ProfileValidation {
     data class Valid(val profile: ProxyProfile) : ProfileValidation

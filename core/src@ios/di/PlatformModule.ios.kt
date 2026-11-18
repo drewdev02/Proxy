@@ -24,6 +24,10 @@ import org.uci.proxy.core.port.SecretStore
 import org.uci.proxy.core.port.TunnelControl
 import org.uci.proxy.core.port.TunnelMonitor
 import org.uci.proxy.core.profile.AppDispatchers
+import org.uci.proxy.core.vpn.OpenVpnCrypto
+import org.uci.proxy.core.vpn.TlsSessionFactory
+import org.uci.proxy.core.vpn.UnavailableOpenVpnCrypto
+import org.uci.proxy.core.vpn.UnavailableTlsSessionFactory
 import platform.Foundation.NSUserDefaults
 
 private const val KEYCHAIN_SERVICE = "org.uci.proxy"
@@ -37,6 +41,9 @@ actual val platformModule: Module = module {
     // NSLog sigue recibiéndolo todo; además se guarda para la pantalla «Registro».
     single<Logger> { BufferedLogger(NsLogLogger(), get(), get()) }
     singleOf(::SecRandomBytes) { bind<RandomBytes>() }
+    // iOS no tiene cliente VPN propio: el modo Otro País queda fuera.
+    single<OpenVpnCrypto> { UnavailableOpenVpnCrypto }
+    single<TlsSessionFactory> { UnavailableTlsSessionFactory }
     // iOS muestra por su cuenta el aviso de red local la primera vez que la app se conecta.
     singleOf(::GrantedLocalNetworkPermission) { bind<LocalNetworkPermission>() }
     // El túnel de iOS llega en la capa 7, con la extensión de red.

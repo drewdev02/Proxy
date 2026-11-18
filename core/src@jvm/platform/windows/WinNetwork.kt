@@ -24,11 +24,12 @@ class WinNetwork(private val runner: CommandRunner) {
      * Da al adaptador su dirección en la subred /16 del túnel y su DNS, y le pone la métrica más baja para que
      * Windows prefiera su DNS al de las demás interfaces.
      */
-    fun configureAdapter(adapter: String, address: String, dnsServer: String, mtu: Int) {
+    fun configureAdapter(adapter: String, address: String, dnsServer: String, mtu: Int, mask: String = TUNNEL_MASK) {
         requireSafeName(adapter)
         require(parseIpv4(address) != null) { "Dirección no válida: $address" }
         require(parseIpv4(dnsServer) != null) { "Servidor DNS no válido: $dnsServer" }
-        must(listOf(NETSH, "interface", "ip", "set", "address", "name=$adapter", "source=static", "addr=$address", "mask=$TUNNEL_MASK", "gateway=none"))
+        require(parseIpv4(mask) != null) { "Máscara no válida: $mask" }
+        must(listOf(NETSH, "interface", "ip", "set", "address", "name=$adapter", "source=static", "addr=$address", "mask=$mask", "gateway=none"))
         must(listOf(NETSH, "interface", "ip", "set", "dns", "name=$adapter", "source=static", "addr=$dnsServer", "validate=no"))
         must(listOf(NETSH, "interface", "ipv4", "set", "subinterface", adapter, "mtu=$mtu", "store=active"))
         must(listOf(NETSH, "interface", "ipv4", "set", "interface", adapter, "metric=1"))
