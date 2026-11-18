@@ -203,6 +203,9 @@ private fun TunnelFailure.message(): String = when (this) {
     TunnelFailure.VPN_PROFILE_INVALID ->
         "No se pudo conectar: el archivo .ovpn del perfil no sirve. Debe ser OpenVPN sobre TCP; vuelve a elegirlo."
     TunnelFailure.VPN_SERVER_UNREACHABLE -> "No se pudo conectar: el proxy no dejó llegar al servidor VPN."
+    TunnelFailure.VPN_SERVER_BLOCKED ->
+        "No se pudo conectar: la política del proxy bloqueó el acceso a los servidores VPN del archivo. " +
+            "Prueba con otro servidor, uno con puerto 443."
     TunnelFailure.VPN_AUTH_FAILED -> "No se pudo conectar: el servidor VPN rechazó el usuario o la contraseña."
     TunnelFailure.VPN_HANDSHAKE_FAILED -> "No se pudo conectar: el servidor VPN no completó el acuerdo de claves."
 }

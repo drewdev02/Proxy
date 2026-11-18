@@ -10,6 +10,7 @@ import org.uci.proxy.core.proxy.ProxyConnectResult
 import org.uci.proxy.core.proxy.ProxyConnector
 import org.uci.proxy.core.proxy.ProxyFailure
 import org.uci.proxy.core.proxy.ProxyTarget
+import org.uci.proxy.core.proxy.sslipNameFor
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -58,16 +59,29 @@ class OpenVpnExit(
         val connector = connectors.firstOrNull { it.protocol == proxy.protocol }
             ?: return VpnConnectResult.Failed(TunnelFailure.VPN_SERVER_UNREACHABLE)
 
-        val remotes = if (config.remoteRandom) config.remotes.shuffled(randomSource()) else config.remotes
-        var failure = TunnelFailure.VPN_SERVER_UNREACHABLE
+        // El 443 primero: es el único puerto que los proxies institucionales dejan pasar con seguridad (SuperProxy usa solo
+        // ese). Dentro de cada grupo se respeta el orden del archivo, o uno al azar si el perfil lo pide.
+        val ordered = if (config.remoteRandom) config.remotes.shuffled(randomSource()) else config.remotes
+        val remotes = ordered.sortedBy { if (it.port == PREFERRED_PORT) 0 else 1 }
+
+        var proxyRefused = false
+        var handshakeFailed = false
         for (remote in remotes.take(MAX_ATTEMPTS)) {
-            logger.log(LogLevel.INFO, TAG, "Conectando con el servidor VPN ${remote.host}:${remote.port} a través del proxy")
-            val result = withTimeoutOrNull(connectTimeout) { connector.connect(proxy, proxyPassword, ProxyTarget(remote.host, remote.port)) }
+            // La IP del servidor, escrita tal cual, la rechaza el Squid de la UCI (403): se pide por su nombre sslip.io.
+            val proxyHost = sslipNameFor(remote.host) ?: remote.host
+            logger.log(LogLevel.INFO, TAG, "Conectando con el servidor VPN ${remote.host}:${remote.port} a través del proxy" +
+                if (proxyHost != remote.host) " (vía $proxyHost)" else "")
+            var result = withTimeoutOrNull(connectTimeout) { connector.connect(proxy, proxyPassword, ProxyTarget(proxyHost, remote.port)) }
+            // Si el proxy no acepta el nombre sslip.io (no lo resuelve, o lo bloquea), se prueba la IP tal cual.
+            if (proxyHost != remote.host && (result as? ProxyConnectResult.Failed)?.failure is ProxyFailure.Refused) {
+                result = withTimeoutOrNull(connectTimeout) { connector.connect(proxy, proxyPassword, ProxyTarget(remote.host, remote.port)) }
+            }
             val connection = when (result) {
                 is ProxyConnectResult.Connected -> result.connection
                 is ProxyConnectResult.Failed -> {
                     logger.log(LogLevel.WARN, TAG, "El proxy no abrió ${remote.host}:${remote.port}: ${result.failure}")
                     if (result.failure.isAuthentication()) return VpnConnectResult.Failed(TunnelFailure.PROXY_AUTH_FAILED)
+                    if (result.failure is ProxyFailure.Refused) proxyRefused = true
                     continue
                 }
                 null -> {
@@ -85,8 +99,14 @@ class OpenVpnExit(
                 return VpnConnectResult.Failed(TunnelFailure.VPN_PROFILE_INVALID)
             } catch (e: OpenVpnException) {
                 logger.log(LogLevel.WARN, TAG, "Falló el handshake con ${remote.host}:${remote.port}: ${e.message}")
-                failure = TunnelFailure.VPN_HANDSHAKE_FAILED
+                handshakeFailed = true
             }
+        }
+        // Lo más informativo primero: si algún servidor llegó a responder, el problema es de la VPN y no del proxy.
+        val failure = when {
+            handshakeFailed -> TunnelFailure.VPN_HANDSHAKE_FAILED
+            proxyRefused -> TunnelFailure.VPN_SERVER_BLOCKED
+            else -> TunnelFailure.VPN_SERVER_UNREACHABLE
         }
         return VpnConnectResult.Failed(failure)
     }
@@ -100,6 +120,7 @@ class OpenVpnExit(
     private companion object {
         const val TAG = "Vpn"
         const val MAX_ATTEMPTS = 6
+        const val PREFERRED_PORT = 443
     }
 }
 

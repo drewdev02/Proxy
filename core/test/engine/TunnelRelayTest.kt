@@ -79,19 +79,19 @@ class TunnelRelayTest {
     }
 
     @Test
-    fun `a raw IP whose first bytes say nothing is opened by address`() = runTest {
+    fun `a raw public IP whose first bytes say nothing is opened through its sslip name`() = runTest {
         val connector = FakeProxyConnector.connectingTo(tunnel)
         val app = appThrough(connector)
         app.handshake()
 
         app.sendData("SSH-2.0-OpenSSH_9.6\r\n")
 
-        assertEquals(listOf(ProxyTarget("93.184.216.34", 443)), connector.targets)
+        assertEquals(listOf(ProxyTarget("93-184-216-34.sslip.io", 443)), connector.targets)
         assertEquals("SSH-2.0-OpenSSH_9.6\r\n", tunnel.writtenText)
     }
 
     @Test
-    fun `a raw IP that stays silent is opened by address after a short wait`() = runTest {
+    fun `a raw public IP that stays silent is opened through its sslip name after a short wait`() = runTest {
         val connector = FakeProxyConnector.connectingTo(tunnel)
         val app = appThrough(connector)
         app.handshake()
@@ -99,7 +99,7 @@ class TunnelRelayTest {
 
         advanceTimeBy(250)
 
-        assertEquals(listOf(ProxyTarget("93.184.216.34", 443)), connector.targets)
+        assertEquals(listOf(ProxyTarget("93-184-216-34.sslip.io", 443)), connector.targets)
     }
 
     @Test
@@ -112,7 +112,8 @@ class TunnelRelayTest {
     }
 
     @Test
-    fun `a refused public IP is retried through an sslip name`() = runTest {
+    fun `a public IP the proxy accepts by name is never asked for by address`() = runTest {
+        // El Squid de la UCI rechaza el CONNECT a una IP pública escrita tal cual, pero acepta el nombre sslip.io.
         val connector = FakeProxyConnector { target ->
             if (target.host.endsWith(".sslip.io")) {
                 ProxyConnectResult.Connected(tunnel)
@@ -125,8 +126,26 @@ class TunnelRelayTest {
 
         app.sendData("SSH-2.0-OpenSSH_9.6\r\n")
 
+        assertEquals(listOf(ProxyTarget("93-184-216-34.sslip.io", 443)), connector.targets, "sin pagar un 403 de más")
+        assertEquals("SSH-2.0-OpenSSH_9.6\r\n", tunnel.writtenText)
+    }
+
+    @Test
+    fun `when the proxy refuses the sslip name the IP itself is tried`() = runTest {
+        val connector = FakeProxyConnector { target ->
+            if (target.host.endsWith(".sslip.io")) {
+                ProxyConnectResult.Failed(ProxyFailure.Refused("HTTP/1.1 403 Forbidden"))
+            } else {
+                ProxyConnectResult.Connected(tunnel)
+            }
+        }
+        val app = appThrough(connector)
+        app.handshake()
+
+        app.sendData("SSH-2.0-OpenSSH_9.6\r\n")
+
         assertEquals(
-            listOf(ProxyTarget("93.184.216.34", 443), ProxyTarget("93-184-216-34.sslip.io", 443)),
+            listOf(ProxyTarget("93-184-216-34.sslip.io", 443), ProxyTarget("93.184.216.34", 443)),
             connector.targets,
         )
         assertEquals("SSH-2.0-OpenSSH_9.6\r\n", tunnel.writtenText)

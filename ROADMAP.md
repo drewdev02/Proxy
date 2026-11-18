@@ -461,6 +461,11 @@ en CI en Linux y macOS; pruebas unitarias del lector, del PRF y de los canales; 
 simulada. Verificado a mano en el emulador de Android con un proxy NTLM y un servidor de ProtonVPN real: la IP pública
 vista desde el emulador fue la del servidor VPN (Canadá), distinta de la del equipo.
 
+**Lo que enseñó la red de la UCI (rc4):** el Squid de la UCI respondió `403` a los `CONNECT` al servidor de ProtonVPN porque
+el `.ovpn` lo da por IP literal. SuperProxy lo evita pidiendo siempre el destino por su nombre `sslip.io`; ahora ProxyUCI
+también (en el modo directo y en el de VPN), prueba antes el puerto 443 y distingue «bloqueado por política» de
+«inalcanzable». Mi proxy de pruebas no rechazaba IP literales, por eso no se vio antes.
+
 > Pendiente: comprobarlo en macOS y Windows reales con la red de la UCI.
 
 ## Capa 10: resistencia

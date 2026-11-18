@@ -78,7 +78,7 @@ class OpenVpnExitTest {
         val result = exit(connector).connect(proxy, "x", start(ovpn()))
 
         assertEquals(listOf(ProxyTarget("192.0.2.10", 443), ProxyTarget("192.0.2.11", 7770)), connector.targets)
-        assertEquals(VpnConnectResult.Failed(TunnelFailure.VPN_SERVER_UNREACHABLE), result)
+        assertEquals(VpnConnectResult.Failed(TunnelFailure.VPN_SERVER_BLOCKED), result, "un 403 es la política del proxy")
     }
 
     @Test
@@ -92,6 +92,77 @@ class OpenVpnExitTest {
 
         assertEquals(2, connector.targets.size)
         assertEquals(VpnConnectResult.Failed(TunnelFailure.VPN_HANDSHAKE_FAILED), result, "el segundo abrió pero el servidor no habló")
+    }
+
+    private val publicIp = "149.22.82.28"
+    private val publicRemotes = "remote $publicIp 7770\nremote $publicIp 8443\nremote $publicIp 443"
+
+    @Test
+    fun `a public server IP is asked of the proxy by its sslip name and never by address`() = runTest {
+        // El Squid de la UCI rechaza el CONNECT a una IP escrita tal cual y acepta el nombre sslip.io.
+        val closed = FakeTunnelConnection().also { it.end() }
+        val connector = FakeProxyConnector { target ->
+            if (target.host.endsWith(".sslip.io")) ProxyConnectResult.Connected(closed) else ProxyConnectResult.Failed(ProxyFailure.Refused("HTTP/1.1 403 Forbidden"))
+        }
+
+        exit(connector).connect(proxy, "x", start(ovpn(remotes = "remote $publicIp 443")))
+
+        assertEquals(listOf(ProxyTarget("149-22-82-28.sslip.io", 443)), connector.targets)
+    }
+
+    @Test
+    fun `if the proxy refuses the sslip name the address is tried before giving up on that server`() = runTest {
+        val connector = FakeProxyConnector.failingWith(ProxyFailure.Refused("HTTP/1.1 403 Forbidden"))
+
+        exit(connector).connect(proxy, "x", start(ovpn(remotes = "remote $publicIp 443")))
+
+        assertEquals(listOf(ProxyTarget("149-22-82-28.sslip.io", 443), ProxyTarget(publicIp, 443)), connector.targets)
+    }
+
+    @Test
+    fun `a server given by name or a private address is not rewritten`() = runTest {
+        val connector = FakeProxyConnector.failingWith(ProxyFailure.Unreachable("sin ruta"))
+
+        exit(connector).connect(proxy, "x", start(ovpn(remotes = "remote vpn.ejemplo.org 443\nremote 10.9.0.5 443")))
+
+        assertEquals(listOf(ProxyTarget("vpn.ejemplo.org", 443), ProxyTarget("10.9.0.5", 443)), connector.targets)
+    }
+
+    @Test
+    fun `port 443 is tried first whatever the order in the file`() = runTest {
+        val connector = FakeProxyConnector.failingWith(ProxyFailure.Unreachable("sin ruta"))
+
+        exit(connector).connect(proxy, "x", start(ovpn(remotes = publicRemotes)))
+
+        assertEquals(443, connector.targets.first().port)
+        assertEquals(setOf(443, 7770, 8443), connector.targets.map { it.port }.toSet(), "los demás quedan como alternativa")
+    }
+
+    @Test
+    fun `port 443 still comes first with a random order`() = runTest {
+        val connector = FakeProxyConnector.failingWith(ProxyFailure.Unreachable("sin ruta"))
+
+        exit(connector).connect(proxy, "x", start(ovpn(remotes = publicRemotes, extra = "remote-random")))
+
+        assertEquals(443, connector.targets.first().port)
+    }
+
+    @Test
+    fun `when the proxy policy refuses every server the failure says so`() = runTest {
+        val connector = FakeProxyConnector.failingWith(ProxyFailure.Refused("HTTP/1.1 403 Forbidden"))
+
+        val result = exit(connector).connect(proxy, "x", start(ovpn(remotes = publicRemotes)))
+
+        assertEquals(VpnConnectResult.Failed(TunnelFailure.VPN_SERVER_BLOCKED), result)
+    }
+
+    @Test
+    fun `when nothing answers at all it is unreachable and not blocked`() = runTest {
+        val connector = FakeProxyConnector.failingWith(ProxyFailure.Unreachable("sin ruta"))
+
+        val result = exit(connector).connect(proxy, "x", start(ovpn(remotes = publicRemotes)))
+
+        assertEquals(VpnConnectResult.Failed(TunnelFailure.VPN_SERVER_UNREACHABLE), result)
     }
 
     @Test

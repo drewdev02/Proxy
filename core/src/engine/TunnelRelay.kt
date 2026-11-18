@@ -6,7 +6,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withTimeoutOrNull
 import org.uci.proxy.core.model.ProxyProfile
-import org.uci.proxy.core.packet.NON_PUBLIC_RANGES
 import org.uci.proxy.core.packet.formatIpv4
 import org.uci.proxy.core.packet.sniffHostname
 import org.uci.proxy.core.port.LogLevel
@@ -17,6 +16,7 @@ import org.uci.proxy.core.proxy.ProxyConnectResult
 import org.uci.proxy.core.proxy.ProxyConnector
 import org.uci.proxy.core.proxy.ProxyFailure
 import org.uci.proxy.core.proxy.ProxyTarget
+import org.uci.proxy.core.proxy.sslipNameFor
 import org.uci.proxy.core.tcp.TunTcpConnection
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -86,14 +86,13 @@ class TunnelRelay(
     }
 
     private suspend fun connect(target: ProxyTarget, address: Int): TcpConnection? {
-        var result = withTimeoutOrNull(connectTimeout) { connector.connect(profile, password, target) }
-
-        // Algunos proxies rechazan abrir túneles hacia una IP escrita tal cual. sslip.io ofrece nombres
-        // que resuelven a la IP que llevan dentro, así que se reintenta con uno.
+        // El Squid de la UCI rechaza los `CONNECT` a una IP pública escrita tal cual: por eso se prueba primero con el
+        // nombre sslip.io equivalente, como hace SuperProxy, y solo si ese se rechaza se prueba la IP.
+        val named = sslipNameFor(target.host)?.let { target.copy(host = it) }
+        var result = withTimeoutOrNull(connectTimeout) { connector.connect(profile, password, named ?: target) }
         val refused = (result as? ProxyConnectResult.Failed)?.failure is ProxyFailure.Refused
-        if (refused && target.host == formatIpv4(address) && isPublic(address)) {
-            val named = target.copy(host = formatIpv4(address).replace('.', '-') + SSLIP_SUFFIX)
-            result = withTimeoutOrNull(connectTimeout) { connector.connect(profile, password, named) }
+        if (refused && named != null) {
+            result = withTimeoutOrNull(connectTimeout) { connector.connect(profile, password, target) }
         }
 
         return when (result) {
@@ -142,11 +141,8 @@ class TunnelRelay(
         app.finish()
     }
 
-    private fun isPublic(address: Int): Boolean = NON_PUBLIC_RANGES.none { it.contains(address) }
-
     private companion object {
         const val TAG = "Relay"
-        const val SSLIP_SUFFIX = ".sslip.io"
         val SNIFF_WAIT = 200.milliseconds
         val CHECK_WAIT = 1.seconds
         val DOWNLOAD_GRACE = 8.seconds

@@ -72,6 +72,9 @@ enum class TunnelFailure {
     /** No se pudo llegar al servidor VPN a través del proxy. */
     VPN_SERVER_UNREACHABLE,
 
+    /** El proxy respondió, pero su política no deja llegar a ningún servidor del perfil (403 o similar). */
+    VPN_SERVER_BLOCKED,
+
     /** El servidor VPN rechazó el usuario o la contraseña. */
     VPN_AUTH_FAILED,
 
