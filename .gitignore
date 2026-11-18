@@ -11,3 +11,8 @@ captures
 xcuserdata
 
 __pycache__/
+
+# Claves de firma de Android: nunca al repositorio.
+keystore.properties
+*.keystore
+*.jks

@@ -12,7 +12,9 @@
 # org.jetbrains.compose.runtime:runtime-desktop, un stub de 4,8 KB). El segundo pisa al primero y a la app le falta
 # la clase `Composer`: la ventana no abre. El classpath de `./kotlin run` conserva las rutas completas, que son únicas.
 param(
-    [string]$OutDir = "build/exe"
+    [string]$OutDir = "build/exe",
+    # Versión que figura en las propiedades del .exe (0.1.0 o 0.1.0-rc1).
+    [string]$Version = "0.0.0-dev"
 )
 
 $ErrorActionPreference = "Stop"
@@ -112,12 +114,24 @@ try {
     $exe = Join-Path $OutDir "ProxyUCI.exe"
     $source = (Resolve-Path (Join-Path $repo "tools\windows-exe\Launcher.cs")).Path
     $manifestCs = (Resolve-Path (Join-Path $repo "tools\windows-exe\app.manifest")).Path
+    # La versión que Windows muestra en «Propiedades > Detalles»: solo cifras (0.1.0.0); la completa, en la informativa.
+    $numeric = ($Version -split "-")[0]
+    if ($numeric -notmatch '^\d+\.\d+\.\d+$') { throw "Versión no válida: $Version (se espera 1.2.3 o 1.2.3-rc1)" }
+    $assemblyInfo = Join-Path $work "AssemblyInfo.cs"
+    @"
+using System.Reflection;
+[assembly: AssemblyTitle("ProxyUCI")]
+[assembly: AssemblyProduct("ProxyUCI")]
+[assembly: AssemblyVersion("$numeric.0")]
+[assembly: AssemblyFileVersion("$numeric.0")]
+[assembly: AssemblyInformationalVersion("$Version")]
+"@ | Set-Content $assemblyInfo -Encoding ASCII
     Invoke-Native "csc" {
         & $csc /nologo /target:winexe /platform:x64 /optimize+ "/out:$exe" `
             "/win32manifest:$manifestCs" `
             "/resource:$zip,payload.zip" "/resource:$idFile,payload.id" `
             /reference:System.IO.Compression.dll /reference:System.IO.Compression.FileSystem.dll `
-            $source
+            $source $assemblyInfo
     }
 
     $size = (Get-Item $exe).Length / 1MB

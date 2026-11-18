@@ -13,3 +13,9 @@ settings:
     namespace: org.uci.proxy
     applicationId: org.uci.proxy
     minSdk: 26
+    # Valores de desarrollo: al publicar una versión, tools/release/set-android-version.py los sustituye por los
+    # de la etiqueta (v0.1.0 -> versionName 0.1.0, versionCode 100).
+    versionCode: 1
+    versionName: 0.0.0-dev
+    signing:
+      enabled: true

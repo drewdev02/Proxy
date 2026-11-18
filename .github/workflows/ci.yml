@@ -3,6 +3,8 @@ name: CI
 on:
   push:
   pull_request:
+  # El flujo de publicación lo ejecuta antes de construir nada: si falla, no se publica.
+  workflow_call:
 
 # En Windows se usa PowerShell y no el bash de Git: el wrapper `kotlin.bat` descarga su toolchain con `tar`, y el
 # `tar` de GNU que trae Git interpreta «C:\ruta» como «máquina:ruta» y falla. Además se pone System32 el primero
@@ -108,45 +110,9 @@ jobs:
           java-version: "25"
       - name: Construir el .exe
         run: ./tools/windows-exe/build-exe.ps1
-      - name: Autoprueba del .exe
-        run: |
-          $exe = (Resolve-Path build/exe/ProxyUCI.exe).Path
-          $report = Join-Path $env:RUNNER_TEMP "autoprueba.txt"
-          # La segunda vez ya no extrae nada: se ve en el tiempo.
-          foreach ($intento in 1, 2) {
-            Remove-Item $report -ErrorAction SilentlyContinue
-            $reloj = [Diagnostics.Stopwatch]::StartNew()
-            $proceso = Start-Process $exe -ArgumentList "--self-test", "`"$report`"" -Wait -PassThru
-            "Ejecución ${intento}: código $($proceso.ExitCode) en $([math]::Round($reloj.Elapsed.TotalSeconds, 1)) s"
-            if (Test-Path $report) { Get-Content $report } else { "(no se escribió el informe)" }
-            if ($proceso.ExitCode -ne 0 -or (Get-Content $report -TotalCount 1) -ne "OK") { throw "La autoprueba falló" }
-          }
-          if (-not ((Get-Content $report -Raw) -match [regex]::Escape("ProxyUCI.exe"))) { throw "La app no supo cuál es su .exe" }
-          Get-ChildItem (Join-Path $env:ProgramFiles "ProxyUCI/app") | Format-Table Name
-      # La autoprueba no abre la interfaz: aquí se arranca la ventana de verdad con la Java recortada. Si faltara un
-      # módulo que Compose necesita, la Java muere en segundos. Sin tarjeta gráfica se usa el dibujado por software.
-      - name: Abrir la ventana del .exe
-        env:
-          SKIKO_RENDER_API: SOFTWARE_COMPAT
-        run: |
-          # Con --ready-file la app abre la ventana y, en cuanto se ha compuesto, escribe «listo» y sale. No se lee
-          # el título de la ventana desde fuera: los ejecutores no tienen un escritorio interactivo.
-          $exe = (Resolve-Path build/exe/ProxyUCI.exe).Path
-          $listo = Join-Path $env:RUNNER_TEMP "ventana-lista.txt"
-          Remove-Item $listo, "$listo.error" -ErrorAction SilentlyContinue
-          $proceso = Start-Process $exe -ArgumentList "--ready-file", "`"$listo`"" -PassThru
-          $salio = $proceso.WaitForExit(90000)
-          if (-not $salio) {
-            Get-Process javaw -ErrorAction SilentlyContinue | Format-Table Id, Responding
-            Get-Process javaw -ErrorAction SilentlyContinue | Stop-Process -Force
-            $proceso | Stop-Process -Force -ErrorAction SilentlyContinue
-          }
-          "Salió: $salio; código: $(if ($salio) { $proceso.ExitCode } else { 'n/a' })"
-          if (Test-Path "$listo.error") { "--- error no capturado en la app"; Get-Content "$listo.error" }
-          if (-not (Test-Path $listo) -or (Get-Content $listo -Raw) -ne "listo") {
-            throw "La ventana no llegó a componerse en 90 s"
-          }
-          "La ventana se compuso con la Java recortada"
+      # Autoprueba (dos veces) y ventana de Compose con la Java recortada: ver tools/windows-exe/smoke-test.ps1.
+      - name: Probar el .exe
+        run: ./tools/windows-exe/smoke-test.ps1 -Exe build/exe/ProxyUCI.exe
       # Los servidores de prueba y la prueba van en el MISMO paso: los procesos que un paso deja en segundo plano
       # mueren al terminar ese paso.
       - name: Túnel real con el .exe como motor

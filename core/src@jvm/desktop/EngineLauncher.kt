@@ -61,21 +61,17 @@ object EngineArguments {
 /**
  * Lanza el motor como root en macOS mediante el diálogo de contraseña de administrador del sistema.
  *
- * El motor es este mismo programa, con la misma máquina virtual y la misma ruta de clases,
- * invocado con [EngineArguments.ENGINE].
+ * El motor es este mismo programa, invocado con [EngineArguments.ENGINE].
  *
- * @param javaCommand ejecutable de Java con el que corre la ventana.
- * @param classPath ruta de clases de la ventana.
- * @param mainClass clase principal del programa.
+ * @param programCommand cómo se invoca este programa, sin las opciones del motor: el lanzador de la app
+ *   empaquetada (`ProxyUCI.app`), o `java -cp <ruta> <clase principal>` al ejecutar desde el entorno de desarrollo.
  */
 class MacElevatedEngineLauncher(
-    private val javaCommand: String,
-    private val classPath: String,
-    private val mainClass: String,
+    private val programCommand: List<String>,
     private val extraFlags: List<String>,
 ) : EngineLauncher {
     override fun launch(port: Int, tokenFile: Path): EngineProcess {
-        val engineCommand = listOf(javaCommand, "-cp", classPath, mainClass, EngineArguments.ENGINE) +
+        val engineCommand = programCommand + EngineArguments.ENGINE +
             listOf(EngineArguments.PORT, port.toString(), EngineArguments.TOKEN_FILE, tokenFile.toString()) +
             extraFlags
         val process = ProcessBuilder(osascriptCommand(engineCommand))
@@ -110,12 +106,29 @@ class MacElevatedEngineLauncher(
 
         fun appleScriptString(text: String): String = "\"" + text.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
+        /**
+         * Propiedad del sistema con la ruta del lanzador de una app empaquetada con `jpackage`. La define el propio
+         * lanzador; sin ella se está ejecutando desde el entorno de desarrollo.
+         */
+        const val JPACKAGE_APP_PATH_PROPERTY = "jpackage.app-path"
+
         /** Lanzador para el proceso actual. */
-        fun forCurrentProcess(mainClass: String): MacElevatedEngineLauncher = MacElevatedEngineLauncher(
-            javaCommand = ProcessHandle.current().info().command().orElse("java"),
-            classPath = System.getProperty("java.class.path"),
-            mainClass = mainClass,
-            extraFlags = System.getenv(EngineArguments.EXTRA_FLAGS_ENV)?.split(' ')?.filter { it.isNotBlank() }.orEmpty(),
-        )
+        fun forCurrentProcess(mainClass: String): MacElevatedEngineLauncher {
+            val packaged = System.getProperty(JPACKAGE_APP_PATH_PROPERTY)
+            val program = if (packaged != null) {
+                listOf(packaged)
+            } else {
+                listOf(
+                    ProcessHandle.current().info().command().orElse("java"),
+                    "-cp",
+                    System.getProperty("java.class.path"),
+                    mainClass,
+                )
+            }
+            return MacElevatedEngineLauncher(
+                programCommand = program,
+                extraFlags = System.getenv(EngineArguments.EXTRA_FLAGS_ENV)?.split(' ')?.filter { it.isNotBlank() }.orEmpty(),
+            )
+        }
     }
 }

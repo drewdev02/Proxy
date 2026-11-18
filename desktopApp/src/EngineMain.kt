@@ -4,6 +4,7 @@ import kotlinx.coroutines.runBlocking
 import org.koin.core.context.startKoin
 import org.uci.proxy.core.desktop.EngineArguments
 import org.uci.proxy.core.desktop.EngineSession
+import org.uci.proxy.core.desktop.MacElevatedEngineLauncher
 import org.uci.proxy.core.desktop.WindowsElevatedEngineLauncher
 import org.uci.proxy.core.di.coreModule
 import org.uci.proxy.core.di.platformModule
@@ -110,6 +111,7 @@ fun runSelfTest(reportFile: String) {
         report.appendLine("plataforma=${platform.kind}")
         report.appendLine("java=${System.getProperty("java.version")} ${System.getProperty("java.vm.name")}")
         report.appendLine("arranque=${System.getProperty(WindowsElevatedEngineLauncher.LAUNCHER_PROPERTY)}")
+        report.appendLine("lanzador-jpackage=${System.getProperty(MacElevatedEngineLauncher.JPACKAGE_APP_PATH_PROPERTY)}")
         // Con `./kotlin run`, este es el classpath exacto que Amper usa para ejecutar la app: tools/windows-exe lo
         // aprovecha para empaquetar las mismas librerías (el jar ejecutable de Amper pierde las que se llaman igual).
         report.appendLine("classpath=${System.getProperty("java.class.path")}")
