@@ -214,7 +214,6 @@ jobs:
   publicar:
     name: Publicar la Release
     needs: [version, windows, macos, android]
-    if: ${{ needs.version.outputs.publish == 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -225,17 +224,28 @@ jobs:
         with:
           path: dist
           merge-multiple: true
-      - name: Sumas de verificación
+      # Este trabajo corre también en los ensayos manuales, para ejercitar la descarga y las sumas; solo la atestación y
+      # la creación de la Release (los pasos con `if`) se saltan cuando no se publica.
+      - name: Comprobar que están los tres archivos
         run: |
           cd dist
           ls -l
+          for patron in 'ProxyUCI-*-windows-x64.exe' 'ProxyUCI-*-macos-arm64.dmg' 'ProxyUCI-*-android*.apk'; do
+            cantidad="$(ls $patron 2>/dev/null | wc -l)"
+            [ "$cantidad" = 1 ] || { echo "::error::Se esperaba un archivo $patron y hay $cantidad"; exit 1; }
+          done
+      - name: Sumas de verificación
+        run: |
+          cd dist
           sha256sum -- * > SHA256SUMS.txt
           cat SHA256SUMS.txt
       # Quien descargue puede comprobar con `gh attestation verify <archivo> -R drewdev02/Proxy` que salió de este repositorio.
       - uses: actions/attest-build-provenance@v4
+        if: ${{ needs.version.outputs.publish == 'true' }}
         with:
           subject-path: "dist/ProxyUCI-*"
       - name: Crear la Release
+        if: ${{ needs.version.outputs.publish == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.version.outputs.tag }}
