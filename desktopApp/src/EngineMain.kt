@@ -89,6 +89,7 @@ fun runEngine(args: List<String>) {
         platformTunnel = tunnel,
         ioDispatcher = dispatchers.background,
         logger = logger,
+        logBuffer = koin.get(),
         maxDuration = EngineArguments.value(args, EngineArguments.MAX_SECONDS)?.toIntOrNull()?.seconds,
     )
 

@@ -10,6 +10,7 @@ import org.uci.proxy.core.desktop.EngineLauncher
 import org.uci.proxy.core.desktop.EngineProcess
 import org.uci.proxy.core.fakes.InMemoryKeyValueStore
 import org.uci.proxy.core.fakes.InMemorySecretStore
+import org.uci.proxy.core.log.LogBuffer
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.ProxyProtocol
 import org.uci.proxy.core.platform.JavaSecureRandomBytes
@@ -72,6 +73,7 @@ class WindowsPackagedExeE2ETest {
             randomBytes = JavaSecureRandomBytes(),
             dispatchers = dispatchers,
             logger = logger,
+            logBuffer = LogBuffer(),
             launchTimeout = 120.seconds,
         )
 

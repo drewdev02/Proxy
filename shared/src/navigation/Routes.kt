@@ -20,6 +20,10 @@ internal sealed interface Route : NavKey {
     /** [profileId] null significa perfil nuevo. */
     @Serializable
     data class ProfileEditor(val profileId: String?) : Route
+
+    /** El registro en vivo. */
+    @Serializable
+    data object Logs : Route
 }
 
 /**

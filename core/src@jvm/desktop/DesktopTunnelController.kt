@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import org.uci.proxy.core.log.LogBuffer
 import org.uci.proxy.core.port.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.RandomBytes
@@ -40,6 +41,8 @@ class DesktopTunnelController(
     private val randomBytes: RandomBytes,
     dispatchers: AppDispatchers,
     private val logger: Logger,
+    /** Donde la ventana junta sus mensajes de registro con los que le manda el motor. */
+    private val logBuffer: LogBuffer,
     private val launchTimeout: Duration = 3.minutes,
 ) : TunnelControl, TunnelMonitor {
     override val isAvailable = true
@@ -148,11 +151,23 @@ class DesktopTunnelController(
 
         var failure: TunnelFailure? = null
         while (true) {
-            val line = reader.readLine() ?: break
+            val line = try {
+                reader.readLine()
+            } catch (_: SocketTimeoutException) {
+                null // el motor no cerró tras avisar de que terminó: se da por acabado
+            } ?: break
+            // Los mensajes de registro del motor se juntan con los de la ventana, para la pantalla «Registro».
+            EngineProtocol.decodeLog(line)?.let { log ->
+                val level = LogLevel.entries.firstOrNull { it.name == log.level } ?: LogLevel.INFO
+                logBuffer.append(log.epochMillis, level, log.tag, log.message)
+                continue
+            }
             when (val state = EngineProtocol.decodeState(line, profileId)) {
                 is TunnelState.Connected -> mutableState.value = state
                 is TunnelState.Failed -> failure = state.failure
-                TunnelState.Disconnected -> break
+                // El motor publica este estado en cuanto el túnel acaba, y aún le quedan por enviar los últimos mensajes de
+                // registro (el cierre, un error al apagar). Se sigue leyendo hasta que cierre el socket, con un tope.
+                TunnelState.Disconnected -> socket.soTimeout = DRAIN_TIMEOUT_MS
                 else -> Unit
             }
         }
@@ -171,5 +186,8 @@ class DesktopTunnelController(
         const val TAG = "DesktopTunnel"
         const val TOKEN_BYTES = 32
         const val ACCEPT_POLL_MS = 500
+
+        /** Cuánto se espera, tras el aviso de que el túnel terminó, a que el motor cierre el socket. */
+        const val DRAIN_TIMEOUT_MS = 2_000
     }
 }

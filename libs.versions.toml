@@ -9,6 +9,7 @@ jna = "5.19.1"
 androidx-core = "1.19.1"
 koin = "4.2.2"
 slf4j = "2.0.19"
+kotlinx-datetime = "0.7.1"
 
 [libraries]
 # Inyección de dependencias (solo en paquetes di/ y puntos de entrada)
@@ -25,6 +26,7 @@ androidx-lifecycle-runtime-compose = { module = "org.jetbrains.androidx.lifecycl
 # Navegación entre pantallas (Navigation 3, versión de JetBrains para Compose Multiplatform) y un ViewModel por pantalla
 androidx-navigation3-ui = { module = "org.jetbrains.androidx.navigation3:navigation3-ui", version.ref = "androidx-navigation3" }
 androidx-lifecycle-viewmodel-navigation3 = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-navigation3", version.ref = "androidx-lifecycle" }
+kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
 kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines" }
 
 # core (común): corrutinas y sockets TCP/UDP multiplataforma

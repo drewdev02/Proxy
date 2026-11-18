@@ -4,6 +4,7 @@ import io.ktor.network.selector.SelectorManager
 import org.koin.core.module.dsl.bind
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
+import org.uci.proxy.core.log.LogBuffer
 import org.uci.proxy.core.net.KtorTcpConnector
 import org.uci.proxy.core.port.TcpConnector
 import org.uci.proxy.core.profile.AppDispatchers
@@ -29,6 +30,8 @@ private val PROXY_TEST_TIMEOUT = 15.seconds
 /** Lógica común. Depende de los puertos y de los [AppDispatchers] que enlaza [platformModule]. */
 val coreModule = module {
     single<Clock> { Clock.System }
+    // Los últimos mensajes de registro, para la pantalla «Registro». Cada plataforma envuelve su registrador con él.
+    single { LogBuffer() }
     single<IdGenerator> { RandomIdGenerator() }
     singleOf(::ProfileValidator)
     singleOf(::StoredProfileRepository) { bind<ProfileRepository>() }

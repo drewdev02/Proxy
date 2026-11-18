@@ -6,6 +6,7 @@ import org.koin.core.module.dsl.bind
 import org.koin.core.module.dsl.binds
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
+import org.uci.proxy.core.log.BufferedLogger
 import org.uci.proxy.core.engine.UnavailableTunnel
 import org.uci.proxy.core.platform.FileKeyValueStore
 import org.uci.proxy.core.platform.JavaHostResolver
@@ -41,7 +42,8 @@ actual val platformModule: Module = module {
     // Dispatchers.IO no existe en el código común, por eso lo aporta cada plataforma.
     single { AppDispatchers(background = Dispatchers.IO) }
     single<PlatformInfo> { JvmPlatformInfo.fromSystemProperties() }
-    singleOf(::Slf4jLogger) { bind<Logger>() }
+    // Logback sigue recibiéndolo todo; además se guarda para la pantalla «Registro».
+    single<Logger> { BufferedLogger(Slf4jLogger(), get(), get()) }
     singleOf(::JavaSecureRandomBytes) { bind<RandomBytes>() }
     singleOf(::GrantedLocalNetworkPermission) { bind<LocalNetworkPermission>() }
     // Sin túnel por defecto. En macOS la app de escritorio lo sustituye en su propio módulo, que es

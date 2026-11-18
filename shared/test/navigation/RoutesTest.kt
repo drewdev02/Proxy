@@ -22,7 +22,7 @@ class RoutesTest {
 
     @Test
     fun `every screen survives being saved and restored`() {
-        val screens = listOf(Route.ProfileList, Route.ProfileEditor(profileId = null), Route.ProfileEditor(profileId = "abc-123"))
+        val screens = listOf(Route.ProfileList, Route.Logs, Route.ProfileEditor(profileId = null),Route.ProfileEditor(profileId = "abc-123"))
 
         screens.forEach { assertEquals(it, roundTrip(it)) }
     }

@@ -7,6 +7,7 @@ import org.koin.core.module.dsl.bind
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.bind
 import org.koin.dsl.module
+import org.uci.proxy.core.log.BufferedLogger
 import org.uci.proxy.core.platform.ActivityPrompt
 import org.uci.proxy.core.platform.AndroidKeystoreProtector
 import org.uci.proxy.core.platform.AndroidLocalAddresses
@@ -37,7 +38,8 @@ actual val platformModule: Module = module {
     // Dispatchers.IO no existe en el código común, por eso lo aporta cada plataforma.
     single { AppDispatchers(background = Dispatchers.IO) }
     singleOf(::AndroidPlatformInfo) { bind<PlatformInfo>() }
-    singleOf(::LogcatLogger) { bind<Logger>() }
+    // Logcat sigue recibiéndolo todo; además se guarda para la pantalla «Registro».
+    single<Logger> { BufferedLogger(LogcatLogger(), get(), get()) }
     singleOf(::JavaSecureRandomBytes) { bind<RandomBytes>() }
     // Cada permiso tiene su propio puente hacia la Activity, que es quien muestra el diálogo del sistema.
     single { AndroidLocalNetworkPermission(get<Context>(), ActivityPrompt()) } bind LocalNetworkPermission::class

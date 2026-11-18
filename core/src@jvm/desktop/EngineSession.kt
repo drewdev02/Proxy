@@ -1,6 +1,7 @@
 package org.uci.proxy.core.desktop
 
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.dropWhile
@@ -8,6 +9,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.uci.proxy.core.engine.TunnelRunner
 import org.uci.proxy.core.engine.TunnelStateStore
+import org.uci.proxy.core.log.LogBuffer
+import org.uci.proxy.core.log.LogEntry
 import org.uci.proxy.core.port.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.PlatformTunnel
@@ -30,6 +33,8 @@ class EngineSession(
     private val platformTunnel: PlatformTunnel,
     private val ioDispatcher: CoroutineDispatcher,
     private val logger: Logger,
+    /** Los mensajes de registro de este proceso: se reenvían a la ventana, que no puede ver los del motor. */
+    private val logBuffer: LogBuffer,
     private val maxDuration: Duration? = null,
 ) {
     suspend fun serve(socket: Socket, token: String) = coroutineScope {
@@ -42,6 +47,16 @@ class EngineSession(
             logger.log(LogLevel.ERROR, TAG, "La ventana no envió una orden de arranque válida")
             return@coroutineScope
         }
+
+        // Lo que el motor registró desde que arrancó (incluido lo anterior a esta orden) y, a partir de ahí, lo nuevo.
+        var lastLogSent = -1L
+        fun forwardNewLogs(entries: List<LogEntry>) {
+            entries.filter { it.id > lastLogSent }.forEach { entry ->
+                writer.println(EngineProtocol.encodeLog(entry))
+                lastLogSent = entry.id
+            }
+        }
+        val logForwarder = launch { logBuffer.entries.collect(::forwardNewLogs) }
 
         val tunnel = launch { runner.run(platformTunnel, start.profile, start.password) }
         val reporter = launch {
@@ -64,6 +79,9 @@ class EngineSession(
         }
 
         tunnel.join()
+        // Lo último que registró el túnel al acabar («Túnel detenido», un fallo…) se envía antes del estado final.
+        logForwarder.cancelAndJoin()
+        forwardNewLogs(logBuffer.entries.value)
         // El último estado ("desconectado" o el fallo) ya está publicado: se envía antes de cerrar.
         EngineProtocol.encodeState(stateStore.state.value)?.let(writer::println)
         reporter.cancel()

@@ -61,6 +61,7 @@ fun ProfileListScreen(
     tunnel: TunnelUiModel,
     onAdd: () -> Unit,
     onEdit: (String) -> Unit,
+    onOpenLogs: () -> Unit,
     onDelete: (String) -> Unit,
     onDismissDeleteError: () -> Unit,
     onConnect: (String) -> Unit,
@@ -69,7 +70,12 @@ fun ProfileListScreen(
     var pendingDelete by remember { mutableStateOf<ProxyProfile?>(null) }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Perfiles de proxy") }) },
+        topBar = {
+            TopAppBar(
+                title = { Text("Perfiles de proxy") },
+                actions = { TextButton(onClick = onOpenLogs) { Text("Registro") } },
+            )
+        },
         floatingActionButton = {
             ExtendedFloatingActionButton(onClick = onAdd) { Text("Nuevo perfil") }
         },
@@ -213,6 +219,7 @@ private fun ProfileListScreenPreview() {
             tunnel = TunnelUiModel(isAvailable = true, state = TunnelState.Connected("1")),
             onAdd = {},
             onEdit = {},
+            onOpenLogs = {},
             onDelete = {},
             onDismissDeleteError = {},
             onConnect = {},

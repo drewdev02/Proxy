@@ -19,6 +19,11 @@ import org.uci.proxy.core.fakes.FakeTunnelConnection
 import org.uci.proxy.core.fakes.InMemoryKeyValueStore
 import org.uci.proxy.core.fakes.InMemorySecretStore
 import org.uci.proxy.core.fakes.RecordingLogger
+import org.uci.proxy.core.log.BufferedLogger
+import org.uci.proxy.core.log.LogBuffer
+import org.uci.proxy.core.log.LogEntry
+import org.uci.proxy.core.port.LogLevel
+import kotlin.time.Clock
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.ProxyProtocol
 import org.uci.proxy.core.packet.buildUdpPacket
@@ -61,6 +66,23 @@ class EngineProtocolTest {
         assertNull(EngineProtocol.decodeStart("STOP"))
         assertNull(EngineProtocol.decodeStart("START {no es json"))
         assertNull(EngineProtocol.decodeStart("START {}"))
+    }
+
+    @Test
+    fun `a log message survives the round trip even when it has several lines and odd characters`() {
+        val entry = LogEntry(7, 1_700_000_000_123, LogLevel.WARN, "Relay", "No abrió ñandú.example:443\n\tcausa: \"tiempo agotado\" \\ fin")
+
+        val line = EngineProtocol.encodeLog(entry)
+
+        assertFalse('\n' in line, "un mensaje es una sola línea")
+        assertEquals(EngineLog(1_700_000_000_123, "WARN", "Relay", entry.message), EngineProtocol.decodeLog(line))
+    }
+
+    @Test
+    fun `lines that are not a valid log message are rejected`() {
+        assertNull(EngineProtocol.decodeLog("STATE connected"))
+        assertNull(EngineProtocol.decodeLog("LOG {no es json"))
+        assertNull(EngineProtocol.decodeLog("LOG {\"epochMillis\":1}"))
     }
 
     @Test
@@ -124,7 +146,10 @@ class DesktopTunnelIntegrationTest {
     private val profile = ProxyProfile("p1", "UCI", "proxy.uci.cu", 3128, ProxyProtocol.HTTP, "andrey")
     private val repository = StoredProfileRepository(InMemoryKeyValueStore(), InMemorySecretStore(), dispatchers, logger)
 
-    // Lado del motor.
+    // Lado del motor. Su registro y el de la ventana son búferes distintos, como lo son sus procesos.
+    private val engineLogs = LogBuffer()
+    private val windowLogs = LogBuffer()
+    private val engineLogger = BufferedLogger(logger, engineLogs, Clock.System)
     private val platformTunnel = FakePlatformTunnel()
     private val connector = FakeProxyConnector.connectingTo(FakeTunnelConnection())
     private var receivedStart: EngineStart? = null
@@ -142,9 +167,9 @@ class DesktopTunnelIntegrationTest {
             hostResolver = { host -> "10.8.0.20".also { receivedHost = host } },
             stateStore = stateStore,
             dispatchers = dispatchers,
-            logger = logger,
+            logger = engineLogger,
         )
-        return EngineSession(runner, stateStore, platformTunnel, Dispatchers.IO, logger, maxDuration)
+        return EngineSession(runner, stateStore, platformTunnel, Dispatchers.IO, engineLogger, engineLogs, maxDuration)
     }
 
     private var receivedHost: String? = null
@@ -171,6 +196,7 @@ class DesktopTunnelIntegrationTest {
         randomBytes = { ByteArray(it) { 7 } },
         dispatchers = dispatchers,
         logger = logger,
+        logBuffer = windowLogs,
         launchTimeout = 5.seconds,
     )
 
@@ -181,6 +207,41 @@ class DesktopTunnelIntegrationTest {
 
     private suspend fun awaitState(predicate: (TunnelState) -> Boolean): TunnelState =
         withTimeout(10.seconds) { controller.state.first(predicate) }
+
+    @Test
+    fun `what the engine logs reaches the window's log, including what it logged before the window asked`() = runBlocking {
+        repository.save(profile, "secreta")
+        engineLogs.append(1_000, LogLevel.INFO, "Motor", "arrancó antes de recibir la orden")
+
+        controller.connect(profile.id)
+        awaitState { it is TunnelState.Connected }
+        engineLogs.append(2_000, LogLevel.WARN, "Relay", "El proxy no abrió example.org:443")
+
+        val received = withTimeout(10.seconds) {
+            windowLogs.entries.first { entries -> entries.any { "example.org" in it.message } }
+        }
+        val messages = received.map { it.message }
+        assertTrue("arrancó antes de recibir la orden" in messages)
+        assertTrue(messages.any { "Túnel activo" in it }, "también llega lo que registra el propio túnel: $messages")
+        val warning = received.single { "example.org" in it.message }
+        assertEquals(LogLevel.WARN, warning.level)
+        assertEquals("Relay", warning.tag)
+        assertEquals(2_000, warning.epochMillis)
+        controller.disconnect()
+        awaitState { it == TunnelState.Disconnected }
+    }
+
+    @Test
+    fun `a log message that arrives after the tunnel stopped is not lost`() = runBlocking {
+        repository.save(profile, "secreta")
+        controller.connect(profile.id)
+        awaitState { it is TunnelState.Connected }
+
+        controller.disconnect()
+        awaitState { it == TunnelState.Disconnected }
+
+        assertTrue(windowLogs.entries.value.any { "Túnel detenido" in it.message }, "el último mensaje del túnel llega antes del cierre")
+    }
 
     @Test
     fun `connecting launches the engine, hands it the profile and reports connected`() = runBlocking {

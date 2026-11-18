@@ -17,6 +17,7 @@ import org.uci.proxy.fakes.InMemoryKeyValueStore
 import org.uci.proxy.fakes.InMemorySecretStore
 import org.uci.proxy.fakes.RecordingLogger
 import org.uci.proxy.home.HomeViewModel
+import org.uci.proxy.logs.LogsViewModel
 import org.uci.proxy.profile.ProfileEditorViewModel
 import org.uci.proxy.profile.ProfileListViewModel
 import kotlin.test.Test
@@ -51,5 +52,10 @@ class AppModulesTest {
     @Test
     fun `tunnel view model resolves from the app modules`() {
         assertNotNull(koin.get<TunnelViewModel>())
+    }
+
+    @Test
+    fun `logs view model resolves from the app modules`() {
+        assertNotNull(koin.get<LogsViewModel>())
     }
 }

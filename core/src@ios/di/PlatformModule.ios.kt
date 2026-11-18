@@ -7,6 +7,7 @@ import org.koin.core.module.dsl.bind
 import org.koin.core.module.dsl.binds
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
+import org.uci.proxy.core.log.BufferedLogger
 import org.uci.proxy.core.engine.UnavailableTunnel
 import org.uci.proxy.core.platform.IosPlatformInfo
 import org.uci.proxy.core.platform.KeychainSecretStore
@@ -33,7 +34,8 @@ actual val platformModule: Module = module {
     // Dispatchers.IO no existe en el código común, por eso lo aporta cada plataforma.
     single { AppDispatchers(background = Dispatchers.IO) }
     singleOf(::IosPlatformInfo) { bind<PlatformInfo>() }
-    singleOf(::NsLogLogger) { bind<Logger>() }
+    // NSLog sigue recibiéndolo todo; además se guarda para la pantalla «Registro».
+    single<Logger> { BufferedLogger(NsLogLogger(), get(), get()) }
     singleOf(::SecRandomBytes) { bind<RandomBytes>() }
     // iOS muestra por su cuenta el aviso de red local la primera vez que la app se conecta.
     singleOf(::GrantedLocalNetworkPermission) { bind<LocalNetworkPermission>() }

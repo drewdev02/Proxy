@@ -13,6 +13,7 @@ import androidx.navigation3.ui.NavDisplay
 import org.jetbrains.compose.reload.DevelopmentEntryPoint
 import org.koin.compose.viewmodel.koinViewModel
 import org.uci.proxy.home.HomeViewModel
+import org.uci.proxy.logs.LogsRoute
 import org.uci.proxy.navigation.Route
 import org.uci.proxy.navigation.routesConfiguration
 import org.uci.proxy.profile.ProfileEditorScreen
@@ -43,7 +44,11 @@ fun App() {
                     ProfileListRoute(
                         onAdd = { backStack.add(Route.ProfileEditor(profileId = null)) },
                         onEdit = { backStack.add(Route.ProfileEditor(profileId = it)) },
+                        onOpenLogs = { backStack.add(Route.Logs) },
                     )
+                }
+                entry<Route.Logs> {
+                    LogsRoute(onBack = { backStack.removeLastOrNull() })
                 }
                 entry<Route.ProfileEditor> { route ->
                     ProfileEditorRoute(
@@ -57,7 +62,7 @@ fun App() {
 }
 
 @Composable
-private fun ProfileListRoute(onAdd: () -> Unit, onEdit: (String) -> Unit) {
+private fun ProfileListRoute(onAdd: () -> Unit, onEdit: (String) -> Unit, onOpenLogs: () -> Unit) {
     val viewModel = koinViewModel<ProfileListViewModel>()
     val home = koinViewModel<HomeViewModel>()
     val tunnel = koinViewModel<TunnelViewModel>()
@@ -72,6 +77,7 @@ private fun ProfileListRoute(onAdd: () -> Unit, onEdit: (String) -> Unit) {
         tunnel = TunnelUiModel(isAvailable = tunnel.isAvailable, state = tunnelState),
         onAdd = onAdd,
         onEdit = onEdit,
+        onOpenLogs = onOpenLogs,
         onDelete = viewModel::delete,
         onDismissDeleteError = viewModel::dismissDeleteError,
         onConnect = tunnel::connect,

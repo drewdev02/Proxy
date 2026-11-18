@@ -16,6 +16,7 @@ dependencies:
   - $libs.androidx.navigation3.ui
   - $libs.androidx.lifecycle.viewmodel.navigation3
   - $kotlin.serialization.json
+  - $libs.kotlinx.datetime
   - $libs.koin.compose
   - $libs.koin.compose.viewmodel
 

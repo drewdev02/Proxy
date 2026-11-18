@@ -2,6 +2,7 @@ package org.uci.proxy.core.desktop
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import org.uci.proxy.core.log.LogEntry
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.port.TunnelState
@@ -13,6 +14,7 @@ import org.uci.proxy.core.port.TunnelState
  *   motor   -> ventana : <token>                    se identifica con el token que recibió al arrancar
  *   ventana -> motor   : START <json de EngineStart>
  *   motor   -> ventana : STATE connected | STATE disconnected | STATE failed <TunnelFailure>
+ *   motor   -> ventana : LOG <json de EngineLog>    un mensaje de registro, para la pantalla «Registro» de la ventana
  *   ventana -> motor   : STOP
  *
  * Si cualquiera de los dos cierra el socket, el otro da el túnel por terminado. Así el motor nunca
@@ -22,12 +24,33 @@ import org.uci.proxy.core.port.TunnelState
 @Serializable
 data class EngineStart(val profile: ProxyProfile, val password: String)
 
+/** Un mensaje de registro del motor. El nivel viaja por su nombre: un nivel que la ventana no conozca no la rompe. */
+@Serializable
+data class EngineLog(val epochMillis: Long, val level: String, val tag: String, val message: String)
+
 object EngineProtocol {
     private val json = Json { ignoreUnknownKeys = true }
 
     const val STOP = "STOP"
     private const val START_PREFIX = "START "
     private const val STATE_PREFIX = "STATE "
+    private const val LOG_PREFIX = "LOG "
+
+    /** El JSON escapa los saltos de línea, así que un mensaje de varias líneas sigue siendo un solo mensaje del protocolo. */
+    fun encodeLog(entry: LogEntry): String = LOG_PREFIX + json.encodeToString(
+        EngineLog.serializer(),
+        EngineLog(entry.epochMillis, entry.level.name, entry.tag, entry.message),
+    )
+
+    /** @return null si [line] no es un LOG válido. */
+    fun decodeLog(line: String): EngineLog? {
+        if (!line.startsWith(LOG_PREFIX)) return null
+        return try {
+            json.decodeFromString(EngineLog.serializer(), line.removePrefix(LOG_PREFIX))
+        } catch (_: kotlinx.serialization.SerializationException) {
+            null
+        }
+    }
 
     fun encodeStart(start: EngineStart): String = START_PREFIX + json.encodeToString(EngineStart.serializer(), start)
 
