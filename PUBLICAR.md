@@ -26,9 +26,21 @@ Actions › **Publicar versión** › *Run workflow*, con la versión que quiera
 los archivos como artefactos del trabajo, pero no crea ninguna Release. Si todavía no hay secretos de Android, el APK se
 firma con una keystore desechable y se llama `…-android-PRUEBA.apk`.
 
-## Una sola vez: la firma de Android
+## La firma de Android (ya configurada)
 
-Un APK sin firmar no se instala, así que **una etiqueta falla si faltan estos secretos** (en lugar de publicar algo inservible).
+La keystore se creó el 2026-11-18 y los cuatro secretos están en el repositorio. Los APK se firman con este certificado:
+
+```
+CN=ProxyUCI
+SHA-256: 14:DA:23:17:DF:6B:03:19:C0:2F:05:D8:DD:D0:7D:6B:0C:E2:00:6D:48:3A:AB:39:2B:CB:36:41:DD:4B:14:69
+```
+
+Se comprueba en un APK descargado con `apksigner verify --verbose --print-certs <apk>`: si la huella es otra, no es de este proyecto.
+La **única copia de la keystore y de sus contraseñas** está en `~/.keystores/proxyuci/` de quien la creó (GitHub no deja leer un
+secreto una vez guardado): consérvala también en un gestor de contraseñas.
+
+Lo que sigue explica cómo se hizo, por si hay que repetirlo. Un APK sin firmar no se instala, así que **una etiqueta falla si faltan
+estos secretos** (en lugar de publicar algo inservible).
 
 1. Crea un `keystore.properties` fuera del repositorio con las cuatro claves y genera la keystore:
 
