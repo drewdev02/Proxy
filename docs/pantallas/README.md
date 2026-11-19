@@ -46,6 +46,16 @@ Escritorio:
 
 ![](../../shared/test@jvm/snapshots/macos/logs/desktop-live.png)
 
+## Ajustes
+
+| Servicios de nombres con pruebas | Servicios de nombres apagados |
+|---|---|
+| ![](../../shared/test@jvm/snapshots/macos/settings/phone-services.png) | ![](../../shared/test@jvm/snapshots/macos/settings/phone-names-off.png) |
+
+Escritorio:
+
+![](../../shared/test@jvm/snapshots/macos/settings/desktop-services.png)
+
 ## Catálogo de componentes
 
 Todos los componentes `Uci` en todos sus estados (en la app: modo desarrollo, pestaña Perfiles → Catálogo).
@@ -57,7 +67,3 @@ Todos los componentes `Uci` en todos sus estados (en la app: modo desarrollo, pe
 | Estado | Formularios | Listas | Navegación | Datos |
 |---|---|---|---|---|
 | ![](../../shared/test@jvm/snapshots/macos/catalog/status.png) | ![](../../shared/test@jvm/snapshots/macos/catalog/forms.png) | ![](../../shared/test@jvm/snapshots/macos/catalog/lists.png) | ![](../../shared/test@jvm/snapshots/macos/catalog/navigation.png) | ![](../../shared/test@jvm/snapshots/macos/catalog/data.png) |
-
-## Pendientes de rediseño
-
-Ajustes todavía tiene el aspecto anterior (con el tema oscuro ya aplicado).
