@@ -45,8 +45,7 @@ class JnaWintunOpener(private val locator: WintunDllLocator) : WintunOpener {
         } catch (e: UnsatisfiedLinkError) {
             throw WindowsNetworkException("No se pudo cargar wintun.dll: ${e.message}")
         }
-        val adapter = lib.WintunCreateAdapter(WString(adapterName), WString(TUNNEL_TYPE), guid())
-            ?: throw failure("crear el adaptador $adapterName (hay que ejecutar como Administrador)")
+        val adapter = createAdapter(lib, adapterName)
         val session = lib.WintunStartSession(adapter, RING_CAPACITY)
         if (session == null) {
             val error = failure("iniciar la sesión del adaptador")
@@ -56,6 +55,29 @@ class JnaWintunOpener(private val locator: WintunDllLocator) : WintunOpener {
         return WintunChannel(lib, adapter, session)
     }
 
+    /**
+     * Al desconectar y volver a conectar enseguida, Windows puede no haber terminado de retirar el adaptador anterior y
+     * rechaza el nombre (error 52, nombre duplicado). Se reintenta unos segundos: en cuanto lo retira, el nombre queda libre.
+     */
+    private fun createAdapter(lib: WintunLibrary, adapterName: String): Pointer {
+        repeat(DUPLICATE_NAME_RETRIES) {
+            lib.WintunCreateAdapter(WString(adapterName), WString(TUNNEL_TYPE), guid())?.let { return it }
+            val error = Native.getLastError()
+            if (error != ERROR_DUP_NAME) throw creationFailure(adapterName, error)
+            Thread.sleep(DUPLICATE_NAME_WAIT_MS)
+        }
+        return lib.WintunCreateAdapter(WString(adapterName), WString(TUNNEL_TYPE), guid())
+            ?: throw creationFailure(adapterName, Native.getLastError())
+    }
+
+    private fun creationFailure(adapterName: String, error: Int) = WindowsNetworkException(
+        if (error == ERROR_DUP_NAME) {
+            "No se pudo crear el adaptador $adapterName: Windows aún no ha retirado el anterior (error de Windows $error)"
+        } else {
+            "No se pudo crear el adaptador $adapterName (hay que ejecutar como Administrador) (error de Windows $error)"
+        },
+    )
+
     private fun failure(action: String) = WindowsNetworkException("No se pudo $action (error de Windows ${Native.getLastError()})")
 
     // Un GUID fijo hace que Windows reconozca el mismo adaptador, con sus perfiles de red, en cada conexión.
@@ -63,6 +85,11 @@ class JnaWintunOpener(private val locator: WintunDllLocator) : WintunOpener {
 
     private companion object {
         const val TUNNEL_TYPE = "ProxyUCI"
+
+        // ERROR_DUP_NAME: el nombre del adaptador sigue en uso por el anterior, que Windows aún está retirando.
+        const val ERROR_DUP_NAME = 52
+        const val DUPLICATE_NAME_RETRIES = 20
+        const val DUPLICATE_NAME_WAIT_MS = 500L
 
         /** 4 MiB, como en la versión en C#. */
         const val RING_CAPACITY = 0x400000
