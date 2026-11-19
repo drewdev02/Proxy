@@ -14,7 +14,7 @@ flowchart TD
     motor -->|consulta DNS| dns["DNS falso<br/>nombre a 10.x.1.y"]
     dns -.->|IP falsa| app
     motor -->|TCP| pila["Pila TCP<br/>en espacio de usuario"]
-    motor -->|otro UDP| icmp["Rechazo ICMP"]
+    motor -->|"otro UDP (salvo por Otro País)"| icmp["Rechazo ICMP"]
     pila --> rele["Relé<br/>averigua el destino"]
     rele -->|"CONNECT con NTLMv2 o Basic, o SOCKS5"| proxy["Proxy institucional"]
     proxy --> internet(("Internet"))
@@ -52,6 +52,7 @@ La primera vez descarga el toolchain y el JDK que necesita. Para Android e iOS: 
 
 ## Código
 
-`core` es el motor, sin Compose; `shared` es la interfaz; `androidApp`, `desktopApp` e `iosApp` son los puntos de entrada.
+`core` es el motor, sin Compose; `database` guarda el registro con Room; `shared` es la interfaz; `androidApp`,
+`desktopApp` e `iosApp` son los puntos de entrada.
 El diseño está en [PLAN.md](PLAN.md), el estado por capas en [ROADMAP.md](ROADMAP.md) y cómo se publica una versión en
 [PUBLICAR.md](PUBLICAR.md).
