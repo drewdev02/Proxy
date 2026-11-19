@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
@@ -54,6 +55,8 @@ private fun fieldColors() = OutlinedTextFieldDefaults.colors(
     unfocusedLeadingIconColor = ProxyUciTheme.colors.onSurfaceMuted,
     unfocusedPlaceholderColor = ProxyUciTheme.colors.onSurfaceFaint,
     focusedPlaceholderColor = ProxyUciTheme.colors.onSurfaceFaint,
+    // Con error, Material aclara el texto de ejemplo y parece escrito de verdad: se mantiene tenue.
+    errorPlaceholderColor = ProxyUciTheme.colors.onSurfaceFaint,
 )
 
 /**
@@ -76,6 +79,7 @@ fun UciTextField(
     enabled: Boolean = true,
     singleLine: Boolean = true,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
     visualTransformation: VisualTransformation = VisualTransformation.None,
 ) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -95,6 +99,7 @@ fun UciTextField(
             isError = error != null,
             supportingText = (error ?: supportingText)?.let { { Text(it, style = MaterialTheme.typography.bodySmall) } },
             keyboardOptions = keyboardOptions,
+            keyboardActions = keyboardActions,
             visualTransformation = visualTransformation,
             shape = MaterialTheme.shapes.medium,
             colors = fieldColors(),
