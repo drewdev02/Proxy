@@ -209,6 +209,20 @@ class RoutesTest {
     }
 
     @Test
+    fun `excluding from a given set only splits what overlaps and never grows it`() {
+        val from = listOf(Ipv4Route.parse("192.0.2.0/24"), Ipv4Route.parse("198.51.100.0/24"))
+
+        val result = routesExcluding(listOf(Ipv4Route.parse("192.0.2.200/32")), from = from)
+
+        assertTrue(Ipv4Route.parse("198.51.100.0/24") in result, "lo que no se solapa queda igual")
+        assertFalse(result.any { it.contains(parseIpv4("192.0.2.200")!!) })
+        assertTrue(result.any { it.contains(parseIpv4("192.0.2.77")!!) })
+        assertFalse(result.any { it.contains(parseIpv4("8.8.8.8")!!) }, "nada fuera de lo dado")
+        fun size(route: Ipv4Route) = 1L shl (32 - route.prefixLength)
+        assertEquals(256L + 255L, result.sumOf(::size))
+    }
+
+    @Test
     fun `a route knows what it contains and covers`() {
         val ten = Ipv4Route.parse("10.0.0.0/8")
 

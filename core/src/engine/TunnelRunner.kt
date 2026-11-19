@@ -128,7 +128,7 @@ class TunnelRunner(
                     dnsServer = plan.dnsServerText,
                     mtu = MTU,
                     // Los rangos con salida directa no entran en la interfaz: el sistema los manda por la red real.
-                    routes = listOf(plan.subnet) + if (directRoutes.isEmpty()) publicRoutes else routesExcluding(NON_PUBLIC_RANGES + directRoutes),
+                    routes = listOf(plan.subnet) + if (directRoutes.isEmpty()) publicRoutes else routesExcluding(directRoutes, from = publicRoutes),
                     proxyAddress = proxyAddress,
                     excludedApps = rules?.directApps.orEmpty(),
                 ),
