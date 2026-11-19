@@ -572,7 +572,12 @@ reconoce. En Kotlin, `TailscaleEngineLiveTest` hace lo mismo con la librería re
 conecta y completa una petición HTTP por el nodo de salida; con la contraseña del proxy mala corta enseguida con
 `PROXY_AUTH_FAILED`. En CI corre obligatoria en Linux, macOS y Windows; `WindowsTailscaleE2ETest` descarga 5 MB por un
 adaptador Wintun real saliendo por Tailscale; y el APK debe llevar las dos librerías de Android. Además, las pruebas del
-editor, de la migración del JSON y de los secretos por motor.
+editor, de la migración del JSON y de los secretos por motor. A mano, en el emulador de Android (16, arm64) con la red de
+pruebas y el proxy NTLM del equipo: el perfil antiguo se leyó como OpenVPN, la búsqueda encontró el nodo, el perfil
+conectó por Tailscale y Chrome recibió la página a través del nodo de salida, con reglas de salida activas. Esa prueba
+destapó tres cosas propias de Android que ya están resueltas: sin netlink para leer las interfaces (se le da a Tailscale
+una interfaz sintética), un temporal que no se puede escribir (la app pasa el suyo y `TMPDIR`) y un `panic` de Go que no
+dejaba rastro (ahora queda en `tsbridge-fallo.txt`, en la caché de la app).
 
 **Limitaciones:** detrás del proxy todo va por los relés DERP de Tailscale (TCP 443): funciona, con más latencia que una
 conexión directa. Hace falta un nodo de salida (una máquina propia en el país, o el complemento de Mullvad de Tailscale).

@@ -174,11 +174,12 @@ var nowhere = &url.URL{Scheme: "http", Host: "127.0.0.1:1"}
 
 // Session es una sesión abierta.
 type Session struct {
-	srv     *tsnet.Server
-	tun     *chanTun
-	network Network
-	logf    func(string, ...any)
-	tempDir string
+	srv      *tsnet.Server
+	tun      *chanTun
+	network  Network
+	logf     func(string, ...any)
+	tempDir  string
+	stopOnly chan struct{}
 }
 
 // Start abre la sesión y espera a que el nodo de salida esté listo (salvo con ListOnly).
@@ -208,6 +209,9 @@ func Start(parent context.Context, cfg Config, logf func(string, ...any)) (*Sess
 	}()
 
 	keepCrashReport(cfg.TempDir)
+	if os.Getenv("TSBRIDGE_VERBOSE") != "" {
+		cfg.Verbose = true
+	}
 	if cfg.TempDir != "" && os.Getenv("TMPDIR") == "" {
 		// Partes de Tailscale buscan dónde guardar cosas con os.TempDir(), que en Android es /data/local/tmp y no se
 		// puede escribir (sin esto, entra en pánico con «no safe place found to store log state»).
@@ -288,6 +292,7 @@ func Start(parent context.Context, cfg Config, logf func(string, ...any)) (*Sess
 		return nil, fail(CodeInternal, "el nodo no recibió una dirección IPv4")
 	}
 	s.network = Network{Address: v4.String(), Prefix: 32, DNS: []string{QuadDNS}, MTU: MTU}
+	s.keepOnlyTCP443()
 	logf("Nodo en la red con la dirección %s", v4)
 
 	if !cfg.ListOnly {
@@ -424,6 +429,33 @@ func (s *Session) useExitNode(ctx context.Context, want string) (*ExitNode, erro
 	return chosen, nil
 }
 
+// keepOnlyTCP443 mantiene a Tailscale en su modo «solo TCP 443»: sin UDP ni STUN. Detrás del proxy es lo que hay, y sin
+// él la comprobación de red, que no puede enviar nada, lo toma por un fallo y hace un «rebind» que corta el relé DERP en
+// mitad de las transferencias (se vio: una descarga se quedaba parada). Normalmente lo concede el servidor de control con
+// una capacidad del nodo, y Tailscale lo vuelve a fijar cada vez que llega un mapa de DERP: por eso se reafirma a menudo.
+func (s *Session) keepOnlyTCP443() {
+	ms, ok := s.srv.Sys().MagicSock.GetOK()
+	if !ok {
+		s.logf("No se pudo poner Tailscale en modo solo TCP 443")
+		return
+	}
+	ms.SetOnlyTCP443(true)
+	s.logf("Tailscale en modo solo TCP 443 (sin UDP)")
+	s.stopOnly = make(chan struct{})
+	go func() {
+		t := time.NewTicker(time.Second)
+		defer t.Stop()
+		for {
+			select {
+			case <-s.stopOnly:
+				return
+			case <-t.C:
+				ms.SetOnlyTCP443(true)
+			}
+		}
+	}()
+}
+
 // Network es la red de la sesión.
 func (s *Session) Network() Network { return s.network }
 
@@ -435,6 +467,12 @@ func (s *Session) ReadPacket(timeout time.Duration) ([]byte, error) { return s.t
 
 // Close cierra la sesión.
 func (s *Session) Close() {
+	if s.stopOnly != nil {
+		close(s.stopOnly)
+	}
+	if in, out := s.tun.droppedIn.Load(), s.tun.droppedOut.Load(); in+out > 0 {
+		s.logf("Paquetes descartados por cola llena: %d hacia Tailscale, %d hacia la app", in, out)
+	}
 	// Tailscale cierra la interfaz virtual al apagarse; cerrarla antes lo deja esperando un cerrojo para siempre.
 	//
 	// Con TS_DEBUG_ALWAYS_USE_DERP, Tailscale (v1.104) reemplaza en cada «rebind» su conexión UDP ficticia sin cerrar
@@ -467,6 +505,8 @@ type chanTun struct {
 	events      chan tun.Event
 	closed      chan struct{}
 	once        sync.Once
+	// Paquetes descartados por cola llena, en cada sentido: si crecen, la app o Tailscale no dan abasto.
+	droppedIn, droppedOut atomic.Int64
 }
 
 func newChanTun() *chanTun {
@@ -488,7 +528,8 @@ func (t *chanTun) inject(p []byte) error {
 	case t.toTailscale <- pkt:
 		return nil
 	default:
-		return nil // cola llena: se descarta, como haría una interfaz saturada
+		t.droppedIn.Add(1) // cola llena: se descarta, como haría una interfaz saturada
+		return nil
 	}
 }
 
@@ -532,6 +573,7 @@ func (t *chanTun) Write(bufs [][]byte, offset int) (int, error) {
 			return 0, io.EOF
 		case t.fromNet <- pkt:
 		default: // la app no lee a tiempo: se descarta
+			t.droppedOut.Add(1)
 		}
 	}
 	return len(bufs), nil

@@ -306,23 +306,32 @@ class Handler(threading.Thread):
                 pass
             return
         with upstream:
-            # Cada sentido se cierra por separado: si un extremo deja de enviar, el otro aún puede responder.
-            open_sources = [self.client, upstream]
-            while open_sources:
-                readable, _, _ = select.select(open_sources, [], [], 60)
-                if not readable:
-                    return
-                for source in readable:
-                    target = upstream if source is self.client else self.client
-                    data = source.recv(65536)
-                    if data:
-                        target.sendall(data)
-                    else:
-                        open_sources.remove(source)
-                        try:
-                            target.shutdown(socket.SHUT_WR)
-                        except OSError:
-                            pass
+            # Un hilo por sentido: con uno solo y envíos bloqueantes, el relé se atasca cuando los dos extremos envían
+            # mucho a la vez (se vio con los relés DERP de Tailscale, que tienen tráfico en ambos sentidos). Cada sentido
+            # se cierra por separado: si un extremo deja de enviar, el otro aún puede responder.
+            upstream.settimeout(None)
+            self.client.settimeout(None)
+            back = threading.Thread(target=pump, args=(upstream, self.client), daemon=True)
+            back.start()
+            pump(self.client, upstream)
+            back.join()
+
+
+def pump(source, target):
+    """Copia de source a target hasta que source cierra, y entonces cierra el envío de target."""
+    try:
+        while True:
+            data = source.recv(65536)
+            if not data:
+                break
+            target.sendall(data)
+    except OSError:
+        pass
+    finally:
+        try:
+            target.shutdown(socket.SHUT_WR)
+        except OSError:
+            pass
 
 
 def main():

@@ -187,6 +187,46 @@ class TailscaleEngineLiveTest {
     }
 
     @Test
+    fun `a large download goes through the exit node without stalling`() = runBlocking {
+        val bridge = bridge() ?: return@runBlocking
+        val size = 3 * 1024 * 1024
+        val server = ServerSocket(0, 50, InetAddress.getByName("127.0.0.1"))
+        closers += { server.close() }
+        thread(isDaemon = true) {
+            while (!server.isClosed) {
+                val client = runCatching { server.accept() }.getOrNull() ?: break
+                thread(isDaemon = true) {
+                    client.use {
+                        it.getInputStream().read(ByteArray(1024))
+                        it.getOutputStream().write("HTTP/1.0 200 OK\r\nContent-Length: $size\r\n\r\n".toByteArray())
+                        it.getOutputStream().write(ByteArray(size) { i -> (i % 251).toByte() })
+                    }
+                }
+            }
+        }
+        val net = startTestNet("127.0.0.1:${server.localPort}") ?: return@runBlocking
+        val proxyPort = startProxy()
+        val start = CountryExitStart(
+            CountryExit.Tailscale(controlUrl = net.controlUrl, exitNode = net.exitNode),
+            CountryExitSecrets.Tailscale(net.authKey),
+            stateDir = Files.createTempDirectory("ts-state").toString(),
+        )
+        val session = assertIs<VpnConnectResult.Connected>(engine(bridge).connect(context(proxyPort), start)).session
+        try {
+            val started = System.currentTimeMillis()
+            val response = httpBytesThrough(session, "203.0.113.42", 80, expected = size)
+            val header = response.indexOfHeaderEnd()
+            val bodyBytes = response.size - header
+            println("Descarga de $bodyBytes bytes en ${System.currentTimeMillis() - started} ms")
+            assertEquals(size, bodyBytes, "bytes del cuerpo")
+            val expectedBody = ByteArray(size) { i -> (i % 251).toByte() }
+            assertTrue(response.copyOfRange(header, response.size).contentEquals(expectedBody), "el cuerpo llegó alterado")
+        } finally {
+            session.close()
+        }
+    }
+
+    @Test
     fun `a wrong proxy password is reported as such`() = runBlocking {
         val bridge = bridge() ?: return@runBlocking
         val net = startTestNet("127.0.0.1:1") ?: return@runBlocking
@@ -201,7 +241,32 @@ class TailscaleEngineLiveTest {
     }
 
     /** Una conexión TCP mínima hecha a mano sobre la sesión: SYN, ACK, la petición, y lo que llegue hasta el FIN. */
-    private suspend fun httpThrough(session: VpnSession, host: String, port: Int): String = withTimeout(60_000) {
+    private fun ByteArray.indexOfHeaderEnd(): Int {
+        for (i in 0..size - 4) {
+            if (this[i] == '\r'.code.toByte() && this[i + 1] == '\n'.code.toByte() && this[i + 2] == '\r'.code.toByte() && this[i + 3] == '\n'.code.toByte()) return i + 4
+        }
+        return size
+    }
+
+    /** Como [httpThrough], pero con los bytes tal cual y parando en cuanto llegan [expected] bytes de cuerpo. */
+    private suspend fun httpBytesThrough(session: VpnSession, host: String, port: Int, expected: Int): ByteArray {
+        val out = java.io.ByteArrayOutputStream()
+        httpThrough(session, host, port, quietMs = 30_000) { chunk ->
+            out.write(chunk)
+            val bytes = out.toByteArray()
+            bytes.size - bytes.indexOfHeaderEnd() >= expected && bytes.indexOfHeaderEnd() < bytes.size
+        }
+        return out.toByteArray()
+    }
+
+    private suspend fun httpThrough(
+        session: VpnSession,
+        host: String,
+        port: Int,
+        quietMs: Long = 15_000,
+        /** Recibe cada trozo de datos; si devuelve true, la descarga se da por terminada. */
+        onData: (ByteArray) -> Boolean = { false },
+    ): String = withTimeout(180_000) {
         val incoming = Channel<TcpSegment>(Channel.UNLIMITED)
         val reader = CoroutineScope(Dispatchers.IO).launch {
             session.receive { bytes ->
@@ -233,13 +298,25 @@ class TailscaleEngineLiveTest {
             session.writePacket(packet(TcpFlags.ACK or TcpFlags.PSH, ack, request))
             seq += request.size
             val body = StringBuilder()
-            while (true) {
-                val s = withTimeoutOrNull(15_000) { incoming.receive() } ?: break
-                if (s.payloadLength > 0 && s.sequence == ack) {
-                    body.append(s.payload.decodeToString())
-                    ack += s.payloadLength
+            // Los segmentos que llegan adelantados se guardan hasta que llega el que falta, como hace un TCP de verdad:
+            // sin esto, cada pérdida obliga al emisor a reenviar todo lo posterior.
+            val pending = HashMap<Int, ByteArray>()
+            var done = false
+            while (!done) {
+                val s = withTimeoutOrNull(quietMs) { incoming.receive() } ?: break
+                if (s.payloadLength > 0 && s.sequence - ack >= 0) pending[s.sequence] = s.payload
+                while (true) {
+                    val next = pending.remove(ack) ?: break
+                    body.append(next.decodeToString(throwOnInvalidSequence = false))
+                    ack += next.size
+                    if (onData(next)) {
+                        session.writePacket(packet(TcpFlags.ACK or TcpFlags.FIN, ack))
+                        done = true
+                        break
+                    }
                 }
-                if (s.has(TcpFlags.FIN)) {
+                if (done) break
+                if (s.has(TcpFlags.FIN) && pending.isEmpty() && s.sequence + s.payloadLength == ack) {
                     ack += 1
                     session.writePacket(packet(TcpFlags.ACK or TcpFlags.FIN, ack))
                     break

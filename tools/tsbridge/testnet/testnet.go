@@ -124,8 +124,21 @@ func Start(ctx context.Context, ip, redirect string, logf logger.Logf) (*Net, er
 			}
 			defer up.Close()
 			n.Forwarded.Add(1)
-			go io.Copy(up, c)
+			clientDone := make(chan struct{})
+			go func() {
+				io.Copy(up, c)
+				close(clientDone)
+			}()
 			io.Copy(c, up)
+			// Cerrar de golpe tiraría lo que aún está en el búfer de envío de la pila TCP del nodo (se vio: una descarga
+			// se cortaba a mitad). Como un proxy de verdad: FIN, y esperar a que el cliente termine.
+			if cw, ok := c.(interface{ CloseWrite() error }); ok {
+				cw.CloseWrite()
+			}
+			select {
+			case <-clientDone:
+			case <-time.After(60 * time.Second):
+			}
 		}, true
 	})
 	upCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
