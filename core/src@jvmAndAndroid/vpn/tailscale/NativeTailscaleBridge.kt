@@ -1,6 +1,7 @@
 package org.uci.proxy.core.vpn.tailscale
 
-import java.io.File
+import java.nio.file.Files
+import java.nio.file.Path
 import java.security.MessageDigest
 
 /** Los métodos nativos de libtsbridge (tools/tsbridge/jni). Los nombres tienen que coincidir con los de la librería. */
@@ -62,13 +63,15 @@ class NativeTailscaleBridge(
 
     companion object {
         /**
-         * Desde los recursos: `native/tsbridge/<resourceDir>/<fileName>`. Se copia a [cacheDir] con un nombre que depende
-         * de su contenido (para no pisar una versión en uso) y se carga con [System.load].
+         * Desde los recursos: `native/tsbridge/<resourceDir>/<fileName>`. Como con `wintun.dll`, se copia a una carpeta
+         * nueva dentro de [root] (en Unix, solo accesible para este usuario), se comprueba que lo escrito es idéntico al
+         * recurso y se carga con [System.load]. Nada de reutilizar una copia anterior: el motor de escritorio corre con
+         * privilegios y no debe cargar algo que otro proceso haya podido dejar o cambiar.
          */
         fun fromResource(
             resourceDir: String,
             fileName: String,
-            cacheDir: File = File(System.getProperty("java.io.tmpdir"), "proxyuci-native"),
+            root: Path = Path.of(System.getProperty("java.io.tmpdir"), "proxyuci-native"),
             onLoadError: (String) -> Unit = {},
         ): NativeTailscaleBridge {
             val resource = "/native/tsbridge/$resourceDir/$fileName"
@@ -77,20 +80,24 @@ class NativeTailscaleBridge(
                 if (bytes == null) {
                     false
                 } else {
-                    val digest = MessageDigest.getInstance("SHA-256").digest(bytes).take(8).joinToString("") { "%02x".format(it) }
-                    val target = File(cacheDir, "$digest-$fileName")
-                    if (!target.exists() || target.length() != bytes.size.toLong()) {
-                        cacheDir.mkdirs()
-                        val partial = File(cacheDir, "${target.name}.${System.nanoTime()}.tmp")
-                        partial.writeBytes(bytes)
-                        if (!partial.renameTo(target) && !target.exists()) error("no se pudo copiar a $target")
-                        partial.delete()
+                    Files.createDirectories(root)
+                    val directory = Files.createTempDirectory(root, "tsbridge-")
+                    val library = directory.resolve(fileName)
+                    Files.write(library, bytes)
+                    if (!sha256(Files.readAllBytes(library)).contentEquals(sha256(bytes))) {
+                        Files.deleteIfExists(library)
+                        error("la copia de $fileName no coincide con la de la app")
                     }
-                    System.load(target.absolutePath)
+                    System.load(library.toAbsolutePath().toString())
+                    // Mientras esté cargada Windows no deja borrarla; se intenta al salir.
+                    library.toFile().deleteOnExit()
+                    directory.toFile().deleteOnExit()
                     true
                 }
             }, onLoadError)
         }
+
+        private fun sha256(bytes: ByteArray): ByteArray = MessageDigest.getInstance("SHA-256").digest(bytes)
 
         /** Una librería que instala el sistema con la app (los `jniLibs` de Android). */
         fun fromSystem(name: String, onLoadError: (String) -> Unit = {}) = NativeTailscaleBridge("lib$name.so", load = {

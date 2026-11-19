@@ -23,6 +23,7 @@ foreach ($attempt in 1, 2) {
     if ($process.ExitCode -ne 0 -or (Get-Content $report -TotalCount 1) -ne "OK") { throw "La autoprueba falló" }
 }
 if (-not ((Get-Content $report -Raw) -match [regex]::Escape("ProxyUCI.exe"))) { throw "La app no supo cuál es su .exe" }
+if (-not ((Get-Content $report -Raw) -match "tailscale=cargado")) { throw "La librería de Tailscale no viene en el .exe o no carga" }
 
 $env:SKIKO_RENDER_API = "SOFTWARE_COMPAT"
 $ready = Join-Path $temp "ventana-lista.txt"

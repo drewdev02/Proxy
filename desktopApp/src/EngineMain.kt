@@ -15,6 +15,8 @@ import org.uci.proxy.core.di.tunnelModule
 import org.uci.proxy.core.engine.TunnelRunner
 import org.uci.proxy.core.packet.Ipv4Route
 import org.uci.proxy.core.platform.JnaProbe
+import org.uci.proxy.core.vpn.tailscale.NativeTailscaleBridge
+import org.uci.proxy.core.vpn.tailscale.TailscaleBridge
 import org.uci.proxy.core.platform.ProcessCommandRunner
 import org.uci.proxy.core.platform.macos.JnaUtunOpener
 import org.uci.proxy.core.platform.macos.MacNetwork
@@ -58,7 +60,20 @@ fun runEngine(args: List<String>) {
     // El motor corre aparte de la ventana: lo que cuente de los servicios de nombres se reenvía por el socket.
     val nameForwarder = EngineNameForwarder()
     val koin = startKoin {
-        modules(platformModule, coreModule, tunnelModule, module { single<NameServiceReporter> { nameForwarder } })
+        modules(
+            platformModule, coreModule, tunnelModule,
+            module {
+                single<NameServiceReporter> { nameForwarder }
+                // El motor corre con privilegios: en Windows la librería de Tailscale se extrae, como wintun.dll, bajo
+                // ProgramData y no en la carpeta temporal del usuario.
+                if (System.getProperty("os.name").orEmpty().startsWith("Windows")) {
+                    single<TailscaleBridge> {
+                        val (dir, file) = NativeTailscaleBridge.desktopResourceDir() ?: return@single TailscaleBridge.Unavailable
+                        NativeTailscaleBridge.fromResource(dir, file, root = windowsNativeDirectory())
+                    }
+                }
+            },
+        )
     }.koin
     val dispatchers = koin.get<AppDispatchers>()
     val logger = koin.get<Logger>()
@@ -130,6 +145,17 @@ fun runSelfTest(reportFile: String) {
             val dll = ResourceWintunDllLocator(Files.createTempDirectory("proxyuci-autoprueba")).locate()
             report.appendLine("wintun=${dll.fileName} (${Files.size(dll)} bytes, huella verificada)")
         }
+        // Tailscale: si la app trae su librería, tiene que cargar (un módulo de Java que falte se vería aquí).
+        val tailscale = NativeTailscaleBridge.desktopResourceDir()?.let { (dir, file) ->
+            if (NativeTailscaleBridge::class.java.getResource("/native/tsbridge/$dir/$file") == null) {
+                "no incluido"
+            } else {
+                val bridge = NativeTailscaleBridge.fromResource(dir, file, root = Files.createTempDirectory("proxyuci-autoprueba"))
+                check(bridge.isAvailable) { "la librería de Tailscale está en la app pero no carga" }
+                "cargado"
+            }
+        } ?: "sin librería para este sistema"
+        report.appendLine("tailscale=$tailscale")
         Files.writeString(Path(reportFile), "OK\n$report")
     } catch (error: Throwable) {
         Files.writeString(Path(reportFile), "FALLO\n$report\n${error.stackTraceToString()}")

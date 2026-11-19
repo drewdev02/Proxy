@@ -90,6 +90,13 @@ jobs:
         with:
           distribution: temurin
           java-version: "25"
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: tools/tsbridge/go.mod
+          cache-dependency-path: tools/tsbridge/go.sum
+      - name: Librería de Tailscale
+        shell: bash
+        run: tools/tsbridge/build.sh
       - name: Construir el .exe
         run: ./tools/windows-exe/build-exe.ps1 -Version ${{ needs.version.outputs.version }}
       - name: Probar el .exe
@@ -116,6 +123,12 @@ jobs:
           distribution: temurin
           java-version: "25"
       # Sin firmar ni notarizar: macOS pedirá confirmar la primera vez (clic derecho > Abrir).
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: tools/tsbridge/go.mod
+          cache-dependency-path: tools/tsbridge/go.sum
+      - name: Librería de Tailscale
+        run: tools/tsbridge/build.sh
       - name: Construir el .dmg
         run: tools/macos-dmg/build-dmg.sh "${{ needs.version.outputs.version }}" build/dmg
       # La autoprueba ya corrió dentro del script; aquí se abre la ventana de Compose de la app empaquetada.
@@ -181,6 +194,14 @@ jobs:
             echo "::error::Faltan los secretos de firma de Android (ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD): no se publica un APK sin firmar"
             exit 1
           fi
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: tools/tsbridge/go.mod
+          cache-dependency-path: tools/tsbridge/go.sum
+      - name: Librerías de Tailscale
+        run: |
+          tools/tsbridge/build.sh android-arm64
+          tools/tsbridge/build.sh android-x86_64
       - name: Construir el APK
         run: ./kotlin build -m androidApp -p android -v release
       - name: Verificar y nombrar el APK
