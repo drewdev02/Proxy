@@ -66,7 +66,7 @@ módulo propio que la extensión no enlaza.
 │   │   ├── net/               KtorTcpConnector
 │   │   ├── engine/            TunnelEngine, TunnelRelay, TunnelRunner, SplitRouting, ConnectivityChecks
 │   │   ├── routing/           RuleSet
-│   │   ├── vpn/               OvpnConfig, OpenVpnClient, OpenVpnExit (modo Otro País)
+│   │   ├── vpn/               CountryEngine, ProxyDialer, OpenVpnEngine (OvpnConfig, OpenVpnClient), tailscale/ (Otro País)
 │   │   ├── profile/           ProfileRepository, ProfileValidator
 │   │   ├── settings/          AppSettings, servicios de nombres y su estado
 │   │   ├── storage/           EncryptedSecretStore
@@ -175,7 +175,7 @@ comportamiento en el núcleo ni en la interfaz: para eso se pregunta por la capa
 |---|---|---|
 | `platformModule` (`expect`) | `core/src@<plataforma>/di` | Dispatchers, `PlatformInfo`, `Logger` (envuelto en `BufferedLogger`), almacenes, aleatoriedad, criptografía de OpenVPN, `LocalAddresses`, `HostResolver`, y en Android `ConnectionOwner` |
 | `coreModule` | `core/src/di` | Reloj, `LogBuffer`, perfiles, ajustes, estado de servicios de nombres, `KtorTcpConnector`, esquemas NTLM y Basic (NTLM primero), conectores HTTP y SOCKS5, `ProxyTester` |
-| `tunnelModule` | `core/src/di` | Solo procesos que ejecutan el túnel: `TunnelStateStore` (como `TunnelMonitor`), `TunAddressPlanner`, `TunnelEngineFactory`, `OpenVpnExit` (como `VpnExit`), `TunnelRunner` |
+| `tunnelModule` | `core/src/di` | Solo procesos que ejecutan el túnel: `TunnelStateStore` (como `TunnelMonitor`), `TunAddressPlanner`, `TunnelEngineFactory`, `ProxyDialer`, `OpenVpnEngine` y `TailscaleEngine` (en `CountryEngines`), `TunnelRunner` |
 | `databaseModule` | `database/src/di` | Room, `RoomLogHistory` (como `LogHistory`) y `LogRecorder` |
 | `uiModule` | `shared/src/di` | View models |
 | `androidAppModule`, `desktopAppModule` | apps | El `TunnelControl` real de cada sistema (servicio de Android, cliente IPC del motor de escritorio) |
@@ -299,8 +299,11 @@ IPv6 queda fuera del túnel, igual que en Super Proxy. Las cuatro plataformas en
 
 ### Modo «Otro País» (macOS, Windows y Android)
 
-Es opcional por perfil: sin archivo `.ovpn`, el perfil conecta directo. Con él, la app es también el cliente OpenVPN:
-no lanza ningún programa externo.
+Es opcional por perfil, con un motor a elegir: OpenVPN o Tailscale. El túnel solo habla con un `CountryEngine`, que abre
+a través del proxy una `VpnSession` de paquetes con su `VpnNetwork` (dirección, prefijo, DNS, MTU); `ProxyDialer` es la
+forma común de llegar a un servidor por el proxy. Tailscale (librería oficial embebida por JNI, `tools/tsbridge`) se
+describe en la capa 12 del [`ROADMAP.md`](./ROADMAP.md). Con OpenVPN, la app es también el cliente: no lanza ningún
+programa externo.
 
 ```
 Apps → interfaz TUN de Proxy → [cifrado OpenVPN] → conexión TCP al servidor VPN (abierta con CONNECT por el proxy)
@@ -313,14 +316,14 @@ Apps → interfaz TUN de Proxy → [cifrado OpenVPN] → conexión TCP al servid
    con el PRF de TLS 1.0 y canal de datos con AES-GCM. Las primitivas de criptografía y el TLS los aporta cada
    plataforma (`OpenVpnCrypto`, `TlsSessionFactory`); escritorio y Android comparten la implementación Java con el
    alias `jvmAndAndroid`, e iOS enlaza versiones «no disponible».
-3. `OpenVpnExit` abre la sesión probando los servidores del archivo, cada uno con un `CONNECT` al proxy (por nombre
-   `sslip.io` si el `.ovpn` da una IP).
+3. `OpenVpnEngine` abre la sesión probando los servidores del archivo, cada uno con el `ProxyDialer` (un `CONNECT` al
+   proxy, por nombre `sslip.io` si el `.ovpn` da una IP).
 4. Sin reglas de salida, `TunnelRunner` crea la interfaz **después** del handshake, con la dirección, la máscara, el DNS
-   y el MTU que empuja el servidor, y pasa los paquetes IPv4 tal cual entre la interfaz y la VPN. Con reglas, la
+   y el MTU de la `VpnNetwork` del motor, y pasa los paquetes IPv4 tal cual entre la interfaz y la VPN. Con reglas, la
    interfaz es la del modo directo y la VPN se abre a la vez, supervisada y con reintentos.
 
-El archivo y la contraseña de la VPN viajan de la ventana al motor en la orden de arranque (`EngineStart.vpn`), porque el
-motor de escritorio corre en otro proceso. iOS no tiene este modo y la interfaz oculta la sección.
+El motor, su configuración y sus secretos viajan de la ventana al motor en la orden de arranque
+(`EngineStart.countryExit`), porque el motor de escritorio corre en otro proceso. iOS no tiene este modo y la interfaz oculta la sección.
 
 ---
 

@@ -471,7 +471,7 @@ sirve en Android, macOS y Windows (los tres son JVM). No hace falta un proxy loc
 | Parte | Trabajo | Hecho |
 |---|---|---|
 | Interfaz | Sección «Salir por otro país (VPN)» en el editor del perfil, con selector de archivo del sistema (oculta en iOS) | ✔ |
-| Núcleo | `OvpnConfig` (lector del `.ovpn`), `OpenVpnClient` (`tls-crypt`, canal de control, AES-GCM), `OpenVpnExit`, camino VPN de `TunnelRunner` | ✔ |
+| Núcleo | `OvpnConfig` (lector del `.ovpn`), `OpenVpnClient` (`tls-crypt`, canal de control, AES-GCM), `OpenVpnExit` (hoy `OpenVpnEngine`, capa 12), camino VPN de `TunnelRunner` | ✔ |
 | Adaptadores | `JcaOpenVpnCrypto` y `SslEngineTlsSession` (compartidos por escritorio y Android con el alias `jvmAndAndroid`), `AwtFilePicker`, selector de Android | ✔ |
 | Almacenamiento | El `.ovpn` y la contraseña de la VPN, por perfil, en el almacén seguro de cada sistema | ✔ |
 
