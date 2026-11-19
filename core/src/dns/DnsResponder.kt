@@ -49,32 +49,40 @@ class DnsResponder(
     }
 
     /** Devuelve la primera pregunta y cuántos bytes ocupa, o null si el mensaje no es una consulta válida. */
-    fun parseQuestion(query: ByteArray): Pair<DnsQuestion, Int>? {
-        if (query.size < HEADER_SIZE) return null
-        val flags = query.readU16(2)
-        if (flags and FLAG_RESPONSE != 0 || query.readU16(4) == 0) return null
-
-        val labels = mutableListOf<String>()
-        var position = HEADER_SIZE
-        while (true) {
-            if (position >= query.size) return null
-            val length = query[position].toInt() and 0xFF
-            position++
-            if (length == 0) break
-            // En la pregunta no se esperan punteros de compresión (los dos bits altos a 1).
-            if (length and 0xC0 != 0 || position + length > query.size) return null
-            labels += query.decodeToString(position, position + length)
-            position += length
-        }
-        if (labels.isEmpty() || position + 4 > query.size) return null
-        if (query.readU16(position + 2) != CLASS_IN) return null
-
-        val question = DnsQuestion(name = labels.joinToString("."), type = query.readU16(position))
-        return question to (position + 4 - HEADER_SIZE)
-    }
+    fun parseQuestion(query: ByteArray): Pair<DnsQuestion, Int>? = readQuestion(query, response = false)
 
     companion object {
         const val TYPE_A = 1
+
+        /** La primera pregunta de una consulta, o null si no es una consulta válida. */
+        fun parseQuestionOf(query: ByteArray): DnsQuestion? = readQuestion(query, response = false)?.first
+
+        /** El nombre por el que pregunta una respuesta, en minúsculas, o null si no es una respuesta válida. */
+        fun questionName(response: ByteArray): String? = readQuestion(response, response = true)?.first?.name?.lowercase()
+
+        private fun readQuestion(message: ByteArray, response: Boolean): Pair<DnsQuestion, Int>? {
+            if (message.size < HEADER_SIZE) return null
+            val flags = message.readU16(2)
+            if ((flags and FLAG_RESPONSE != 0) != response || message.readU16(4) == 0) return null
+
+            val labels = mutableListOf<String>()
+            var position = HEADER_SIZE
+            while (true) {
+                if (position >= message.size) return null
+                val length = message[position].toInt() and 0xFF
+                position++
+                if (length == 0) break
+                // En la pregunta no se esperan punteros de compresión (los dos bits altos a 1).
+                if (length and 0xC0 != 0 || position + length > message.size) return null
+                labels += message.decodeToString(position, position + length)
+                position += length
+            }
+            if (labels.isEmpty() || position + 4 > message.size) return null
+            if (message.readU16(position + 2) != CLASS_IN) return null
+
+            val question = DnsQuestion(name = labels.joinToString("."), type = message.readU16(position))
+            return question to (position + 4 - HEADER_SIZE)
+        }
         private const val CLASS_IN = 1
         private const val HEADER_SIZE = 12
         private const val ANSWER_SIZE = 16

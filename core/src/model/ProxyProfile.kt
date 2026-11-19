@@ -19,6 +19,8 @@ data class ProxyProfile(
     val username: String,
     /** Si no es null, el tráfico sale por una VPN OpenVPN (modo «Otro País») encadenada tras este proxy. */
     val vpn: VpnProfile? = null,
+    /** Qué sale por el proxy, por la VPN, directo o se bloquea. */
+    val routing: RoutingRules = RoutingRules(),
 )
 
 /**

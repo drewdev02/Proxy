@@ -124,6 +124,7 @@ private fun ProfileEditorRoute(profileId: String?, onClose: () -> Unit) {
         onVpnPickFile = { scope.launch { picker?.pickText()?.let { viewModel.onVpnFileChosen(it.name, it.text) } } },
         onVpnUsernameChange = viewModel::onVpnUsernameChange,
         onVpnPasswordChange = viewModel::onVpnPasswordChange,
+        routingActions = viewModel,
         onDraftChange = viewModel::onDraftChange,
         onPasswordChange = viewModel::onPasswordChange,
         onTest = viewModel::testProxy,

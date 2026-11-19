@@ -9,6 +9,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.uci.proxy.core.model.ProxyProfile
+import org.uci.proxy.core.model.RouteExit
+import org.uci.proxy.core.model.RoutingRules
+import org.uci.proxy.core.routing.parseRule
 import org.uci.proxy.core.model.VpnProfile
 import org.uci.proxy.core.model.VpnSecrets
 import org.uci.proxy.core.port.LocalNetworkPermission
@@ -50,6 +53,47 @@ data class VpnDraft(
     val needsCredentials: Boolean = true,
 )
 
+/** Las reglas de salida tal como se editan, más la regla que se está escribiendo. */
+data class RoutingDraft(
+    val rules: RoutingRules = RoutingRules(),
+    val newRule: String = "",
+    val newRuleExit: RouteExit = RouteExit.VPN,
+    /** Lo escrito no es ni un dominio ni una IP. */
+    val newRuleInvalid: Boolean = false,
+)
+
+/** Lo que la sección de reglas de salida puede pedir. */
+interface RoutingActions {
+    fun onRoutingEnabledChange(enabled: Boolean)
+
+    fun onDefaultExitChange(exit: RouteExit)
+
+    fun onNewRuleChange(text: String)
+
+    fun onNewRuleExitChange(exit: RouteExit)
+
+    fun addRule()
+
+    fun onRuleExitChange(index: Int, exit: RouteExit)
+
+    /** Sube ([delta] negativo) o baja una regla. */
+    fun moveRule(index: Int, delta: Int)
+
+    fun removeRule(index: Int)
+
+    /** Para vistas previas. */
+    object None : RoutingActions {
+        override fun onRoutingEnabledChange(enabled: Boolean) = Unit
+        override fun onDefaultExitChange(exit: RouteExit) = Unit
+        override fun onNewRuleChange(text: String) = Unit
+        override fun onNewRuleExitChange(exit: RouteExit) = Unit
+        override fun addRule() = Unit
+        override fun onRuleExitChange(index: Int, exit: RouteExit) = Unit
+        override fun moveRule(index: Int, delta: Int) = Unit
+        override fun removeRule(index: Int) = Unit
+    }
+}
+
 data class ProfileEditorUiState(
     val isNew: Boolean = true,
     val draft: ProfileDraft = ProfileDraft(),
@@ -61,6 +105,7 @@ data class ProfileEditorUiState(
     val saved: Boolean = false,
     val test: ProxyTestUiState = ProxyTestUiState.Idle,
     val vpn: VpnDraft = VpnDraft(),
+    val routing: RoutingDraft = RoutingDraft(),
 ) {
     val isBusy: Boolean get() = isSaving || test == ProxyTestUiState.Running
 }
@@ -72,7 +117,7 @@ class ProfileEditorViewModel(
     private val proxyTester: ProxyTester,
     private val localNetworkPermission: LocalNetworkPermission,
     private val logger: Logger,
-) : ViewModel() {
+) : ViewModel(), RoutingActions {
     private val state = MutableStateFlow(ProfileEditorUiState())
     val uiState: StateFlow<ProfileEditorUiState> = state.asStateFlow()
 
@@ -98,6 +143,7 @@ class ProfileEditorViewModel(
             isNew = existing == null,
             draft = existing?.toDraft() ?: ProfileDraft(),
             vpn = existing?.vpn?.let { VpnDraft(enabled = true, fileName = it.fileName, username = it.username) } ?: VpnDraft(),
+            routing = RoutingDraft(rules = existing?.routing ?: RoutingRules()),
         )
         if (existing != null) {
             viewModelScope.launch {
@@ -166,6 +212,59 @@ class ProfileEditorViewModel(
         state.update { it.copy(vpn = it.vpn.copy(password = password), saveFailed = false) }
     }
 
+    override fun onRoutingEnabledChange(enabled: Boolean) = updateRules { it.copy(enabled = enabled) }
+
+    override fun onDefaultExitChange(exit: RouteExit) = updateRules { it.copy(defaultExit = exit) }
+
+    override fun onNewRuleChange(text: String) {
+        state.update { it.copy(routing = it.routing.copy(newRule = text, newRuleInvalid = false)) }
+    }
+
+    override fun onNewRuleExitChange(exit: RouteExit) {
+        state.update { it.copy(routing = it.routing.copy(newRuleExit = exit)) }
+    }
+
+    /** Añade lo escrito al final de la lista. Si es un dominio con salida «Directo», que aún no existe, pasa a «Proxy». */
+    override fun addRule() {
+        val routing = state.value.routing
+        val parsed = parseRule(routing.newRule, routing.newRuleExit)
+        if (parsed == null) {
+            state.update { it.copy(routing = it.routing.copy(newRuleInvalid = true)) }
+            return
+        }
+        val rule = if (parsed.exit in RoutingRules.exitsFor(parsed.kind)) parsed else parsed.copy(exit = RouteExit.PROXY)
+        state.update {
+            it.copy(
+                routing = it.routing.copy(
+                    rules = it.routing.rules.copy(rules = it.routing.rules.rules.filterNot { r -> r.kind == rule.kind && r.value == rule.value } + rule),
+                    newRule = "",
+                    newRuleInvalid = false,
+                ),
+                saveFailed = false,
+            )
+        }
+    }
+
+    override fun onRuleExitChange(index: Int, exit: RouteExit) = updateRules { rules ->
+        rules.copy(rules = rules.rules.mapIndexed { i, rule -> if (i == index) rule.copy(exit = exit) else rule })
+    }
+
+    override fun moveRule(index: Int, delta: Int) = updateRules { rules ->
+        val target = index + delta
+        if (index !in rules.rules.indices || target !in rules.rules.indices) return@updateRules rules
+        val list = rules.rules.toMutableList()
+        list.add(target, list.removeAt(index))
+        rules.copy(rules = list)
+    }
+
+    override fun removeRule(index: Int) = updateRules { rules ->
+        rules.copy(rules = rules.rules.filterIndexed { i, _ -> i != index })
+    }
+
+    private fun updateRules(change: (RoutingRules) -> RoutingRules) {
+        state.update { it.copy(routing = it.routing.copy(rules = change(it.routing.rules)), saveFailed = false) }
+    }
+
     /**
      * La pantalla ya reaccionó al guardado y se cerró. Sin esto, [ProfileEditorUiState.saved] seguiría a true y, si el
      * sistema recreara la actividad antes de que este view model se descarte, la pantalla volvería a cerrarse.
@@ -212,7 +311,10 @@ class ProfileEditorViewModel(
             validation is ProfileValidation.Valid -> {
                 state.update { it.copy(errors = emptySet(), isSaving = true, saveFailed = false) }
                 viewModelScope.launch {
-                    val profile = validation.profile.copy(vpn = if (vpn.enabled) VpnProfile(vpn.fileName, vpn.username.trim()) else null)
+                    val profile = validation.profile.copy(
+                        vpn = if (vpn.enabled) VpnProfile(vpn.fileName, vpn.username.trim()) else null,
+                        routing = current.routing.rules,
+                    )
                     val secrets = if (vpn.enabled) VpnSecrets(vpn.ovpn, vpn.password) else null
                     val ok = guarded("guardar el perfil") { repository.save(profile, current.password, secrets) } != null
                     state.update { it.copy(isSaving = false, saved = ok, saveFailed = !ok) }

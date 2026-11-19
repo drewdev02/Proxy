@@ -3,6 +3,7 @@ package org.uci.proxy.core.engine
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,7 +24,11 @@ import org.uci.proxy.core.port.TunnelMonitor
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.port.TunnelUnavailableException
 import org.uci.proxy.core.profile.AppDispatchers
+import org.uci.proxy.core.port.TunDevice
 import org.uci.proxy.core.profile.ProfileRepository
+import org.uci.proxy.core.routing.RuleSet
+import org.uci.proxy.core.vpn.VpnSession
+import kotlin.time.Duration.Companion.seconds
 import org.uci.proxy.core.settings.AppSettings
 import org.uci.proxy.core.vpn.OpenVpnPush
 import org.uci.proxy.core.vpn.VpnConnectResult
@@ -95,12 +100,26 @@ class TunnelRunner(
             return
         }
         val resolvedProfile = profile.copy(host = proxyAddress)
-        if (vpn != null) {
+        val routing = profile.routing
+        if (vpn != null && !routing.enabled) {
             runThroughVpn(platformTunnel, profile, resolvedProfile, password, vpn, settings)
             return
         }
 
+        // Con reglas de salida que usan «Otro País», la VPN se abre antes que la interfaz: así las primeras consultas DNS
+        // ya pueden ir por ella. Si no conecta, el túnel arranca igual y lo suyo sale por el proxy mientras se reintenta.
+        val rules = if (routing.enabled) RuleSet(routing) else null
+        val exit = vpnExit
+        val vpnStart = if (routing.usesVpn && exit != null) vpn else null
+        if (routing.usesVpn && vpnStart == null) {
+            logger.log(LogLevel.WARN, TAG, "Las reglas mandan tráfico por Otro País, pero el perfil no tiene VPN: sale por el proxy")
+        }
+        val retry = if (vpnStart != null && exit != null) VpnRetry(exit, resolvedProfile, password, vpnStart, settings) else null
+        val firstAttempt = retry?.let { openVpn(it) }
+        val firstSession = firstAttempt?.session
+
         val plan = addressPlanner.plan()
+        val directRoutes = rules?.directRoutes.orEmpty()
         val tun = try {
             platformTunnel.establish(
                 TunConfig(
@@ -108,29 +127,39 @@ class TunnelRunner(
                     address = plan.tunAddressText,
                     dnsServer = plan.dnsServerText,
                     mtu = MTU,
-                    routes = listOf(plan.subnet) + publicRoutes,
+                    // Los rangos con salida directa no entran en la interfaz: el sistema los manda por la red real.
+                    routes = listOf(plan.subnet) + if (directRoutes.isEmpty()) publicRoutes else routesExcluding(NON_PUBLIC_RANGES + directRoutes),
                     proxyAddress = proxyAddress,
                 ),
             )
         } catch (e: TunnelUnavailableException) {
             logger.log(LogLevel.ERROR, TAG, "No se pudo crear la interfaz: ${e.message}")
+            firstSession?.close()
             stateStore.set(TunnelState.Failed(TunnelFailure.INTERFACE_UNAVAILABLE))
             return
         }
 
-        logger.log(LogLevel.INFO, TAG, "Túnel activo en ${plan.tunAddressText}, proxy $proxyAddress")
-        stateStore.set(TunnelState.Connected(profile.id))
+        val link = VpnLink(plan.tunAddress, logger)
+        val split = rules?.let { SplitRouting(it, link) }
+        logger.log(LogLevel.INFO, TAG, "Túnel activo en ${plan.tunAddressText}, proxy $proxyAddress" + if (rules != null) ", con reglas de salida" else "")
+        val vpnDown = retry != null && firstSession == null
+        if (vpnDown) logger.log(LogLevel.WARN, TAG, "Otro País no conectó: lo que iba por él sale por el proxy")
+        stateStore.set(TunnelState.Connected(profile.id, vpnDown = vpnDown))
         try {
             coroutineScope {
                 // En este ámbito viven también el temporizador TCP y los relés de cada conexión.
-                val engine = engineFactory.create(plan, output = tun, scope = this, profile = resolvedProfile, password = password, settings = settings)
+                val engine = engineFactory.create(plan, output = tun, scope = this, profile = resolvedProfile, password = password, settings = settings, split = split)
                 val loop = launch(dispatchers.background) { engine.run(tun) }
+                if (retry != null && firstAttempt != null) {
+                    launch { superviseVpn(firstAttempt, link, tun, profile.id, retry) }
+                }
                 try {
                     loop.join()
                 } catch (e: CancellationException) {
                     // La lectura de la interfaz es bloqueante y no atiende a la cancelación:
                     // solo cerrar la interfaz la despierta.
                     tun.close()
+                    link.closeSession()
                     throw e
                 }
                 // La interfaz se cerró sola: se detiene lo que quede en marcha para que el ámbito termine.
@@ -138,8 +167,70 @@ class TunnelRunner(
             }
         } finally {
             tun.close()
+            link.closeSession()
             stateStore.set(TunnelState.Disconnected)
             logger.log(LogLevel.INFO, TAG, "Túnel detenido")
+        }
+    }
+
+    /** Lo necesario para volver a abrir la VPN. */
+    private class VpnRetry(val exit: VpnExit, val proxy: ProxyProfile, val password: String, val vpn: VpnStart, val settings: AppSettings)
+
+    /** Un intento de abrir la VPN: la sesión, o si merece la pena reintentar. */
+    private class VpnAttempt(val session: VpnSession?, val retry: Boolean)
+
+    private suspend fun openVpn(retry: VpnRetry): VpnAttempt =
+        when (val result = retry.exit.connect(retry.proxy, retry.password, retry.vpn, retry.settings)) {
+            is VpnConnectResult.Connected -> VpnAttempt(result.session, retry = true)
+            is VpnConnectResult.Failed -> {
+                logger.log(LogLevel.WARN, TAG, "Otro País no conectó: ${result.failure}")
+                // Credenciales o archivo malos no se arreglan reintentando.
+                val retryable = result.failure !in PERMANENT_VPN_FAILURES
+                if (!retryable) logger.log(LogLevel.ERROR, TAG, "La VPN no se reintentará: revisa el archivo o las credenciales del perfil")
+                VpnAttempt(null, retryable)
+            }
+        }
+
+    /**
+     * Mantiene la VPN de las reglas de salida: la entrega al motor mientras está, y cuando se cae (o no llegó a conectar)
+     * avisa, deja que su tráfico salga por el proxy y reintenta cada vez más espaciado.
+     */
+    private suspend fun superviseVpn(firstAttempt: VpnAttempt, link: VpnLink, tun: TunDevice, profileId: String, retry: VpnRetry) {
+        val first = firstAttempt.session
+        var session = first
+        var retryable = firstAttempt.retry
+        var wait = VPN_RETRY_FIRST
+        try {
+            while (true) {
+                if (session != null) {
+                    link.attach(session)
+                    if (session !== first) {
+                        logger.log(LogLevel.INFO, TAG, "Otro País volvió: su tráfico sale otra vez por la VPN")
+                        stateStore.set(TunnelState.Connected(profileId))
+                    }
+                    wait = VPN_RETRY_FIRST
+                    try {
+                        session.receive { packet -> link.inbound(packet)?.let { tun.writePacket(it) } }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        logger.log(LogLevel.WARN, TAG, "La VPN falló: ${e.message}")
+                    }
+                    link.detach()
+                    session.close()
+                    session = null
+                    logger.log(LogLevel.WARN, TAG, "Se cayó Otro País: su tráfico sale por el proxy mientras se reintenta")
+                    stateStore.set(TunnelState.Connected(profileId, vpnDown = true))
+                }
+                if (!retryable) return
+                delay(wait)
+                wait = minOf(wait * 2, VPN_RETRY_MAX)
+                val attempt = openVpn(retry)
+                session = attempt.session
+                retryable = attempt.retry
+            }
+        } finally {
+            session?.close()
         }
     }
 
@@ -239,5 +330,9 @@ class TunnelRunner(
 
         // Si el servidor VPN no empuja un DNS: una dirección pública, que de todos modos va por la VPN.
         const val FALLBACK_DNS = "1.1.1.1"
+
+        val VPN_RETRY_FIRST = 5.seconds
+        val VPN_RETRY_MAX = 60.seconds
+        val PERMANENT_VPN_FAILURES = setOf(TunnelFailure.VPN_AUTH_FAILED, TunnelFailure.VPN_PROFILE_INVALID, TunnelFailure.PROXY_AUTH_FAILED)
     }
 }

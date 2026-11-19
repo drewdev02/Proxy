@@ -171,8 +171,16 @@ private fun ProfileCard(
         Column(Modifier.padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 4.dp)) {
             Text(profile.name, style = MaterialTheme.typography.titleMedium)
             Text(profile.summary(), style = MaterialTheme.typography.bodyMedium)
-            if (isActive && tunnel.state is TunnelState.Connected) {
+            val connected = tunnel.state as? TunnelState.Connected
+            if (isActive && connected != null) {
                 Text("Conectado", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                if (connected.vpnDown) {
+                    Text(
+                        "Otro País no está disponible: su tráfico sale por el proxy mientras se reintenta.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
                 // El perfil en uso no se edita ni se borra hasta desconectar.

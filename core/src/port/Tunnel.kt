@@ -87,7 +87,11 @@ sealed interface TunnelState {
 
     data class Connecting(val profileId: String) : TunnelState
 
-    data class Connected(val profileId: String) : TunnelState
+    /**
+     * @param vpnDown con reglas de salida que usan «Otro País»: la VPN no está (no conectó o se cayó), así que lo que iba
+     *   por ella sale por el proxy mientras se reintenta.
+     */
+    data class Connected(val profileId: String, val vpnDown: Boolean = false) : TunnelState
 
     data class Failed(val failure: TunnelFailure) : TunnelState
 }

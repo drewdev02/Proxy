@@ -126,3 +126,30 @@ internal fun internetChecksum(sum: Long): Int {
     while (folded ushr 16 != 0L) folded = (folded and 0xFFFF) + (folded ushr 16)
     return folded.toInt().inv() and 0xFFFF
 }
+
+/**
+ * Copia de [packet] con otras direcciones de origen y destino, y los checksums de IP y de TCP o UDP recalculados.
+ *
+ * Es la traducción de direcciones con la que una conexión de la interfaz sale por la VPN (y su respuesta vuelve).
+ */
+fun rewriteAddresses(packet: Ipv4Packet, source: Int, destination: Int): ByteArray {
+    val bytes = packet.bytes.copyOf(packet.totalLength)
+    val header = packet.headerLength
+    bytes.writeInt(12, source)
+    bytes.writeInt(16, destination)
+    bytes.writeU16(10, 0)
+    bytes.writeU16(10, internetChecksum(sumWords(bytes, 0, header)))
+
+    val length = packet.payloadLength
+    val checksumOffset = when (packet.protocol) {
+        PROTOCOL_TCP -> if (length >= 20) header + 16 else return bytes
+        // Un UDP sin checksum (0) se deja así: es válido en IPv4.
+        PROTOCOL_UDP -> if (length >= UDP_HEADER && bytes.readU16(header + 6) != 0) header + 6 else return bytes
+        else -> return bytes
+    }
+    bytes.writeU16(checksumOffset, 0)
+    val pseudoHeader = sumWords(bytes, 12, 8) + packet.protocol + length
+    val checksum = internetChecksum(pseudoHeader + sumWords(bytes, header, length))
+    bytes.writeU16(checksumOffset, if (checksum == 0 && packet.protocol == PROTOCOL_UDP) 0xFFFF else checksum)
+    return bytes
+}
