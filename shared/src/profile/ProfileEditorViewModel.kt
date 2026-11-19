@@ -14,11 +14,18 @@ import org.uci.proxy.core.model.RouteRule
 import org.uci.proxy.core.model.RuleKind
 import org.uci.proxy.core.model.RoutingRules
 import org.uci.proxy.core.routing.parseRule
-import org.uci.proxy.core.model.VpnProfile
-import org.uci.proxy.core.model.VpnSecrets
+import org.uci.proxy.core.model.CountryEngineKind
+import org.uci.proxy.core.model.CountryExit
+import org.uci.proxy.core.model.CountryExitSecrets
+import org.uci.proxy.core.settings.AppSettings
+import org.uci.proxy.core.settings.SettingsRepository
+import org.uci.proxy.core.vpn.CountryEngineCatalog
+import org.uci.proxy.core.vpn.tailscale.ExitNodeListing
+import org.uci.proxy.core.vpn.tailscale.TailscaleExitNode
 import org.uci.proxy.core.port.LocalNetworkPermission
 import org.uci.proxy.core.port.LogLevel
 import org.uci.proxy.core.port.Logger
+import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.profile.IdGenerator
 import org.uci.proxy.core.profile.ProfileDraft
 import org.uci.proxy.core.profile.ProfileField
@@ -41,9 +48,11 @@ sealed interface ProxyTestUiState {
     data object LocalNetworkDenied : ProxyTestUiState
 }
 
-/** La VPN del perfil («Otro País») tal como se edita. Con [enabled] en false el perfil sale directo por el proxy. */
+/** La salida «Otro País» del perfil tal como se edita. Con [enabled] en false el perfil sale directo por el proxy. */
 data class VpnDraft(
     val enabled: Boolean = false,
+    /** El motor elegido; los campos de cada uno se conservan al cambiar, por si se vuelve atrás. */
+    val engine: CountryEngineKind = CountryEngineKind.OPENVPN,
     val fileName: String = "",
     /** El contenido del archivo ya leído; vacío si no se eligió uno válido. */
     val ovpn: String = "",
@@ -53,7 +62,28 @@ data class VpnDraft(
     val fileError: String? = null,
     /** Si el servidor VPN pide usuario y contraseña (casi todos los comerciales sí). */
     val needsCredentials: Boolean = true,
+    val tailscale: TailscaleDraft = TailscaleDraft(),
 )
+
+/** La configuración de Tailscale tal como se edita. */
+data class TailscaleDraft(
+    val controlUrl: String = CountryExit.Tailscale.DEFAULT_CONTROL_URL,
+    val authKey: String = "",
+    val exitNode: String = "",
+    val hostname: String = CountryExit.Tailscale.DEFAULT_HOSTNAME,
+    val search: ExitNodeSearch = ExitNodeSearch.Idle,
+)
+
+/** La búsqueda de nodos de salida de la red, que lanza el botón «Buscar nodos». */
+sealed interface ExitNodeSearch {
+    data object Idle : ExitNodeSearch
+
+    data object Running : ExitNodeSearch
+
+    data class Found(val nodes: List<TailscaleExitNode>) : ExitNodeSearch
+
+    data class Failed(val message: String) : ExitNodeSearch
+}
 
 /** Las reglas de salida tal como se editan, más la regla que se está escribiendo. */
 data class RoutingDraft(
@@ -100,6 +130,40 @@ interface RoutingActions {
     }
 }
 
+/** Lo que la sección «Otro País» puede pedir. */
+interface CountryExitActions {
+    fun onVpnEnabledChange(enabled: Boolean)
+
+    fun onEngineChange(engine: CountryEngineKind)
+
+    fun onVpnUsernameChange(username: String)
+
+    fun onVpnPasswordChange(password: String)
+
+    fun onTailscaleControlUrlChange(url: String)
+
+    fun onTailscaleAuthKeyChange(key: String)
+
+    fun onTailscaleExitNodeChange(node: String)
+
+    fun onTailscaleHostnameChange(hostname: String)
+
+    fun searchExitNodes()
+
+    /** Para vistas previas. */
+    object None : CountryExitActions {
+        override fun onVpnEnabledChange(enabled: Boolean) = Unit
+        override fun onEngineChange(engine: CountryEngineKind) = Unit
+        override fun onVpnUsernameChange(username: String) = Unit
+        override fun onVpnPasswordChange(password: String) = Unit
+        override fun onTailscaleControlUrlChange(url: String) = Unit
+        override fun onTailscaleAuthKeyChange(key: String) = Unit
+        override fun onTailscaleExitNodeChange(node: String) = Unit
+        override fun onTailscaleHostnameChange(hostname: String) = Unit
+        override fun searchExitNodes() = Unit
+    }
+}
+
 data class ProfileEditorUiState(
     val isNew: Boolean = true,
     val draft: ProfileDraft = ProfileDraft(),
@@ -112,6 +176,8 @@ data class ProfileEditorUiState(
     val test: ProxyTestUiState = ProxyTestUiState.Idle,
     val vpn: VpnDraft = VpnDraft(),
     val routing: RoutingDraft = RoutingDraft(),
+    /** Los motores de Otro País que hay en este equipo, en el orden en que se ofrecen. */
+    val engines: List<CountryEngineKind> = listOf(CountryEngineKind.OPENVPN),
 ) {
     val isBusy: Boolean get() = isSaving || test == ProxyTestUiState.Running
 }
@@ -123,7 +189,11 @@ class ProfileEditorViewModel(
     private val proxyTester: ProxyTester,
     private val localNetworkPermission: LocalNetworkPermission,
     private val logger: Logger,
-) : ViewModel(), RoutingActions {
+    /** Qué motores de Otro País hay, y la búsqueda de nodos de Tailscale. */
+    private val catalog: CountryEngineCatalog = CountryEngineCatalog.OpenVpnOnly,
+    /** Los ajustes con los que se busca: cómo pedirle al proxy las IP públicas. */
+    private val settings: SettingsRepository? = null,
+) : ViewModel(), RoutingActions, CountryExitActions {
     private val state = MutableStateFlow(ProfileEditorUiState())
     val uiState: StateFlow<ProfileEditorUiState> = state.asStateFlow()
 
@@ -145,26 +215,32 @@ class ProfileEditorViewModel(
         started = Started(profileId)
         val existing = profileId?.let { id -> repository.profiles.value.firstOrNull { it.id == id } }
         editingId = existing?.id
+        val engines = catalog.available.ifEmpty { listOf(CountryEngineKind.OPENVPN) }
         state.value = ProfileEditorUiState(
             isNew = existing == null,
             draft = existing?.toDraft() ?: ProfileDraft(),
-            vpn = existing?.vpn?.let { VpnDraft(enabled = true, fileName = it.fileName, username = it.username) } ?: VpnDraft(),
+            vpn = existing?.countryExit?.toDraft() ?: VpnDraft(engine = engines.first()),
             routing = RoutingDraft(rules = existing?.routing ?: RoutingRules()),
+            engines = engines,
         )
         if (existing != null) {
             viewModelScope.launch {
                 val password = guarded("leer la contraseña") { repository.password(existing.id) }.orEmpty()
-                val secrets = if (existing.vpn != null) guarded("leer la VPN") { repository.vpnSecrets(existing.id) } else null
+                val secrets = if (existing.countryExit != null) guarded("leer los secretos de Otro País") { repository.exitSecrets(existing.id) } else null
                 // Si entretanto se abrió otro perfil, estos datos ya no corresponden al formulario.
                 if (editingId == existing.id) {
                     state.update {
                         it.copy(
                             password = password,
-                            vpn = if (secrets == null) it.vpn else it.vpn.copy(
-                                ovpn = secrets.ovpn,
-                                password = secrets.password,
-                                needsCredentials = needsCredentials(secrets.ovpn),
-                            ),
+                            vpn = when (secrets) {
+                                is CountryExitSecrets.OpenVpn -> it.vpn.copy(
+                                    ovpn = secrets.ovpn,
+                                    password = secrets.password,
+                                    needsCredentials = needsCredentials(secrets.ovpn),
+                                )
+                                is CountryExitSecrets.Tailscale -> it.vpn.copy(tailscale = it.vpn.tailscale.copy(authKey = secrets.authKey))
+                                null -> it.vpn
+                            },
                         )
                     }
                 }
@@ -189,8 +265,85 @@ class ProfileEditorViewModel(
         state.update { it.copy(password = password, saveFailed = false, test = it.test.afterEdit()) }
     }
 
-    fun onVpnEnabledChange(enabled: Boolean) {
+    override fun onVpnEnabledChange(enabled: Boolean) {
         state.update { it.copy(vpn = it.vpn.copy(enabled = enabled), errors = it.errors - VPN_FIELDS, saveFailed = false) }
+    }
+
+    override fun onEngineChange(engine: CountryEngineKind) {
+        if (engine !in state.value.engines) return
+        state.update { it.copy(vpn = it.vpn.copy(engine = engine), errors = it.errors - VPN_FIELDS, saveFailed = false) }
+    }
+
+    override fun onTailscaleControlUrlChange(url: String) = updateTailscale(ProfileField.TAILSCALE_CONTROL_URL) {
+        // Otra red: los nodos encontrados ya no valen.
+        it.copy(controlUrl = url, search = ExitNodeSearch.Idle)
+    }
+
+    override fun onTailscaleAuthKeyChange(key: String) = updateTailscale(ProfileField.TAILSCALE_AUTH_KEY) { it.copy(authKey = key) }
+
+    override fun onTailscaleExitNodeChange(node: String) = updateTailscale(null) { it.copy(exitNode = node) }
+
+    override fun onTailscaleHostnameChange(hostname: String) = updateTailscale(null) { it.copy(hostname = hostname) }
+
+    private fun updateTailscale(field: ProfileField?, change: (TailscaleDraft) -> TailscaleDraft) {
+        state.update {
+            it.copy(
+                vpn = it.vpn.copy(tailscale = change(it.vpn.tailscale)),
+                errors = if (field == null) it.errors else it.errors - field,
+                saveFailed = false,
+            )
+        }
+    }
+
+    /**
+     * Busca los nodos de salida de la red con la clave escrita, a través del proxy del formulario (sin guardarlo). Si solo
+     * hay uno y no se eligió ninguno, queda elegido.
+     */
+    override fun searchExitNodes() {
+        val current = state.value
+        if (current.vpn.tailscale.search == ExitNodeSearch.Running) return
+        val tailscale = current.vpn.tailscale
+        val errors = tailscaleErrors(tailscale)
+        val validation = validator.validate(editingId ?: TEST_PROFILE_ID, current.draft)
+        if (validation is ProfileValidation.Invalid || errors.isNotEmpty()) {
+            state.update { it.copy(errors = (validation as? ProfileValidation.Invalid)?.errors.orEmpty() + errors) }
+            return
+        }
+        val profile = (validation as ProfileValidation.Valid).profile
+        updateTailscale(null) { it.copy(search = ExitNodeSearch.Running) }
+        viewModelScope.launch {
+            val outcome = if (!localNetworkPermission.request()) {
+                ExitNodeSearch.Failed("La app necesita permiso para acceder a la red local y alcanzar el proxy.")
+            } else {
+                val listing = guarded("buscar los nodos de salida") {
+                    catalog.listTailscaleExitNodes(
+                        proxy = profile,
+                        proxyPassword = current.password,
+                        settings = settings?.settings?.value ?: AppSettings(),
+                        exit = tailscale.toExit(),
+                        secrets = CountryExitSecrets.Tailscale(tailscale.authKey.trim()),
+                    )
+                }
+                when (listing) {
+                    is ExitNodeListing.Found ->
+                        if (listing.nodes.isEmpty()) ExitNodeSearch.Failed("La red no tiene ningún nodo de salida.") else ExitNodeSearch.Found(listing.nodes)
+                    is ExitNodeListing.Failed -> ExitNodeSearch.Failed(listing.failure.searchMessage())
+                    null -> ExitNodeSearch.Failed("No se pudo buscar los nodos de salida.")
+                }
+            }
+            state.update {
+                if (it.vpn.tailscale.search != ExitNodeSearch.Running) return@update it
+                val found = (outcome as? ExitNodeSearch.Found)?.nodes
+                val autoPick = if (found?.size == 1 && it.vpn.tailscale.exitNode.isBlank()) found.single().selector else it.vpn.tailscale.exitNode
+                it.copy(vpn = it.vpn.copy(tailscale = it.vpn.tailscale.copy(search = outcome, exitNode = autoPick)))
+            }
+        }
+    }
+
+    private fun tailscaleErrors(tailscale: TailscaleDraft): Set<ProfileField> = buildSet {
+        val url = tailscale.controlUrl.trim()
+        if (!(url.startsWith("https://") || url.startsWith("http://")) || url.substringAfter("://").isBlank()) add(ProfileField.TAILSCALE_CONTROL_URL)
+        if (tailscale.authKey.isBlank()) add(ProfileField.TAILSCALE_AUTH_KEY)
     }
 
     /** La persona eligió un archivo `.ovpn`: se comprueba enseguida, para avisar antes de guardar y no al conectar. */
@@ -210,11 +363,11 @@ class ProfileEditorViewModel(
         state.update { it.copy(vpn = vpn, errors = it.errors - ProfileField.VPN_FILE, saveFailed = false) }
     }
 
-    fun onVpnUsernameChange(username: String) {
+    override fun onVpnUsernameChange(username: String) {
         state.update { it.copy(vpn = it.vpn.copy(username = username), errors = it.errors - ProfileField.VPN_USERNAME, saveFailed = false) }
     }
 
-    fun onVpnPasswordChange(password: String) {
+    override fun onVpnPasswordChange(password: String) {
         state.update { it.copy(vpn = it.vpn.copy(password = password), saveFailed = false) }
     }
 
@@ -317,9 +470,13 @@ class ProfileEditorViewModel(
 
         val validation = validator.validate(editingId ?: idGenerator.newId(), current.draft)
         val vpn = current.vpn
-        val vpnErrors = buildSet {
-            if (vpn.enabled && vpn.ovpn.isBlank()) add(ProfileField.VPN_FILE)
-            if (vpn.enabled && vpn.needsCredentials && vpn.username.isBlank()) add(ProfileField.VPN_USERNAME)
+        val vpnErrors = when {
+            !vpn.enabled -> emptySet()
+            vpn.engine == CountryEngineKind.TAILSCALE -> tailscaleErrors(vpn.tailscale)
+            else -> buildSet {
+                if (vpn.ovpn.isBlank()) add(ProfileField.VPN_FILE)
+                if (vpn.needsCredentials && vpn.username.isBlank()) add(ProfileField.VPN_USERNAME)
+            }
         }
         when {
             validation is ProfileValidation.Invalid -> state.update { it.copy(errors = validation.errors + vpnErrors) }
@@ -327,11 +484,13 @@ class ProfileEditorViewModel(
             validation is ProfileValidation.Valid -> {
                 state.update { it.copy(errors = emptySet(), isSaving = true, saveFailed = false) }
                 viewModelScope.launch {
-                    val profile = validation.profile.copy(
-                        vpn = if (vpn.enabled) VpnProfile(vpn.fileName, vpn.username.trim()) else null,
-                        routing = current.routing.rules,
-                    )
-                    val secrets = if (vpn.enabled) VpnSecrets(vpn.ovpn, vpn.password) else null
+                    val (exit, secrets) = when {
+                        !vpn.enabled -> null to null
+                        vpn.engine == CountryEngineKind.TAILSCALE ->
+                            vpn.tailscale.toExit() to CountryExitSecrets.Tailscale(vpn.tailscale.authKey.trim())
+                        else -> CountryExit.OpenVpn(vpn.fileName, vpn.username.trim()) to CountryExitSecrets.OpenVpn(vpn.ovpn, vpn.password)
+                    }
+                    val profile = validation.profile.copy(countryExit = exit, routing = current.routing.rules)
                     val ok = guarded("guardar el perfil") { repository.save(profile, current.password, secrets) } != null
                     state.update { it.copy(isSaving = false, saved = ok, saveFailed = !ok) }
                 }
@@ -361,6 +520,31 @@ class ProfileEditorViewModel(
         true
     }
 
+    private fun CountryExit.toDraft(): VpnDraft = when (this) {
+        is CountryExit.OpenVpn -> VpnDraft(enabled = true, engine = CountryEngineKind.OPENVPN, fileName = fileName, username = username)
+        is CountryExit.Tailscale -> VpnDraft(
+            enabled = true,
+            engine = CountryEngineKind.TAILSCALE,
+            tailscale = TailscaleDraft(controlUrl = controlUrl, exitNode = exitNode, hostname = hostname),
+        )
+    }
+
+    private fun TailscaleDraft.toExit() = CountryExit.Tailscale(
+        controlUrl = controlUrl.trim().trimEnd('/'),
+        exitNode = exitNode.trim(),
+        hostname = hostname.trim().ifEmpty { CountryExit.Tailscale.DEFAULT_HOSTNAME },
+    )
+
+    private fun TunnelFailure.searchMessage(): String = when (this) {
+        TunnelFailure.VPN_AUTH_FAILED -> "La red rechazó la clave de autenticación."
+        TunnelFailure.PROXY_AUTH_FAILED -> "El proxy rechazó el usuario o la contraseña del perfil."
+        TunnelFailure.VPN_SERVER_BLOCKED -> "La política del proxy no deja llegar al servidor de control."
+        TunnelFailure.VPN_SERVER_UNREACHABLE -> "No se pudo llegar al servidor de control a través del proxy."
+        TunnelFailure.ENGINE_UNAVAILABLE -> "Tailscale no está disponible en este equipo."
+        TunnelFailure.VPN_PROFILE_INVALID -> "La dirección del servidor de control no es válida."
+        else -> "No se pudo buscar los nodos de salida (puede que haya otra sesión de Tailscale abierta)."
+    }
+
     private fun ProxyProfile.toDraft() = ProfileDraft(
         name = name,
         host = host,
@@ -374,7 +558,12 @@ class ProfileEditorViewModel(
 
     private companion object {
         const val TAG = "ProfileEditor"
-        val VPN_FIELDS = setOf(ProfileField.VPN_FILE, ProfileField.VPN_USERNAME)
+        val VPN_FIELDS = setOf(
+            ProfileField.VPN_FILE,
+            ProfileField.VPN_USERNAME,
+            ProfileField.TAILSCALE_CONTROL_URL,
+            ProfileField.TAILSCALE_AUTH_KEY,
+        )
 
         // La prueba no guarda nada: el perfil temporal solo necesita un id cualquiera.
         const val TEST_PROFILE_ID = "prueba"

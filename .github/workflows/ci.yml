@@ -38,10 +38,67 @@ jobs:
         run: |
           if [ "$RUNNER_OS" = "Linux" ]; then sudo apt-get update -qq && sudo apt-get install -y -qq openvpn; else brew install openvpn; fi
           command -v openvpn || ls /opt/homebrew/sbin/openvpn /usr/local/sbin/openvpn 2>/dev/null
+      # El motor Tailscale de Otro País: su librería nativa (Go, por JNI) y la red de pruebas (control, DERP y nodo de
+      # salida). La prueba de punta a punta es obligatoria aquí: PROXYUCI_REQUIRE_TAILSCALE hace que falle si falta algo.
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: tools/tsbridge/go.mod
+          cache-dependency-path: tools/tsbridge/go.sum
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Librería de Tailscale y red de pruebas
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          tools/tsbridge/build.sh
+          tools/tsbridge/build.sh testnet
+      # En Windows, «bash» sería el de WSL (System32 va primero en el PATH): se usa el de Git.
+      - name: Librería de Tailscale y red de pruebas (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          & "C:\Program Files\Git\bin\bash.exe" tools/tsbridge/build.sh
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & "C:\Program Files\Git\bin\bash.exe" tools/tsbridge/build.sh testnet
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Pruebas del núcleo
+        env:
+          PROXYUCI_REQUIRE_TAILSCALE: "1"
         run: ${{ matrix.kotlin }} test -m core --platform jvm
       - name: Pruebas de la interfaz
         run: ${{ matrix.kotlin }} test -m shared --platform jvm
+
+  # El puente de Tailscale por su lado: pruebas de Go (sesión por un proxy con autenticación, nodo de salida, clave mala)
+  # y las librerías de Android, que se meten en un APK para comprobar que llegan a él.
+  tsbridge:
+    name: Tailscale (Go y Android)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: tools/tsbridge/go.mod
+          cache-dependency-path: tools/tsbridge/go.sum
+      - name: Pruebas de Go
+        working-directory: tools/tsbridge
+        run: |
+          test -z "$(gofmt -l .)" || { gofmt -l .; echo "Código de Go sin formatear"; exit 1; }
+          go vet ./bridge ./testnet ./cmd/...
+          go test ./bridge ./testnet -count=1 -timeout 300s -v 2>&1 | grep -v "tailscale:"
+          exit ${PIPESTATUS[0]}
+      - name: Librerías de Android
+        run: |
+          tools/tsbridge/build.sh android-arm64
+          tools/tsbridge/build.sh android-x86_64
+      - name: APK con las librerías
+        run: |
+          ./kotlin build -m androidApp
+          apk=$(find build -name "*.apk" | head -1)
+          unzip -l "$apk" | grep libtsbridge
+          unzip -l "$apk" | grep -q "lib/arm64-v8a/libtsbridge.so"
+          unzip -l "$apk" | grep -q "lib/x86_64/libtsbridge.so"
 
   # El túnel de verdad en Windows: adaptador Wintun real, `netsh` real, DNS del sistema y una descarga por el proxy
   # de pruebas. Los ejecutores de Windows corren como Administrador, que es lo que pide Wintun. Solo entran en el
@@ -62,9 +119,25 @@ jobs:
           $admin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
           "Administrador: $admin"
           if (-not $admin) { throw "El ejecutor no corre como Administrador" }
+      # Para «Otro País» con Tailscale sobre el adaptador real: la librería y la red de pruebas.
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: tools/tsbridge/go.mod
+          cache-dependency-path: tools/tsbridge/go.sum
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      # «bash» sería el de WSL (System32 va primero en el PATH): se usa el de Git.
+      - name: Librería de Tailscale y red de pruebas
+        run: |
+          & "C:\Program Files\Git\bin\bash.exe" tools/tsbridge/build.sh
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & "C:\Program Files\Git\bin\bash.exe" tools/tsbridge/build.sh testnet
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       # Los servidores de prueba y la prueba van en el MISMO paso: en los ejecutores de Windows los procesos que un
       # paso deja en segundo plano mueren al terminar ese paso (se comprobó: el paso siguiente ya no los encontraba).
-      - name: Prueba del túnel y de las reglas de salida (con su origen HTTP y su proxy NTLM)
+      - name: Prueba del túnel, de las reglas de salida y de Tailscale (con su origen HTTP y su proxy NTLM)
         env:
           PROXYUCI_E2E_WINDOWS: "1"
         run: |
@@ -93,6 +166,10 @@ jobs:
             # (error 52), y así se prueba además volver a conectar tras desconectar, como hace la app.
             ./kotlin.bat test -m core --platform jvm --include-classes 'org.uci.proxy.core.windows.WindowsSplitTunnelE2ETest'
             if ($code -eq 0) { $code = $LASTEXITCODE }
+            # Otro País con Tailscale sobre el adaptador real, también en su propio proceso: el motor Tailscale de verdad
+            # y una red de pruebas, con todo lo de Tailscale pasando por un proxy NTLM propio de la prueba.
+            ./kotlin.bat test -m core --platform jvm --include-classes 'org.uci.proxy.core.windows.WindowsTailscaleE2ETest'
+            if ($code -eq 0) { $code = $LASTEXITCODE }
           } finally {
             "--- registro del proxy de pruebas"
             Get-Content $proxyLog, $proxyErr -ErrorAction SilentlyContinue | Select-Object -Last 40
@@ -119,6 +196,15 @@ jobs:
         with:
           distribution: temurin
           java-version: "25"
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: tools/tsbridge/go.mod
+          cache-dependency-path: tools/tsbridge/go.sum
+      # El .exe lleva la librería de Tailscale; la autoprueba comprueba que carga con la Java recortada.
+      - name: Librería de Tailscale
+        run: |
+          & "C:\Program Files\Git\bin\bash.exe" tools/tsbridge/build.sh
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Construir el .exe
         run: ./tools/windows-exe/build-exe.ps1
       # Autoprueba (dos veces) y ventana de Compose con la Java recortada: ver tools/windows-exe/smoke-test.ps1.

@@ -4,6 +4,8 @@ import kotlinx.coroutines.test.runTest
 import org.uci.proxy.core.fakes.FakeProxyConnector
 import org.uci.proxy.core.fakes.FakeTunnelConnection
 import org.uci.proxy.core.fakes.RecordingLogger
+import org.uci.proxy.core.model.CountryExit
+import org.uci.proxy.core.model.CountryExitSecrets
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.ProxyProtocol
 import org.uci.proxy.core.port.RandomBytes
@@ -42,7 +44,7 @@ NYGIlZfSux9h1bDqLl/kX4lVBMvFTTcqK+qSwST3SSmJRnF9Zv+et82x
 private const val DAMAGED_AUTHORITY = "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----"
 
 /** Qué pasa al llegar a los servidores VPN a través del proxy, sin hablar OpenVPN de verdad. */
-class OpenVpnExitTest {
+class OpenVpnEngineTest {
     private val proxy = ProxyProfile("p", "UCI", "10.8.0.20", 3128, ProxyProtocol.HTTP, "andrey")
     private val keyHex = (0 until 256).joinToString("") { it.toString(16).padStart(2, '0') }
 
@@ -54,16 +56,18 @@ class OpenVpnExitTest {
         "<ca>\n$authority\n</ca>\n" +
         "<tls-crypt>\n-----BEGIN OpenVPN Static key V1-----\n${keyHex.chunked(32).joinToString("\n")}\n-----END OpenVPN Static key V1-----\n</tls-crypt>\n"
 
-    private fun exit(connector: FakeProxyConnector) = OpenVpnExit(
+    private fun exit(connector: FakeProxyConnector, available: Boolean = true) = OpenVpnEngine(
         client = OpenVpnClient(JcaOpenVpnCrypto(), SslEngineTlsSessionFactory(), RandomBytes { ByteArray(it) { 7 } }, RecordingLogger(), { 0L }),
-        connectors = listOf(connector),
+        dialer = ProxyDialer(listOf(connector), RecordingLogger()),
         random = RandomBytes { ByteArray(it) { 7 } },
         logger = RecordingLogger(),
+        isAvailable = available,
     )
 
-    private fun start(text: String) = VpnStart(text, "vpnuser", "vpnpass")
+    private fun start(text: String) = CountryExitStart(CountryExit.OpenVpn("pais.ovpn", "vpnuser"), CountryExitSecrets.OpenVpn(text, "vpnpass"))
 
-    private suspend fun VpnExit.connect(proxy: ProxyProfile, password: String, vpn: VpnStart) = connect(proxy, password, vpn, AppSettings())
+    private suspend fun OpenVpnEngine.connect(proxy: ProxyProfile, password: String, start: CountryExitStart, settings: AppSettings = AppSettings()) =
+        connect(ExitContext(proxy, password, settings), start)
 
     @Test
     fun `a profile that cannot be used is reported without touching the network`() = runTest {
@@ -255,9 +259,20 @@ class OpenVpnExitTest {
     }
 
     @Test
-    fun `the unavailable exit fails with a clear reason`() = runTest {
-        val result = UnavailableVpnExit.connect(proxy, "x", start(ovpn()))
+    fun `an engine that is not available here is reported as such`() = runTest {
+        val engines = CountryEngines(listOf(exit(FakeProxyConnector.failingWith(ProxyFailure.AuthRejected), available = false)))
 
-        assertIs<VpnConnectResult.Failed>(result)
+        val result = engines.connect(ExitContext(proxy, "x", AppSettings()), start(ovpn()))
+
+        assertEquals(VpnConnectResult.Failed(TunnelFailure.ENGINE_UNAVAILABLE), result)
+        assertEquals(emptyList(), engines.available)
+    }
+
+    @Test
+    fun `a Tailscale exit given to the OpenVPN engine is rejected`() = runTest {
+        val result = exit(FakeProxyConnector.failingWith(ProxyFailure.AuthRejected))
+            .connect(proxy, "x", CountryExitStart(CountryExit.Tailscale(), CountryExitSecrets.Tailscale("k")))
+
+        assertEquals(VpnConnectResult.Failed(TunnelFailure.VPN_PROFILE_INVALID), result)
     }
 }

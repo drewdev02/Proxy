@@ -1,14 +1,23 @@
 package org.uci.proxy.connection
 
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TestTimeSource
 import kotlinx.coroutines.CompletableDeferred
 import org.uci.proxy.core.log.LogBuffer
+import org.uci.proxy.core.model.CountryExit
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.ProxyProtocol
 import org.uci.proxy.core.model.RouteExit
 import org.uci.proxy.core.model.RouteRule
 import org.uci.proxy.core.model.RoutingRules
 import org.uci.proxy.core.model.RuleKind
-import org.uci.proxy.core.model.VpnProfile
 import org.uci.proxy.core.port.LogLevel
 import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.port.TunnelState
@@ -21,15 +30,6 @@ import org.uci.proxy.fakes.FakeProxyTester
 import org.uci.proxy.fakes.FakeTunnel
 import org.uci.proxy.fakes.InMemoryKeyValueStore
 import org.uci.proxy.fakes.MainDispatcherTest
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
-import kotlin.time.TestTimeSource
 
 class ConnectionViewModelTest : MainDispatcherTest() {
     private val uci = ProxyProfile("p1", "UCI", "proxy.uci.cu", 8080, ProxyProtocol.HTTP, "ana")
@@ -229,7 +229,7 @@ class RoutingSummaryTest {
 
     @Test
     fun `without rules but with a VPN everything goes through the other country`() {
-        val summary = base.copy(vpn = VpnProfile("ca.ovpn", "u")).routingSummary()
+        val summary = base.copy(countryExit = CountryExit.OpenVpn("ca.ovpn", "u")).routingSummary()
 
         assertEquals(RouteExit.VPN, summary.defaultExit)
         assertTrue(summary.hasVpn)

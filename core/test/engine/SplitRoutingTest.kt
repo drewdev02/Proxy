@@ -21,7 +21,8 @@ import org.uci.proxy.core.model.RouteExit
 import org.uci.proxy.core.model.RouteRule
 import org.uci.proxy.core.model.RoutingRules
 import org.uci.proxy.core.model.RuleKind
-import org.uci.proxy.core.model.VpnProfile
+import org.uci.proxy.core.model.CountryExit
+import org.uci.proxy.core.model.CountryExitSecrets
 import org.uci.proxy.core.packet.Ipv4Packet
 import org.uci.proxy.core.packet.PROTOCOL_TCP
 import org.uci.proxy.core.packet.PROTOCOL_UDP
@@ -43,11 +44,11 @@ import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.profile.AppDispatchers
 import org.uci.proxy.core.profile.StoredProfileRepository
-import org.uci.proxy.core.vpn.OpenVpnPush
+import org.uci.proxy.core.fakes.fakeEngines
+import org.uci.proxy.core.vpn.CountryExitStart
+import org.uci.proxy.core.vpn.VpnNetwork
 import org.uci.proxy.core.vpn.VpnConnectResult
-import org.uci.proxy.core.vpn.VpnExit
 import org.uci.proxy.core.vpn.VpnSession
-import org.uci.proxy.core.vpn.VpnStart
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -60,10 +61,7 @@ private val VPN_DNS = parseIpv4("10.98.0.1")!!
 
 /** Una sesión VPN en memoria: lo que la prueba meta en [fromServer] llega al motor, y lo que el motor envíe queda en [sent]. */
 private class ScriptedVpnSession : VpnSession {
-    override val push = OpenVpnPush(
-        address = "10.98.0.9", netmask = "255.255.0.0", dnsServers = listOf("10.98.0.1"), peerId = 3, cipher = "AES-256-GCM",
-        tunMtu = 1500, pingSeconds = 10, pingRestartSeconds = 60, redirectGateway = true,
-    )
+    override val network = VpnNetwork(address = "10.98.0.9", prefixLength = 16, dnsServers = listOf("10.98.0.1"), mtu = 1500)
     val sent = mutableListOf<ByteArray>()
     val fromServer = Channel<ByteArray>(Channel.UNLIMITED)
     var closed = false
@@ -91,7 +89,7 @@ class SplitRoutingTest {
     private val tun get() = platformTunnel.tun
     private val proxyTunnel = FakeTunnelConnection()
     private val connector = FakeProxyConnector.connectingTo(proxyTunnel)
-    private val start = VpnStart("client\n", "vpnuser", "vpnpass")
+    private val start = CountryExitStart(CountryExit.OpenVpn("pais.ovpn", "vpnuser"), CountryExitSecrets.OpenVpn("client\n", "vpnpass"))
 
     private val rules = RoutingRules(
         enabled = true,
@@ -102,7 +100,7 @@ class SplitRoutingTest {
             RouteRule(RuleKind.IP, "200.55.0.0/16", RouteExit.DIRECT),
         ),
     )
-    private val profile = ProxyProfile("p1", "UCI", "proxy.uci.cu", 3128, ProxyProtocol.HTTP, "andrey", VpnProfile("pais.ovpn", "vpnuser"), rules)
+    private val profile = ProxyProfile("p1", "UCI", "proxy.uci.cu", 3128, ProxyProtocol.HTTP, "andrey", CountryExit.OpenVpn("pais.ovpn", "vpnuser"), rules)
 
     /** La app dueña de cada conexión, por su puerto de origen. */
     private val appsByPort = mutableMapOf<Int, List<String>>()
@@ -112,14 +110,14 @@ class SplitRoutingTest {
     private val results = ArrayDeque<VpnConnectResult>()
     private val sessions = mutableListOf<ScriptedVpnSession>()
     private var attempts = 0
-    private val exit = VpnExit { _, _, _, _ ->
+    private val exit = fakeEngines { _, _ ->
         attempts++
         val next = if (results.size > 1) results.removeFirst() else results.firstOrNull() ?: VpnConnectResult.Connected(ScriptedVpnSession())
         // Cada conexión correcta es una sesión nueva.
         if (next is VpnConnectResult.Connected) VpnConnectResult.Connected(ScriptedVpnSession().also { sessions += it }) else next
     }
 
-    private fun TestScope.connect(profile: ProxyProfile = this@SplitRoutingTest.profile, vpn: VpnStart? = start) = backgroundScope.launch {
+    private fun TestScope.connect(profile: ProxyProfile = this@SplitRoutingTest.profile, vpn: CountryExitStart? = start) = backgroundScope.launch {
         val dispatchers = AppDispatchers(background = UnconfinedTestDispatcher(testScheduler))
         val runner = TunnelRunner(
             profiles = StoredProfileRepository(InMemoryKeyValueStore(), InMemorySecretStore(), dispatchers, logger),
@@ -129,7 +127,7 @@ class SplitRoutingTest {
             stateStore = stateStore,
             dispatchers = dispatchers,
             logger = logger,
-            vpnExit = exit,
+            engines = exit,
         )
         runner.run(platformTunnel, profile, "x", vpn = vpn)
     }.also { runCurrent() }

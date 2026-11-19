@@ -82,6 +82,12 @@ enum class TunnelFailure {
 
     /** El handshake con el servidor VPN falló por otro motivo. */
     VPN_HANDSHAKE_FAILED,
+
+    /** El nodo de salida elegido no existe en la red (Tailscale), o hay varios y no se eligió ninguno. */
+    EXIT_NODE_NOT_FOUND,
+
+    /** El motor de Otro País del perfil no está disponible en este equipo. */
+    ENGINE_UNAVAILABLE,
 }
 
 sealed interface TunnelState {

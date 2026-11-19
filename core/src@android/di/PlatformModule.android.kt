@@ -1,6 +1,7 @@
 package org.uci.proxy.core.di
 
 import android.content.Context
+import org.uci.proxy.core.port.EngineStateDirectories
 import kotlinx.coroutines.Dispatchers
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.bind
@@ -24,6 +25,7 @@ import org.uci.proxy.core.port.HostResolver
 import org.uci.proxy.core.port.KeyValueStore
 import org.uci.proxy.core.port.LocalAddresses
 import org.uci.proxy.core.port.LocalNetworkPermission
+import org.uci.proxy.core.port.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.PlatformInfo
 import org.uci.proxy.core.port.RandomBytes
@@ -34,6 +36,8 @@ import org.uci.proxy.core.vpn.JcaOpenVpnCrypto
 import org.uci.proxy.core.vpn.OpenVpnCrypto
 import org.uci.proxy.core.vpn.SslEngineTlsSessionFactory
 import org.uci.proxy.core.vpn.TlsSessionFactory
+import org.uci.proxy.core.vpn.tailscale.NativeTailscaleBridge
+import org.uci.proxy.core.vpn.tailscale.TailscaleBridge
 
 private const val SETTINGS_FILE = "proxyuci.settings"
 private const val SECRETS_FILE = "proxyuci.secrets"
@@ -47,6 +51,8 @@ actual val platformModule: Module = module {
     // El cliente OpenVPN propio (modo Otro País) usa la criptografía y el TLS estándar de Java.
     single<OpenVpnCrypto> { JcaOpenVpnCrypto() }
     single<TlsSessionFactory> { SslEngineTlsSessionFactory() }
+    // El motor Tailscale de Otro País: su librería nativa (jniLibs de la app), si esta compilación la trae.
+    single<TailscaleBridge> { NativeTailscaleBridge.fromSystem("tsbridge", onLoadError = { get<Logger>().log(LogLevel.WARN, "Tailscale", it) }) }
     // Logcat sigue recibiéndolo todo; además se guarda para la pantalla «Registro».
     single<Logger> { BufferedLogger(LogcatLogger(), get(), get()) }
     singleOf(::JavaSecureRandomBytes) { bind<RandomBytes>() }
@@ -56,6 +62,11 @@ actual val platformModule: Module = module {
     singleOf(::AndroidLocalAddresses) { bind<LocalAddresses>() }
     // Para las reglas de salida por app: qué app abrió cada conexión.
     single<ConnectionOwner> { AndroidConnectionOwner(get<Context>()) }
+    // El estado de los motores de Otro País (la identidad de un nodo de Tailscale), un directorio privado por perfil.
+    single<EngineStateDirectories> {
+        val base = java.io.File(get<Context>().filesDir, "engines")
+        EngineStateDirectories { id -> java.io.File(base, id).path }
+    }
     single<HostResolver> { JavaHostResolver(get<AppDispatchers>().background) }
     single<KeyValueStore> { SharedPreferencesKeyValueStore(get<Context>(), SETTINGS_FILE) }
     single<SecretStore> {

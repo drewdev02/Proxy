@@ -9,7 +9,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import org.uci.proxy.core.model.ProxyProfile
-import org.uci.proxy.core.model.VpnSecrets
+import org.uci.proxy.core.model.CountryExit
+import org.uci.proxy.core.model.CountryExitSecrets
 import org.uci.proxy.core.port.KeyValueStore
 import org.uci.proxy.core.port.LogLevel
 import org.uci.proxy.core.port.Logger
@@ -30,14 +31,18 @@ class StoredProfileRepository(
 
     override val profiles: StateFlow<List<ProxyProfile>> = state.asStateFlow()
 
-    override suspend fun save(profile: ProxyProfile, password: String, vpn: VpnSecrets?) = write {
+    override suspend fun save(profile: ProxyProfile, password: String, exitSecrets: CountryExitSecrets?) = write {
         // Primero los secretos: si el almacén seguro falla, la lista no queda apuntando a un perfil a medias.
         if (password.isEmpty()) secretStore.remove(passwordKey(profile.id)) else secretStore.put(passwordKey(profile.id), password)
-        if (profile.vpn == null || vpn == null) {
-            removeVpnSecrets(profile.id)
-        } else {
-            secretStore.put(vpnFileKey(profile.id), vpn.ovpn)
-            if (vpn.password.isEmpty()) secretStore.remove(vpnPasswordKey(profile.id)) else secretStore.put(vpnPasswordKey(profile.id), vpn.password)
+        // Solo quedan los secretos del motor actual: al cambiar de motor, los del anterior se borran.
+        removeExitSecrets(profile.id)
+        when (val secrets = exitSecrets.takeIf { profile.countryExit != null }) {
+            is CountryExitSecrets.OpenVpn -> {
+                secretStore.put(vpnFileKey(profile.id), secrets.ovpn)
+                if (secrets.password.isNotEmpty()) secretStore.put(vpnPasswordKey(profile.id), secrets.password)
+            }
+            is CountryExitSecrets.Tailscale -> secretStore.put(tailscaleKey(profile.id), secrets.authKey)
+            null -> Unit
         }
 
         val current = state.value
@@ -52,21 +57,29 @@ class StoredProfileRepository(
     override suspend fun delete(id: String) = write {
         persist(state.value.filterNot { it.id == id })
         secretStore.remove(passwordKey(id))
-        removeVpnSecrets(id)
+        removeExitSecrets(id)
     }
 
     override suspend fun password(id: String): String = withContext(dispatchers.background) {
         secretStore.get(passwordKey(id)).orEmpty()
     }
 
-    override suspend fun vpnSecrets(id: String): VpnSecrets? = withContext(dispatchers.background) {
-        val ovpn = secretStore.get(vpnFileKey(id)) ?: return@withContext null
-        VpnSecrets(ovpn, secretStore.get(vpnPasswordKey(id)).orEmpty())
+    override suspend fun exitSecrets(id: String): CountryExitSecrets? = withContext(dispatchers.background) {
+        when (state.value.firstOrNull { it.id == id }?.countryExit) {
+            is CountryExit.OpenVpn -> {
+                val ovpn = secretStore.get(vpnFileKey(id)) ?: return@withContext null
+                CountryExitSecrets.OpenVpn(ovpn, secretStore.get(vpnPasswordKey(id)).orEmpty())
+            }
+            // La clave de Tailscale puede faltar: con la identidad del nodo ya guardada no hace falta para reconectar.
+            is CountryExit.Tailscale -> CountryExitSecrets.Tailscale(secretStore.get(tailscaleKey(id)).orEmpty())
+            null -> null
+        }
     }
 
-    private fun removeVpnSecrets(id: String) {
+    private fun removeExitSecrets(id: String) {
         secretStore.remove(vpnFileKey(id))
         secretStore.remove(vpnPasswordKey(id))
+        secretStore.remove(tailscaleKey(id))
     }
 
     private suspend fun write(block: () -> Unit) = withContext(dispatchers.background) {
@@ -93,6 +106,8 @@ class StoredProfileRepository(
     private fun vpnFileKey(id: String) = "profile.$id.vpn-file"
 
     private fun vpnPasswordKey(id: String) = "profile.$id.vpn-password"
+
+    private fun tailscaleKey(id: String) = "profile.$id.tailscale-authkey"
 
     private companion object {
         const val TAG = "ProfileRepository"

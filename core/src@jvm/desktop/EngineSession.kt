@@ -62,7 +62,7 @@ class EngineSession(
         }
         val logForwarder = launch { logBuffer.entries.collect(::forwardNewLogs) }
 
-        val tunnel = launch { runner.run(platformTunnel, start.profile, start.password, start.settings, start.vpn) }
+        val tunnel = launch { runner.run(platformTunnel, start.profile, start.password, start.settings, start.countryExit) }
         val reporter = launch {
             // El estado de partida es "desconectado": enviarlo haría creer a la ventana que el túnel ya terminó.
             stateStore.state

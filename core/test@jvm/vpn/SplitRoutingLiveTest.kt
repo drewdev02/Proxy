@@ -24,7 +24,8 @@ import org.uci.proxy.core.model.RouteExit
 import org.uci.proxy.core.model.RouteRule
 import org.uci.proxy.core.model.RoutingRules
 import org.uci.proxy.core.model.RuleKind
-import org.uci.proxy.core.model.VpnProfile
+import org.uci.proxy.core.model.CountryExit
+import org.uci.proxy.core.model.CountryExitSecrets
 import org.uci.proxy.core.net.KtorTcpConnector
 import org.uci.proxy.core.packet.Ipv4Packet
 import org.uci.proxy.core.packet.TcpFlags
@@ -88,16 +89,16 @@ class SplitRoutingLiveTest {
             stateStore = stateStore,
             dispatchers = dispatchers,
             logger = logger,
-            vpnExit = OpenVpnExit(client, connectors, randomBytes, logger),
+            engines = CountryEngines(listOf(OpenVpnEngine(client, ProxyDialer(connectors, logger), randomBytes, logger))),
         )
         val profile = ProxyProfile(
             "p1", "Pruebas", proxyHost, proxyPort.toInt(), ProxyProtocol.HTTP, System.getenv("SPLIT_PROXY_USER").orEmpty(),
-            VpnProfile("pais.ovpn", auth[0]),
+            CountryExit.OpenVpn("pais.ovpn", auth[0]),
             RoutingRules(enabled = true, rules = listOf(RouteRule(RuleKind.DOMAIN, "ifconfig.me", RouteExit.VPN))),
         )
         val platformTunnel = FakePlatformTunnel()
         val job = CoroutineScope(Dispatchers.IO).launch {
-            runner.run(platformTunnel, profile, System.getenv("SPLIT_PROXY_PASSWORD").orEmpty(), vpn = VpnStart(File(file).readText(), auth[0], auth[1]))
+            runner.run(platformTunnel, profile, System.getenv("SPLIT_PROXY_PASSWORD").orEmpty(), vpn = CountryExitStart(profile.countryExit!!, CountryExitSecrets.OpenVpn(File(file).readText(), auth[1])))
         }
         try {
             val state = withTimeout(120_000) { stateStore.state.first { it is TunnelState.Connected || it is TunnelState.Failed } }

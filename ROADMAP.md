@@ -242,8 +242,14 @@ muestra "Conectado" y un `nslookup` desde otra app devuelve una IP de la subred 
 >   portarlo, las páginas `http://` fallarían allí. El proxy de pruebas sí acepta `CONNECT` al 80.
 > - **Atajos para Telegram** (no inspeccionar sus IP, cortar rápido el puerto 80): no portados.
 >
-> Sí portado, con un matiz: el recurso a `sslip.io` para IP públicas se usa solo si el proxy rechaza la IP
-> escrita tal cual, en vez de siempre; así no se depende de ese servicio con proxies que no lo necesitan.
+> Sí portado: el recurso a `sslip.io` para IP públicas. Al principio se usaba solo si el proxy rechazaba la IP
+> escrita tal cual; desde la rc5 se pide siempre primero por nombre, como SuperProxy, porque el Squid de la UCI
+> rechaza las IP literales (ver capa 9, «Servicios de nombres configurables»).
+>
+> Añadido después (rc3): el túnel contesta en local las comprobaciones de conectividad de Android, Windows y macOS
+> (`ConnectivityChecks`): el proxy institucional suele bloquearlas (403, 503) y el sistema mostraba «sin Internet»
+> aunque el tráfico pasara. Solo contesta si el proxy ha abierto conexiones hace poco, para no ocultar un proxy caído
+> o una contraseña mala. Se desactiva en Ajustes.
 >
 > Cierre a medias: si una app cierra su envío antes de recibir la respuesta, el relé se lo transmite al
 > proxy, como hacía `SuperProxyWin`. Funciona con el proxy de pruebas; falta ver cómo lo trata Squid.
@@ -310,9 +316,8 @@ extremo completo; a partir de aquí el núcleo ya no cambia para las demás plat
 >   el fallo suelto visto en la prueba completa no es del túnel.
 > - Al conectar y desconectar se cortan las conexiones TCP abiertas del equipo (la pila responde con RST a
 >   las que no conoce); se reconectan solas.
-> - El motor root se ejecuta desde las carpetas de compilación del usuario: vale para desarrollo, no para
->   distribuir. Cada conexión pide la contraseña de administrador.
-> - Este Mac tenía activa otra VPN de túnel completo (Tailscale con nodo de salida). No se ha probado sin ella.
+> - Cada conexión pide la contraseña de administrador. (Al principio el motor root se ejecutaba desde las
+>   carpetas de compilación; ahora se distribuye dentro de `ProxyUCI.app` en el `.dmg`, ver `PUBLICAR.md`.)
 >
 > Opciones de prueba del motor, por la variable `PROXYUCI_ENGINE_FLAGS`: `--max-seconds N`,
 > `--no-dns-capture`, `--dns-domains a,b`, `--routes cidr,cidr`, `--log-file ruta`. El proxy de pruebas, en la misma máquina,
@@ -423,15 +428,32 @@ el simulador.
 
 ## Capa 8: actividad
 
-**Resultado:** una pestaña "Actividad" muestra bytes subidos y bajados en vivo y un registro de eventos
-(conexiones, DNS, errores), en las cuatro plataformas.
+> **Estado: el registro está hecho en las cuatro plataformas; faltan los contadores de tráfico.**
+>
+> Hecho:
+> - **Pantalla «Registro» en vivo:** filtros por nivel, pausar y reanudar, limpiar y copiar. Cada plataforma envuelve
+>   su registrador con `BufferedLogger`, que llena el búfer común `LogBuffer` (mensajes de hasta 4000 caracteres).
+> - **Escritorio:** el motor elevado reenvía sus mensajes a la ventana con `LOG <json>` por el socket local.
+> - **Registro guardado (Room):** el módulo `database` guarda los mensajes en SQLite (`LogRecorder` →
+>   `RoomLogHistory`); al abrir la app se recupera lo anterior. Se guardan 7 días y como mucho 20 000 líneas, y
+>   «Limpiar» borra también lo guardado. Va aparte de `core` para que la extensión de iOS no cargue SQLite. Probado
+>   en JVM e iOS con la misma batería de contrato del DAO.
+>
+> Pendiente: contadores de bytes subidos y bajados (`TunnelMonitor` solo expone el estado) y el transporte de
+> estadísticas en iOS (`sendProviderMessage`, con la capa 7).
 
-| Parte | Trabajo |
-|---|---|
-| Interfaz | Pestaña Actividad con contadores y lista de eventos |
-| Núcleo | `TunnelStats`, `TunnelEvent`, emisión desde motor, DNS y relé |
-| Adaptadores | Transporte de estadísticas entre procesos: IPC en escritorio, `sendProviderMessage` en iOS |
-| Inyección | Sin enlaces nuevos; se amplía `TunnelMonitor` |
+**Resultado:** una pantalla muestra bytes subidos y bajados en vivo y un registro de eventos (conexiones, DNS,
+errores), en las cuatro plataformas.
+
+| Parte | Trabajo | Hecho |
+|---|---|---|
+| Interfaz | Pantalla «Registro» con filtros, pausa, limpiar y copiar | ✔ |
+| Interfaz | Contadores de tráfico | |
+| Núcleo | `LogBuffer`, `BufferedLogger`, `LogRecorder`, puerto `LogHistory` | ✔ |
+| Núcleo | Estadísticas de tráfico desde motor y relé | |
+| Almacenamiento | Módulo `database`: Room KMP con SQLite incluido (`RoomLogHistory`, `databaseModule`) | ✔ |
+| Adaptadores | Mensajes `LOG` del motor a la ventana en escritorio | ✔ |
+| Adaptadores | Estadísticas entre procesos: IPC en escritorio, `sendProviderMessage` en iOS | |
 
 **Demo:** descargar un archivo y ver los contadores moverse en cada plataforma.
 
@@ -449,7 +471,7 @@ sirve en Android, macOS y Windows (los tres son JVM). No hace falta un proxy loc
 | Parte | Trabajo | Hecho |
 |---|---|---|
 | Interfaz | Sección «Salir por otro país (VPN)» en el editor del perfil, con selector de archivo del sistema (oculta en iOS) | ✔ |
-| Núcleo | `OvpnConfig` (lector del `.ovpn`), `OpenVpnClient` (`tls-crypt`, canal de control, AES-GCM), `OpenVpnExit`, camino VPN de `TunnelRunner` | ✔ |
+| Núcleo | `OvpnConfig` (lector del `.ovpn`), `OpenVpnClient` (`tls-crypt`, canal de control, AES-GCM), `OpenVpnExit` (hoy `OpenVpnEngine`, capa 12), camino VPN de `TunnelRunner` | ✔ |
 | Adaptadores | `JcaOpenVpnCrypto` y `SslEngineTlsSession` (compartidos por escritorio y Android con el alias `jvmAndAndroid`), `AwtFilePicker`, selector de Android | ✔ |
 | Almacenamiento | El `.ovpn` y la contraseña de la VPN, por perfil, en el almacén seguro de cada sistema | ✔ |
 
@@ -535,6 +557,59 @@ dirección inventada sale por el proxy hasta volver a resolver (60 s como mucho)
 
 > Pendiente: reglas por app en Windows y macOS, crear reglas desde el registro, plantillas («Streaming → Otro País»),
 > y salida directa para dominios.
+
+---
+
+## Capa 12: motores de Otro País (OpenVPN y Tailscale)
+
+**Resultado:** al activar «Salir por otro país» en un perfil se elige el motor: **OpenVPN** (lo de la capa 9) o
+**Tailscale**: un nodo de salida de una red de Tailscale (o de un servidor Headscale), con una clave de autenticación. El
+túnel, las reglas de salida y la vuelta al proxy si Otro País se cae funcionan igual con los dos.
+
+**Diseño:** el túnel ya no sabe de OpenVPN. Habla con un `CountryEngine` que, a través del proxy del perfil, abre una
+`VpnSession` de paquetes IP con su `VpnNetwork` (dirección, prefijo, DNS, MTU). `CountryEngines` reúne los de cada
+plataforma; `ProxyDialer` es la forma común de llegar a un servidor por el proxy (nombres sslip.io, preferir rechazos
+informativos, credenciales). El perfil guarda un `CountryExit` (`OpenVpn` o `Tailscale`) y sus secretos van al almacén
+seguro (`CountryExitSecrets`). En el JSON sigue la clave `vpn`: los perfiles anteriores se leen como OpenVPN.
+
+**Tailscale por dentro:** `tools/tsbridge` es un módulo de Go sobre `tsnet` con una interfaz virtual propia: la app le
+entrega paquetes y recibe paquetes, sin interfaz del sistema. Se compila como librería compartida con solo JNI (la misma
+para Android y la JVM de escritorio). Todo lo que Tailscale abre (control, relés DERP) va a un proxy CONNECT local de la
+app (`LocalConnectProxy`, en 127.0.0.1 con un token de un solo uso) que sale por el proxy del perfil con NTLM y todo lo
+demás. El UDP directo se desactiva (`TS_DEBUG_ALWAYS_USE_DERP` y el modo «solo TCP 443» de Tailscale, sin STUN): detrás
+del proxy no existe, así nada sale por fuera, y la comprobación de red no provoca «rebinds» que corten el relé. No se
+suben registros a Tailscale. La identidad del nodo se guarda en un directorio privado por perfil; la búsqueda de nodos
+del editor usa un nodo efímero que la red olvida. En Android la librería va en `jniLibs`; en escritorio, en los recursos,
+y se extrae como `wintun.dll` (carpeta nueva, huella comprobada, en el motor de Windows bajo `ProgramData`).
+
+| Parte | Trabajo | Hecho |
+|---|---|---|
+| Interfaz | Selector de motor, campos de Tailscale (servidor de control, clave, nodo de salida, nombre) y «Buscar nodos de salida» | ✔ |
+| Núcleo | `CountryEngine`, `CountryEngines`, `VpnNetwork`, `ProxyDialer`, `OpenVpnEngine`, `TailscaleEngine`, `LocalConnectProxy`, `CountryEngineCatalog` | ✔ |
+| Adaptadores | `NativeTailscaleBridge` (JNI) y `tools/tsbridge` (Go): librería para macOS, Windows, Linux y Android arm64/x86_64 | ✔ |
+| Protocolo | `EngineStart.countryExit` lleva motor, secretos y directorio de estado al motor de escritorio | ✔ |
+
+**Pruebas:** en Go, una sesión abierta solo a través de un proxy con autenticación saca una conexión TCP por el nodo de
+salida de una red de pruebas propia (`testcontrol` de Tailscale, un DERP con TLS y un nodo de salida), y una clave mala se
+reconoce. En Kotlin, `TailscaleEngineLiveTest` hace lo mismo con la librería real y el proxy NTLM de pruebas: busca nodos,
+conecta y completa una petición HTTP por el nodo de salida, descarga 3 MB íntegros (alrededor de 1 s) y, con la contraseña
+del proxy mala, corta enseguida con `PROXY_AUTH_FAILED`. En CI corre obligatoria en Linux, macOS y Windows; `WindowsTailscaleE2ETest` descarga 5 MB por un
+adaptador Wintun real saliendo por Tailscale; y el APK debe llevar las dos librerías de Android. Además, las pruebas del
+editor, de la migración del JSON y de los secretos por motor. A mano, en el emulador de Android (16, arm64) con la red de
+pruebas y el proxy NTLM del equipo: el perfil antiguo se leyó como OpenVPN, la búsqueda encontró el nodo, el perfil
+conectó por Tailscale y Chrome recibió la página a través del nodo de salida, con reglas de salida activas. Esa prueba
+destapó tres cosas propias de Android que ya están resueltas: sin netlink para leer las interfaces (se le da a Tailscale
+una interfaz sintética), un temporal que no se puede escribir (la app pasa el suyo y `TMPDIR`) y un `panic` de Go que no
+dejaba rastro (ahora queda en `tsbridge-fallo.txt`, en la caché de la app).
+
+**Limitaciones:** detrás del proxy todo va por los relés DERP de Tailscale (TCP 443): funciona, con más latencia que una
+conexión directa. Hace falta un nodo de salida (una máquina propia en el país, o el complemento de Mullvad de Tailscale).
+Una sola sesión de Tailscale por proceso: en Android, buscar nodos con un túnel Tailscale activo no se puede. Tailscale
+1.104 a veces no termina de apagarse con solo DERP (no cierra su conexión UDP ficticia al «rebind»): se da por cerrada a
+los 5 s. La librería pesa unos 20 MB por plataforma.
+
+> Pendiente: probarlo en la red de la UCI con un nodo de salida real, en Android y en escritorio; inicio de sesión
+> interactivo (sin clave) desde el editor.
 
 ---
 

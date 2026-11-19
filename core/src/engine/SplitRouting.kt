@@ -80,8 +80,8 @@ class VpnLink(private val appAddress: Int, private val logger: Logger) {
 
     suspend fun attach(newSession: VpnSession) = lock.withLock {
         session = newSession
-        vpnAddress = parseIpv4(newSession.push.address) ?: 0
-        vpnDns = newSession.push.dnsServers.firstNotNullOfOrNull(::parseIpv4) ?: FALLBACK_DNS
+        vpnAddress = parseIpv4(newSession.network.address) ?: 0
+        vpnDns = newSession.network.dnsServers.firstNotNullOfOrNull(::parseIpv4) ?: FALLBACK_DNS
         pendingDns.clear()
         unresolvable.clear()
     }

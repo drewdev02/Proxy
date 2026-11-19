@@ -16,12 +16,18 @@ internal fun TunnelFailure.reason(): String = when (this) {
     TunnelFailure.INTERFACE_UNAVAILABLE -> "el sistema no permitió crear la conexión VPN."
     TunnelFailure.PROXY_HOST_UNRESOLVED -> "no se encuentra el servidor del perfil."
     TunnelFailure.PROXY_AUTH_FAILED -> "el proxy rechazó el usuario o la contraseña."
-    TunnelFailure.VPN_PROFILE_INVALID -> "el archivo .ovpn del perfil no sirve. Debe ser OpenVPN sobre TCP; vuelve a elegirlo."
-    TunnelFailure.VPN_SERVER_UNREACHABLE -> "el proxy no dejó llegar al servidor VPN."
+    TunnelFailure.VPN_PROFILE_INVALID ->
+        "la configuración de Otro País no sirve (el archivo .ovpn debe ser OpenVPN sobre TCP; " +
+            "la dirección del servidor de Tailscale debe ser válida). Revísala en el perfil."
+    TunnelFailure.VPN_SERVER_UNREACHABLE -> "el proxy no dejó llegar al servidor de Otro País."
     TunnelFailure.VPN_SERVER_BLOCKED ->
-        "la política del proxy bloqueó el acceso a los servidores VPN del archivo. Prueba con otro servidor, uno con puerto 443."
-    TunnelFailure.VPN_AUTH_FAILED -> "el servidor VPN rechazó el usuario o la contraseña."
-    TunnelFailure.VPN_HANDSHAKE_FAILED -> "el servidor VPN no completó el acuerdo de claves."
+        "la política del proxy bloqueó el acceso a los servidores de Otro País. Con OpenVPN, prueba con otro servidor, uno con puerto 443."
+    TunnelFailure.VPN_AUTH_FAILED ->
+        "Otro País rechazó las credenciales (usuario y contraseña de la VPN, o clave de Tailscale)."
+    TunnelFailure.VPN_HANDSHAKE_FAILED -> "el servidor de Otro País no completó la conexión."
+    TunnelFailure.EXIT_NODE_NOT_FOUND ->
+        "el nodo de salida de Tailscale no existe en la red, o hay varios y no se eligió ninguno."
+    TunnelFailure.ENGINE_UNAVAILABLE -> "el motor de Otro País del perfil no está disponible en este equipo."
 }
 
 /** La frase completa: «No se pudo conectar: …». */
@@ -35,6 +41,7 @@ internal val TunnelFailure.isFixedInProfile: Boolean
         TunnelFailure.VPN_PROFILE_INVALID,
         TunnelFailure.VPN_SERVER_BLOCKED,
         TunnelFailure.VPN_AUTH_FAILED,
+        TunnelFailure.EXIT_NODE_NOT_FOUND,
         -> true
         else -> false
     }

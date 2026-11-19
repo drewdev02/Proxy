@@ -28,6 +28,9 @@ class KtorTcpConnector(
     }
 }
 
+/** Una conexión ya abierta (por ejemplo, aceptada por un servidor local) con la misma interfaz que las salientes. */
+fun Socket.asTcpConnection(): TcpConnection = KtorTcpConnection(this)
+
 private class KtorTcpConnection(private val socket: Socket) : TcpConnection {
     private val input = socket.openReadChannel()
     private val output = socket.openWriteChannel(autoFlush = false)

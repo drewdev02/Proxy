@@ -36,6 +36,7 @@ fun desktopAppModule(platformInfo: PlatformInfo) = module {
                 logBuffer = get(),
                 settings = get(),
                 nameStatus = get<NameServiceStatusRepository>(),
+                stateDirectories = get(),
             )
         } binds arrayOf(TunnelControl::class, TunnelMonitor::class)
     }

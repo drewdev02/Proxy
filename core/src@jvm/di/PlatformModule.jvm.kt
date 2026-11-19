@@ -13,6 +13,7 @@ import org.uci.proxy.core.platform.JavaHostResolver
 import org.uci.proxy.core.platform.JavaSecureRandomBytes
 import org.uci.proxy.core.platform.JvmLocalAddresses
 import org.uci.proxy.core.platform.JvmAppDirectories
+import org.uci.proxy.core.port.EngineStateDirectories
 import org.uci.proxy.core.platform.JvmPlatformInfo
 import org.uci.proxy.core.platform.MacKeychainSecretStore
 import org.uci.proxy.core.platform.Slf4jLogger
@@ -22,6 +23,7 @@ import org.uci.proxy.core.port.HostResolver
 import org.uci.proxy.core.port.KeyValueStore
 import org.uci.proxy.core.port.LocalAddresses
 import org.uci.proxy.core.port.LocalNetworkPermission
+import org.uci.proxy.core.port.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.PlatformInfo
 import org.uci.proxy.core.port.PlatformKind
@@ -35,6 +37,8 @@ import org.uci.proxy.core.vpn.JcaOpenVpnCrypto
 import org.uci.proxy.core.vpn.OpenVpnCrypto
 import org.uci.proxy.core.vpn.SslEngineTlsSessionFactory
 import org.uci.proxy.core.vpn.TlsSessionFactory
+import org.uci.proxy.core.vpn.tailscale.NativeTailscaleBridge
+import org.uci.proxy.core.vpn.tailscale.TailscaleBridge
 
 private const val KEYCHAIN_SERVICE = "org.uci.proxy"
 
@@ -52,6 +56,11 @@ actual val platformModule: Module = module {
     // El cliente OpenVPN propio (modo Otro País) usa la criptografía y el TLS estándar de Java.
     single<OpenVpnCrypto> { JcaOpenVpnCrypto() }
     single<TlsSessionFactory> { SslEngineTlsSessionFactory() }
+    // El motor Tailscale de Otro País: su librería nativa, si este sistema la trae.
+    single<TailscaleBridge> {
+        val (dir, file) = NativeTailscaleBridge.desktopResourceDir() ?: return@single TailscaleBridge.Unavailable
+        NativeTailscaleBridge.fromResource(dir, file, onLoadError = { get<Logger>().log(LogLevel.WARN, "Tailscale", it) })
+    }
     singleOf(::GrantedLocalNetworkPermission) { bind<LocalNetworkPermission>() }
     // Sin túnel por defecto. En macOS la app de escritorio lo sustituye en su propio módulo, que es
     // donde se sabe cómo relanzar el programa como motor; el de Windows llega en la capa 6.
@@ -60,6 +69,11 @@ actual val platformModule: Module = module {
     singleOf(::JvmLocalAddresses) { bind<LocalAddresses>() }
     single<HostResolver> { JavaHostResolver(get<AppDispatchers>().background) }
     single { JvmAppDirectories.fromSystem(get()) }
+    // El estado de los motores de Otro País (la identidad de un nodo de Tailscale), un directorio por perfil.
+    single<EngineStateDirectories> {
+        val base = get<JvmAppDirectories>().dataDir.resolve("engines")
+        EngineStateDirectories { id -> base.resolve(id).toString() }
+    }
     single<KeyValueStore> { FileKeyValueStore(get<JvmAppDirectories>().dataDir.resolve("settings.properties")) }
     single<SecretStore> {
         when (get<PlatformInfo>().kind) {

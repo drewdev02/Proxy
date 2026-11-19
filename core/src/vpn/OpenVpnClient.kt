@@ -224,10 +224,17 @@ class OpenVpnSession internal constructor(
     private val framed: FramedConnection,
     private val channel: ControlChannel,
     private val data: DataChannel,
-    override val push: OpenVpnPush,
+    val push: OpenVpnPush,
     private val logger: Logger,
 ) : VpnSession {
     private val writeLock = Mutex()
+
+    override val network = VpnNetwork(
+        address = push.address,
+        prefixLength = VpnNetwork.prefixOf(push.netmask),
+        dnsServers = push.dnsServers,
+        mtu = push.tunMtu,
+    )
 
     /** Envía un paquete IP al servidor. */
     override suspend fun writePacket(packet: ByteArray) {

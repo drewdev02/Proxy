@@ -33,12 +33,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.delay
 import org.koin.compose.viewmodel.koinViewModel
+import org.uci.proxy.common.LOCAL_NETWORK_DENIED_FOR_TEST
 import org.uci.proxy.common.isFixedInProfile
 import org.uci.proxy.common.message
 import org.uci.proxy.common.reason
-import org.uci.proxy.common.LOCAL_NETWORK_DENIED_FOR_TEST
 import org.uci.proxy.core.log.LogEntry
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.RouteExit
@@ -47,6 +49,7 @@ import org.uci.proxy.core.port.LogLevel
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.proxy.ProxyTestResult
 import org.uci.proxy.logs.formatLogTime
+import org.uci.proxy.profile.label
 import org.uci.proxy.theme.ProxyUciTheme
 import org.uci.proxy.ui.components.UciBottomSheet
 import org.uci.proxy.ui.components.UciButton
@@ -66,8 +69,6 @@ import org.uci.proxy.ui.components.UciStatusDot
 import org.uci.proxy.ui.components.UciStatusPill
 import org.uci.proxy.ui.components.UciTone
 import org.uci.proxy.ui.icons.UciIcons
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.seconds
 
 /** Lo que la pantalla puede pedir a quien la contiene (navegar a otras pantallas). */
 class ConnectionNavigation(
@@ -234,7 +235,8 @@ private fun ActiveProfileCard(state: ConnectionUiState, profile: ProxyProfile, o
         }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             UciStatusPill(profile.protocol.name)
-            if (profile.vpn != null) UciStatusPill("Otro País", tone = UciTone.Routing)
+            // El motor importa: OpenVPN y Tailscale fallan y se configuran distinto.
+            profile.countryExit?.let { UciStatusPill("Otro País · ${it.kind.label}", tone = UciTone.Routing) }
             if (profile.routing.enabled) UciStatusPill("Reglas", tone = UciTone.Routing)
         }
     }

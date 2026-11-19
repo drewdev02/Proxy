@@ -1,8 +1,8 @@
 package org.uci.proxy.profile
 
 import org.uci.proxy.core.model.ProxyProtocol
-import org.uci.proxy.core.model.VpnProfile
-import org.uci.proxy.core.model.VpnSecrets
+import org.uci.proxy.core.model.CountryExit
+import org.uci.proxy.core.model.CountryExitSecrets
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.profile.ProfileDraft
 import org.uci.proxy.core.profile.ProfileField
@@ -75,8 +75,8 @@ class ProfileEditorVpnTest : MainDispatcherTest() {
         viewModel.save()
 
         val saved = repository.profiles.value.single()
-        assertEquals(VpnProfile("pais.ovpn", "vpnuser"), saved.vpn)
-        assertEquals(VpnSecrets(goodOvpn, "vpnpass"), repository.vpnSecrets[saved.id])
+        assertEquals(CountryExit.OpenVpn("pais.ovpn", "vpnuser"), saved.countryExit)
+        assertEquals(CountryExitSecrets.OpenVpn(goodOvpn, "vpnpass"), repository.vpnSecrets[saved.id])
     }
 
     @Test
@@ -111,7 +111,7 @@ class ProfileEditorVpnTest : MainDispatcherTest() {
         viewModel.save()
 
         val saved = repository.profiles.value.single()
-        assertNull(saved.vpn)
+        assertNull(saved.countryExit)
         assertNull(repository.vpnSecrets[saved.id])
     }
 
@@ -141,8 +141,8 @@ class ProfileEditorVpnTest : MainDispatcherTest() {
 
     @Test
     fun `editing a profile with a VPN loads its file and password`() {
-        val stored = ProxyProfile("a1", "UCI", "proxy.uci.cu", 3128, ProxyProtocol.HTTP, "andrey", VpnProfile("pais.ovpn", "vpnuser"))
-        val withVpn = FakeProfileRepository(listOf(stored)).apply { vpnSecrets["a1"] = VpnSecrets(goodOvpn, "vpnpass") }
+        val stored = ProxyProfile("a1", "UCI", "proxy.uci.cu", 3128, ProxyProtocol.HTTP, "andrey", CountryExit.OpenVpn("pais.ovpn", "vpnuser"))
+        val withVpn = FakeProfileRepository(listOf(stored)).apply { vpnSecrets["a1"] = CountryExitSecrets.OpenVpn(goodOvpn, "vpnpass") }
         val viewModel = ProfileEditorViewModel(
             withVpn, ProfileValidator(), { "nuevo" }, FakeProxyTester(), FakeLocalNetworkPermission(), RecordingLogger(),
         )

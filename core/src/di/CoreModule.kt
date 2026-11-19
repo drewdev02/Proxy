@@ -29,6 +29,13 @@ import org.uci.proxy.core.profile.StoredActiveProfileStore
 import org.uci.proxy.core.settings.SettingsRepository
 import org.uci.proxy.core.settings.StoredNameServiceStatusRepository
 import org.uci.proxy.core.settings.StoredSettingsRepository
+import org.uci.proxy.core.vpn.CountryEngineCatalog
+import org.uci.proxy.core.vpn.EngineCatalog
+import org.uci.proxy.core.vpn.OpenVpnCrypto
+import org.uci.proxy.core.vpn.ProxyDialer
+import org.uci.proxy.core.vpn.UnavailableOpenVpnCrypto
+import org.uci.proxy.core.vpn.tailscale.TailscaleBridge
+import org.uci.proxy.core.vpn.tailscale.TailscaleEngine
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 
@@ -60,6 +67,21 @@ val coreModule = module {
     // El orden es la preferencia: NTLM antes que Basic, que manda la contraseña en claro.
     single { HttpConnectConnector(get(), schemes = listOf(get<NtlmAuthScheme>(), get<BasicAuthScheme>())) }
     singleOf(::Socks5Connector)
+    // Los motores de Otro País que puede ofrecer la interfaz, y la búsqueda de nodos de Tailscale.
+    single<CountryEngineCatalog> {
+        val bridge = getOrNull<TailscaleBridge>() ?: TailscaleBridge.Unavailable
+        EngineCatalog(
+            openVpnAvailable = getOrNull<OpenVpnCrypto>().let { it != null && it !is UnavailableOpenVpnCrypto },
+            tailscale = TailscaleEngine(
+                bridge = bridge,
+                dialer = ProxyDialer(listOf(get<HttpConnectConnector>(), get<Socks5Connector>()), get(), get<NameServiceStatusRepository>()),
+                selector = get(),
+                random = get(),
+                logger = get(),
+                io = get<AppDispatchers>().background,
+            ),
+        )
+    }
     single<ProxyTester> {
         ConnectingProxyTester(
             connectors = listOf(get<HttpConnectConnector>(), get<Socks5Connector>()),

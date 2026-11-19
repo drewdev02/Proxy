@@ -15,7 +15,18 @@ import kotlin.time.TimeSource
 val uiModule = module {
     viewModelOf(::HomeViewModel)
     viewModelOf(::ProfileListViewModel)
-    viewModelOf(::ProfileEditorViewModel)
+    viewModel {
+        ProfileEditorViewModel(
+            repository = get(),
+            validator = get(),
+            idGenerator = get(),
+            proxyTester = get(),
+            localNetworkPermission = get(),
+            logger = get(),
+            catalog = get(),
+            settings = get(),
+        )
+    }
     viewModelOf(::TunnelViewModel)
     viewModelOf(::LogsViewModel)
     viewModelOf(::SettingsViewModel)

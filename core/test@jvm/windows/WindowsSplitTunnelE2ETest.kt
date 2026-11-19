@@ -23,10 +23,11 @@ import org.uci.proxy.core.model.RouteExit
 import org.uci.proxy.core.model.RouteRule
 import org.uci.proxy.core.model.RoutingRules
 import org.uci.proxy.core.model.RuleKind
-import org.uci.proxy.core.model.VpnProfile
+import org.uci.proxy.core.model.CountryExit
+import org.uci.proxy.core.model.CountryExitSecrets
 import org.uci.proxy.core.vpn.VpnConnectResult
-import org.uci.proxy.core.vpn.VpnExit
-import org.uci.proxy.core.vpn.VpnStart
+import org.uci.proxy.core.fakes.fakeEngines
+import org.uci.proxy.core.vpn.CountryExitStart
 import java.io.IOException
 import java.net.InetAddress
 import java.net.InetSocketAddress
@@ -78,7 +79,7 @@ class WindowsSplitTunnelE2ETest {
             val runner = TunnelRunner(
                 koin.get(), koin.get(), koin.get(), koin.get(), stateStore, dispatchers, koin.get<Logger>(),
                 publicRoutes = listOf(Ipv4Route.parse("192.0.2.0/24")),
-                vpnExit = VpnExit { _, _, _, _ -> VpnConnectResult.Connected(vpn) },
+                engines = fakeEngines { _, _ -> VpnConnectResult.Connected(vpn) },
             )
             val tunnel = WinPlatformTunnel(
                 network = WinNetwork(ProcessCommandRunner()),
@@ -95,9 +96,9 @@ class WindowsSplitTunnelE2ETest {
                     RouteRule(RuleKind.IP, DIRECT_IP, RouteExit.DIRECT),
                 ),
             )
-            val profile = ProxyProfile("e2e", "E2E", "127.0.0.1", proxyPort, ProxyProtocol.HTTP, "andrey", VpnProfile("bucle.ovpn", "x"), rules)
+            val profile = ProxyProfile("e2e", "E2E", "127.0.0.1", proxyPort, ProxyProtocol.HTTP, "andrey", CountryExit.OpenVpn("bucle.ovpn", "x"), rules)
 
-            val session = scope.launch { runner.run(tunnel, profile, "secreta7", vpn = VpnStart("", "x", "y")) }
+            val session = scope.launch { runner.run(tunnel, profile, "secreta7", vpn = CountryExitStart(profile.countryExit!!, CountryExitSecrets.OpenVpn("", "y"))) }
             val state = runBlocking {
                 withTimeout(90.seconds) { stateStore.state.first { it is TunnelState.Connected || it is TunnelState.Failed } }
             }

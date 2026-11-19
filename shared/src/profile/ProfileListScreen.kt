@@ -206,7 +206,7 @@ private fun ProfileCard(
 
 private fun ProxyProfile.summary(): String {
     val user = if (username.isEmpty()) "" else " · $username"
-    val exit = vpn?.let { " · VPN ${it.fileName}" }.orEmpty()
+    val exit = countryExit?.let { " · ${it.kind.label} ${it.summary}" }.orEmpty()
     return "${protocol.label} · $host:$port$user$exit"
 }
 

@@ -20,3 +20,7 @@ keystore.properties
 # Perfiles de VPN y capturas con credenciales: nunca al repositorio.
 *.ovpn
 Pasted *.png
+
+# Librerías nativas del puente de Tailscale: las construye tools/tsbridge/build.sh (y el CI).
+core/resources@jvm/native/tsbridge/
+androidApp/jniLibs/

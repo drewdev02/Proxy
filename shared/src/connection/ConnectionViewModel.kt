@@ -55,8 +55,8 @@ data class RoutingSummary(
 
 fun ProxyProfile.routingSummary(): RoutingSummary = RoutingSummary(
     enabled = routing.enabled,
-    defaultExit = if (routing.enabled) routing.defaultExit else if (vpn != null) RouteExit.VPN else RouteExit.PROXY,
-    hasVpn = vpn != null,
+    defaultExit = if (routing.enabled) routing.defaultExit else if (countryExit != null) RouteExit.VPN else RouteExit.PROXY,
+    hasVpn = countryExit != null,
     rules = if (!routing.enabled) {
         emptyMap()
     } else {
