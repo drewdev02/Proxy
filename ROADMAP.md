@@ -554,8 +554,9 @@ seguro (`CountryExitSecrets`). En el JSON sigue la clave `vpn`: los perfiles ant
 entrega paquetes y recibe paquetes, sin interfaz del sistema. Se compila como librería compartida con solo JNI (la misma
 para Android y la JVM de escritorio). Todo lo que Tailscale abre (control, relés DERP) va a un proxy CONNECT local de la
 app (`LocalConnectProxy`, en 127.0.0.1 con un token de un solo uso) que sale por el proxy del perfil con NTLM y todo lo
-demás. El UDP directo se desactiva (`TS_DEBUG_ALWAYS_USE_DERP`): detrás del proxy no existe, y así nada sale por fuera. No
-se suben registros a Tailscale. La identidad del nodo se guarda en un directorio privado por perfil; la búsqueda de nodos
+demás. El UDP directo se desactiva (`TS_DEBUG_ALWAYS_USE_DERP` y el modo «solo TCP 443» de Tailscale, sin STUN): detrás
+del proxy no existe, así nada sale por fuera, y la comprobación de red no provoca «rebinds» que corten el relé. No se
+suben registros a Tailscale. La identidad del nodo se guarda en un directorio privado por perfil; la búsqueda de nodos
 del editor usa un nodo efímero que la red olvida. En Android la librería va en `jniLibs`; en escritorio, en los recursos,
 y se extrae como `wintun.dll` (carpeta nueva, huella comprobada, en el motor de Windows bajo `ProgramData`).
 
@@ -569,8 +570,8 @@ y se extrae como `wintun.dll` (carpeta nueva, huella comprobada, en el motor de 
 **Pruebas:** en Go, una sesión abierta solo a través de un proxy con autenticación saca una conexión TCP por el nodo de
 salida de una red de pruebas propia (`testcontrol` de Tailscale, un DERP con TLS y un nodo de salida), y una clave mala se
 reconoce. En Kotlin, `TailscaleEngineLiveTest` hace lo mismo con la librería real y el proxy NTLM de pruebas: busca nodos,
-conecta y completa una petición HTTP por el nodo de salida; con la contraseña del proxy mala corta enseguida con
-`PROXY_AUTH_FAILED`. En CI corre obligatoria en Linux, macOS y Windows; `WindowsTailscaleE2ETest` descarga 5 MB por un
+conecta y completa una petición HTTP por el nodo de salida, descarga 3 MB íntegros (alrededor de 1 s) y, con la contraseña
+del proxy mala, corta enseguida con `PROXY_AUTH_FAILED`. En CI corre obligatoria en Linux, macOS y Windows; `WindowsTailscaleE2ETest` descarga 5 MB por un
 adaptador Wintun real saliendo por Tailscale; y el APK debe llevar las dos librerías de Android. Además, las pruebas del
 editor, de la migración del JSON y de los secretos por motor. A mano, en el emulador de Android (16, arm64) con la red de
 pruebas y el proxy NTLM del equipo: el perfil antiguo se leyó como OpenVPN, la búsqueda encontró el nodo, el perfil
