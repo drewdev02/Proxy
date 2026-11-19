@@ -267,7 +267,7 @@ class DesktopTunnelIntegrationTest {
         withTimeout(10.seconds) { controller.state.first(predicate) }
 
     @Test
-    fun `what the engine logs reaches the window's log, including what it logged before the window asked`() = runBlocking {
+    fun `what the engine logs reaches the window's log, including what it logged before the window asked`() = runBlocking<Unit> {
         repository.save(profile, "secreta")
         engineLogs.append(1_000, LogLevel.INFO, "Motor", "arrancó antes de recibir la orden")
 
@@ -290,7 +290,7 @@ class DesktopTunnelIntegrationTest {
     }
 
     @Test
-    fun `a profile with a VPN sends its file and credentials to the engine and a failure comes back by name`() = runBlocking {
+    fun `a profile with a VPN sends its file and credentials to the engine and a failure comes back by name`() = runBlocking<Unit> {
         val withVpn = profile.copy(countryExit = CountryExit.OpenVpn("pais.ovpn", "vpnuser"))
         repository.save(withVpn, "proxypass", CountryExitSecrets.OpenVpn("client\n", "vpnpass"))
 
@@ -305,7 +305,7 @@ class DesktopTunnelIntegrationTest {
     }
 
     @Test
-    fun `a profile whose VPN file is missing fails in the window without launching the engine`() = runBlocking {
+    fun `a profile whose VPN file is missing fails in the window without launching the engine`() = runBlocking<Unit> {
         val withVpn = profile.copy(countryExit = CountryExit.OpenVpn("pais.ovpn", "vpnuser"))
         repository.save(withVpn, "proxypass", exitSecrets = null)
 
@@ -317,7 +317,7 @@ class DesktopTunnelIntegrationTest {
     }
 
     @Test
-    fun `what the engine says about a name service reaches the window`() = runBlocking {
+    fun `what the engine says about a name service reaches the window`() = runBlocking<Unit> {
         repository.save(profile, "secreta")
         controller.connect(profile.id)
         awaitState { it is TunnelState.Connected }
@@ -332,7 +332,7 @@ class DesktopTunnelIntegrationTest {
     }
 
     @Test
-    fun `a log message that arrives after the tunnel stopped is not lost`() = runBlocking {
+    fun `a log message that arrives after the tunnel stopped is not lost`() = runBlocking<Unit> {
         repository.save(profile, "secreta")
         controller.connect(profile.id)
         awaitState { it is TunnelState.Connected }
@@ -344,7 +344,7 @@ class DesktopTunnelIntegrationTest {
     }
 
     @Test
-    fun `connecting launches the engine, hands it the profile and reports connected`() = runBlocking {
+    fun `connecting launches the engine, hands it the profile and reports connected`() = runBlocking<Unit> {
         repository.save(profile, "secreta")
 
         controller.connect(profile.id)
@@ -357,7 +357,7 @@ class DesktopTunnelIntegrationTest {
     }
 
     @Test
-    fun `the tunnel run by the engine really works while connected`() = runBlocking {
+    fun `the tunnel run by the engine really works while connected`() = runBlocking<Unit> {
         repository.save(profile, "secreta")
         controller.connect(profile.id)
         awaitState { it is TunnelState.Connected }
@@ -372,7 +372,7 @@ class DesktopTunnelIntegrationTest {
     }
 
     @Test
-    fun `disconnecting stops the engine and closes the interface`() = runBlocking {
+    fun `disconnecting stops the engine and closes the interface`() = runBlocking<Unit> {
         repository.save(profile, "secreta")
         controller.connect(profile.id)
         awaitState { it is TunnelState.Connected }
@@ -384,7 +384,7 @@ class DesktopTunnelIntegrationTest {
     }
 
     @Test
-    fun `the token file is private and removed when the session ends`() = runBlocking {
+    fun `the token file is private and removed when the session ends`() = runBlocking<Unit> {
         repository.save(profile, "secreta")
         controller.connect(profile.id)
         awaitState { it is TunnelState.Connected }
@@ -398,7 +398,7 @@ class DesktopTunnelIntegrationTest {
     }
 
     @Test
-    fun `an engine that cannot create the interface is reported as a failure`() = runBlocking {
+    fun `an engine that cannot create the interface is reported as a failure`() = runBlocking<Unit> {
         repository.save(profile, "secreta")
         platformTunnel.failWith = "no es root"
 
@@ -408,7 +408,7 @@ class DesktopTunnelIntegrationTest {
     }
 
     @Test
-    fun `cancelling the administrator prompt is reported as permission denied`() = runBlocking {
+    fun `cancelling the administrator prompt is reported as permission denied`() = runBlocking<Unit> {
         repository.save(profile, "secreta")
         // Como osascript cuando se cancela la contraseña: el proceso termina sin que el motor llegue a existir.
         launchBehaviour = { _, _ ->
@@ -425,7 +425,7 @@ class DesktopTunnelIntegrationTest {
     }
 
     @Test
-    fun `a local process that connects without the token is not trusted with the profile`() = runBlocking {
+    fun `a local process that connects without the token is not trusted with the profile`() = runBlocking<Unit> {
         repository.save(profile, "secreta")
         var intruderGot: String? = "sin respuesta"
         launchBehaviour = { port, _ ->
@@ -450,7 +450,7 @@ class DesktopTunnelIntegrationTest {
     }
 
     @Test
-    fun `an engine that reaches its time limit disconnects on its own`() = runBlocking {
+    fun `an engine that reaches its time limit disconnects on its own`() = runBlocking<Unit> {
         repository.save(profile, "secreta")
         engineMaxDuration = 300.milliseconds
 
@@ -462,7 +462,7 @@ class DesktopTunnelIntegrationTest {
     }
 
     @Test
-    fun `connecting with an unknown profile fails without launching anything`() = runBlocking {
+    fun `connecting with an unknown profile fails without launching anything`() = runBlocking<Unit> {
         var launched = false
         launchBehaviour = { port, file -> launched = true; launchInProcess(port, file) }
 
@@ -473,7 +473,7 @@ class DesktopTunnelIntegrationTest {
     }
 
     @Test
-    fun `after a session ends a new one can be started`() = runBlocking {
+    fun `after a session ends a new one can be started`() = runBlocking<Unit> {
         repository.save(profile, "secreta")
         controller.connect(profile.id)
         awaitState { it is TunnelState.Connected }
