@@ -7,6 +7,9 @@ import org.koin.dsl.KoinAppDeclaration
 import org.uci.proxy.core.di.coreModule
 import org.uci.proxy.core.di.platformModule
 import org.uci.proxy.core.log.LogRecorder
+import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.port.Logger
+import org.uci.proxy.core.port.PlatformInfo
 import org.uci.proxy.database.di.databaseModule
 
 /** Módulos del proceso que muestra la interfaz. */
@@ -24,4 +27,10 @@ fun initKoin(config: KoinAppDeclaration? = null): KoinApplication = startKoin {
 }.also { app ->
     // El registro se guarda en disco desde el arranque, haya o no alguien mirando la pantalla «Registro».
     app.koin.get<LogRecorder>().start()
+    logStartup(app.koin.get(), app.koin.get())
+}
+
+/** Una línea al arrancar con la plataforma, útil al leer un registro que alguien envía. */
+internal fun logStartup(platformInfo: PlatformInfo, logger: Logger) {
+    logger.log(LogLevel.INFO, "ProxyUCI", "ProxyUCI en ${platformInfo.kind.displayName} ${platformInfo.osVersion}")
 }

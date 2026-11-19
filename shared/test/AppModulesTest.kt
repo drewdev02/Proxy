@@ -6,7 +6,6 @@ import org.koin.dsl.module
 import org.uci.proxy.core.port.TunnelControl
 import org.uci.proxy.core.port.TunnelMonitor
 import org.uci.proxy.fakes.FakeTunnel
-import org.uci.proxy.tunnel.TunnelViewModel
 import org.uci.proxy.core.log.InMemoryLogHistory
 import org.uci.proxy.core.port.KeyValueStore
 import org.uci.proxy.core.port.LogHistory
@@ -19,7 +18,6 @@ import org.uci.proxy.fakes.InMemoryKeyValueStore
 import org.uci.proxy.fakes.InMemorySecretStore
 import org.uci.proxy.fakes.RecordingLogger
 import org.uci.proxy.connection.ConnectionViewModel
-import org.uci.proxy.home.HomeViewModel
 import org.uci.proxy.logs.LogsViewModel
 import org.uci.proxy.profile.ProfileEditorViewModel
 import org.uci.proxy.profile.ProfileListViewModel
@@ -45,19 +43,9 @@ class AppModulesTest {
     private val koin = koinApplication { modules(appModules + testOverrides) }.koin
 
     @Test
-    fun `HomeViewModel resolves from the app modules`() {
-        assertTrue(koin.get<HomeViewModel>().uiState.platformName.isNotBlank())
-    }
-
-    @Test
     fun `profile view models resolve from the app modules`() {
-        assertNotNull(koin.get<ProfileListViewModel>())
+        assertTrue(koin.get<ProfileListViewModel>().uiState.value.platformLabel.startsWith("ProxyUCI en "))
         assertNotNull(koin.get<ProfileEditorViewModel>())
-    }
-
-    @Test
-    fun `tunnel view model resolves from the app modules`() {
-        assertNotNull(koin.get<TunnelViewModel>())
     }
 
     @Test

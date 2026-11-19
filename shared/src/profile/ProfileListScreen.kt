@@ -37,9 +37,7 @@ import org.uci.proxy.common.message
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.ProxyProtocol
 import org.uci.proxy.core.port.TunnelState
-import org.uci.proxy.home.HomeViewModel
 import org.uci.proxy.theme.ProxyUciTheme
-import org.uci.proxy.tunnel.TunnelViewModel
 
 /** Lo que la lista necesita saber del túnel. */
 data class TunnelUiModel(
@@ -56,10 +54,7 @@ data class TunnelUiModel(
         }
 }
 
-/**
- * La lista de perfiles a nivel de pantalla: obtiene sus ViewModels y pasa solo estado y acciones a la versión sin estado.
- * Usa tres ViewModels de forma provisional; al rediseñarla se juntan en uno solo, uno por pantalla.
- */
+/** La lista de perfiles a nivel de pantalla: obtiene su ViewModel y pasa solo estado y acciones a la versión sin estado. */
 @Composable
 internal fun ProfileListScreen(
     onAdd: () -> Unit,
@@ -68,18 +63,14 @@ internal fun ProfileListScreen(
     onOpenSettings: () -> Unit,
     onOpenCatalog: (() -> Unit)?,
     viewModel: ProfileListViewModel = koinViewModel(),
-    home: HomeViewModel = koinViewModel(),
-    tunnel: TunnelViewModel = koinViewModel(),
 ) {
-    val profiles by viewModel.profiles.collectAsStateWithLifecycle()
-    val deleteFailed by viewModel.deleteFailed.collectAsStateWithLifecycle()
-    val tunnelState by tunnel.state.collectAsStateWithLifecycle()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     ProfileListScreen(
-        profiles = profiles,
-        platformLabel = "ProxyUCI en ${home.uiState.platformName} ${home.uiState.osVersion}",
-        deleteFailed = deleteFailed,
-        tunnel = TunnelUiModel(isAvailable = tunnel.isAvailable, state = tunnelState),
+        profiles = state.profiles,
+        platformLabel = state.platformLabel,
+        deleteFailed = state.deleteFailed,
+        tunnel = state.tunnel,
         onAdd = onAdd,
         onEdit = onEdit,
         onOpenLogs = onOpenLogs,
@@ -87,8 +78,8 @@ internal fun ProfileListScreen(
         onOpenCatalog = onOpenCatalog,
         onDelete = viewModel::delete,
         onDismissDeleteError = viewModel::dismissDeleteError,
-        onConnect = tunnel::connect,
-        onDisconnect = tunnel::disconnect,
+        onConnect = viewModel::connect,
+        onDisconnect = viewModel::disconnect,
     )
 }
 

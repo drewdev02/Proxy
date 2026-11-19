@@ -61,14 +61,12 @@ class SettingsActions(
 /** Ajustes a nivel de pantalla: obtiene su ViewModel y pasa solo estado y acciones a la versión sin estado. */
 @Composable
 internal fun SettingsScreen(onBack: (() -> Unit)? = null, viewModel: SettingsViewModel = koinViewModel()) {
-    val settings by viewModel.settings.collectAsStateWithLifecycle()
-    val statuses by viewModel.statuses.collectAsStateWithLifecycle()
-    val tests by viewModel.tests.collectAsStateWithLifecycle()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     SettingsScreen(
-        settings = settings,
-        statuses = statuses,
-        tests = tests,
+        settings = state.settings,
+        statuses = state.statuses,
+        tests = state.tests,
         actions = SettingsActions(
             onBack = onBack,
             onAnswerConnectivityChecksChange = viewModel::onAnswerConnectivityChecksChange,
