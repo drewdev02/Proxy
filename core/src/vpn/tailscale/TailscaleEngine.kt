@@ -97,6 +97,7 @@ class TailscaleEngine(
             stateDir = stateDir,
             exitNode = exit.exitNode,
             proxyUrl = proxy.url,
+            tempDir = bridge.tempDir,
             timeoutMs = startTimeoutMs,
         )
         val started = parse<StartReply>(startBridge(config, proxy))
@@ -143,6 +144,7 @@ class TailscaleEngine(
                 proxyUrl = proxy.url,
                 listOnly = true,
                 ephemeral = true,
+                tempDir = bridge.tempDir,
                 timeoutMs = startTimeoutMs,
             )
             val started = parse<StartReply>(startBridge(config, proxy))
@@ -150,6 +152,7 @@ class TailscaleEngine(
             val handle = started?.handle
             if (handle == null) {
                 val error = started?.error ?: BridgeError("INTERNAL", "respuesta ilegible de la librería")
+                logger.log(LogLevel.WARN, TAG, "No se pudieron buscar los nodos de salida (${error.code}): ${error.message}")
                 return ExitNodeListing.Failed(failureOf(error, proxy), error.message)
             }
             try {
@@ -264,6 +267,7 @@ class TailscaleEngine(
         val proxyUrl: String,
         val listOnly: Boolean = false,
         val ephemeral: Boolean = false,
+        val tempDir: String = "",
         val timeoutMs: Int,
     )
 

@@ -16,6 +16,8 @@ import (
 	"net/netip"
 	"net/url"
 	"os"
+	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -55,8 +57,11 @@ type Config struct {
 	// Ephemeral registra un nodo efímero, sin guardar nada en disco: la red lo olvida al desconectarse. Para listar
 	// nodos sin dejar uno permanente por cada búsqueda.
 	Ephemeral bool `json:"ephemeral"`
-	TimeoutMs int  `json:"timeoutMs"`
-	Verbose   bool `json:"verbose"`
+	// TempDir es dónde crear directorios temporales. En Android el de Go por defecto (/data/local/tmp) no se puede
+	// escribir: la app da el suyo.
+	TempDir   string `json:"tempDir"`
+	TimeoutMs int    `json:"timeoutMs"`
+	Verbose   bool   `json:"verbose"`
 }
 
 // Network es la red que la sesión le da al túnel.
@@ -143,6 +148,24 @@ func Setup() error {
 	return setupErr
 }
 
+var crashOnce sync.Once
+
+// keepCrashReport hace que un fallo fatal de Go (un panic) quede escrito en dir/tsbridge-fallo.txt: en Android la
+// salida de error del proceso no va a ninguna parte, y sin esto no se sabría por qué se cerró la app.
+func keepCrashReport(dir string) {
+	if dir == "" {
+		return
+	}
+	crashOnce.Do(func() {
+		f, err := os.OpenFile(filepath.Join(dir, "tsbridge-fallo.txt"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+		if err != nil {
+			return
+		}
+		_ = debug.SetCrashOutput(f, debug.CrashOptions{})
+		f.Close()
+	})
+}
+
 // UseProxy fija el proxy por el que sale todo lo de Tailscale en este proceso.
 func UseProxy(u *url.URL) { proxyURL.Store(u) }
 
@@ -184,6 +207,12 @@ func Start(parent context.Context, cfg Config, logf func(string, ...any)) (*Sess
 		}
 	}()
 
+	keepCrashReport(cfg.TempDir)
+	if cfg.TempDir != "" && os.Getenv("TMPDIR") == "" {
+		// Partes de Tailscale buscan dónde guardar cosas con os.TempDir(), que en Android es /data/local/tmp y no se
+		// puede escribir (sin esto, entra en pánico con «no safe place found to store log state»).
+		os.Setenv("TMPDIR", cfg.TempDir)
+	}
 	if err := Setup(); err != nil {
 		// Sin la función de proxy, Tailscale saldría directo, saltándose el proxy del perfil: no se conecta.
 		return nil, fail(CodeInternal, "no se pudo fijar el proxy de Tailscale: %v", err)
@@ -208,7 +237,7 @@ func Start(parent context.Context, cfg Config, logf func(string, ...any)) (*Sess
 	tempDir := ""
 	if cfg.Ephemeral {
 		// tsnet necesita un directorio aunque no guarde el estado en él.
-		dir, err := os.MkdirTemp("", "tsbridge-efimero")
+		dir, err := os.MkdirTemp(cfg.TempDir, "tsbridge-efimero")
 		if err != nil {
 			return nil, fail(CodeInternal, "no se pudo crear un directorio temporal: %v", err)
 		}

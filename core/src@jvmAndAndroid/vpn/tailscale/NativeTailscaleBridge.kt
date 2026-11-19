@@ -47,6 +47,9 @@ class NativeTailscaleBridge(
         }
     }
 
+    // En Android es la caché de la app; en escritorio, el temporal del sistema.
+    override val tempDir: String = System.getProperty("java.io.tmpdir").orEmpty()
+
     override fun start(configJson: String): String = TsBridgeNative.start(configJson)
 
     override fun cancelStart() = TsBridgeNative.cancelStart()

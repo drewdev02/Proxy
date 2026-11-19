@@ -10,6 +10,9 @@ interface TailscaleBridge {
     /** Si la librería está en este equipo y se pudo cargar. */
     val isAvailable: Boolean
 
+    /** Dónde puede crear directorios temporales la librería (en Android, la caché de la app). */
+    val tempDir: String get() = ""
+
     /** Abre una sesión: `{"handle":n,"network":{...}}` o `{"error":{"code":"...","message":"..."}}`. Tarda lo que tarde el control. */
     fun start(configJson: String): String
 
