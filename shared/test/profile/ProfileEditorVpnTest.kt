@@ -34,7 +34,7 @@ class ProfileEditorVpnTest : MainDispatcherTest() {
         repository, ProfileValidator(), idGenerator = { "nuevo" }, FakeProxyTester(), FakeLocalNetworkPermission(), RecordingLogger(),
     ).also { it.start(null) }
 
-    private fun ProfileEditorViewModel.fillValidProfile() = onDraftChange(validDraft)
+    private fun ProfileEditorViewModel.fillValidProfile() = updateDraft(validDraft)
 
     @Test
     fun `a new profile goes straight out through the proxy`() {
@@ -45,7 +45,7 @@ class ProfileEditorVpnTest : MainDispatcherTest() {
     fun `choosing a valid file turns the VPN on and remembers its name`() {
         val viewModel = newViewModel()
 
-        viewModel.onVpnFileChosen("pais.ovpn", goodOvpn)
+        viewModel.loadOvpnFile("pais.ovpn", goodOvpn)
 
         val vpn = viewModel.uiState.value.vpn
         assertTrue(vpn.enabled)
@@ -59,7 +59,7 @@ class ProfileEditorVpnTest : MainDispatcherTest() {
     fun `a file that cannot be used is rejected right away with the reason`() {
         val viewModel = newViewModel()
 
-        viewModel.onVpnFileChosen("udp.ovpn", udpOvpn)
+        viewModel.loadOvpnFile("udp.ovpn", udpOvpn)
 
         val vpn = viewModel.uiState.value.vpn
         assertEquals("", vpn.ovpn)
@@ -69,9 +69,9 @@ class ProfileEditorVpnTest : MainDispatcherTest() {
     @Test
     fun `a profile with the VPN on is saved with its file and credentials`() = runTestSave { viewModel ->
         viewModel.fillValidProfile()
-        viewModel.onVpnFileChosen("pais.ovpn", goodOvpn)
-        viewModel.onVpnUsernameChange("vpnuser")
-        viewModel.onVpnPasswordChange("vpnpass")
+        viewModel.loadOvpnFile("pais.ovpn", goodOvpn)
+        viewModel.updateVpnUsername("vpnuser")
+        viewModel.updateVpnPassword("vpnpass")
         viewModel.save()
 
         val saved = repository.profiles.value.single()
@@ -83,7 +83,7 @@ class ProfileEditorVpnTest : MainDispatcherTest() {
     fun `with the VPN on a file and a user are required`() {
         val viewModel = newViewModel()
         viewModel.fillValidProfile()
-        viewModel.onVpnEnabledChange(true)
+        viewModel.setCountryExitEnabled(true)
 
         viewModel.save()
 
@@ -96,7 +96,7 @@ class ProfileEditorVpnTest : MainDispatcherTest() {
         val viewModel = newViewModel()
         viewModel.fillValidProfile()
 
-        viewModel.onVpnFileChosen("abierta.ovpn", goodOvpn.replace("auth-user-pass\n", ""))
+        viewModel.loadOvpnFile("abierta.ovpn", goodOvpn.replace("auth-user-pass\n", ""))
         viewModel.save()
 
         assertFalse(viewModel.uiState.value.vpn.needsCredentials)
@@ -106,8 +106,8 @@ class ProfileEditorVpnTest : MainDispatcherTest() {
     @Test
     fun `with the VPN off nothing about it is saved`() = runTestSave { viewModel ->
         viewModel.fillValidProfile()
-        viewModel.onVpnFileChosen("pais.ovpn", goodOvpn)
-        viewModel.onVpnEnabledChange(false)
+        viewModel.loadOvpnFile("pais.ovpn", goodOvpn)
+        viewModel.setCountryExitEnabled(false)
         viewModel.save()
 
         val saved = repository.profiles.value.single()
@@ -118,7 +118,7 @@ class ProfileEditorVpnTest : MainDispatcherTest() {
     @Test
     fun `errors in the VPN fields and the proxy fields are reported together`() {
         val viewModel = newViewModel()
-        viewModel.onVpnEnabledChange(true)
+        viewModel.setCountryExitEnabled(true)
 
         viewModel.save()
 
@@ -130,11 +130,11 @@ class ProfileEditorVpnTest : MainDispatcherTest() {
     fun `fixing a VPN field clears its error`() {
         val viewModel = newViewModel()
         viewModel.fillValidProfile()
-        viewModel.onVpnEnabledChange(true)
+        viewModel.setCountryExitEnabled(true)
         viewModel.save()
 
-        viewModel.onVpnUsernameChange("vpnuser")
-        viewModel.onVpnFileChosen("pais.ovpn", goodOvpn)
+        viewModel.updateVpnUsername("vpnuser")
+        viewModel.loadOvpnFile("pais.ovpn", goodOvpn)
 
         assertTrue(viewModel.uiState.value.errors.isEmpty())
     }
@@ -161,7 +161,7 @@ class ProfileEditorVpnTest : MainDispatcherTest() {
     @Test
     fun `starting for another profile forgets the VPN of the previous one`() {
         val viewModel = newViewModel()
-        viewModel.onVpnFileChosen("pais.ovpn", goodOvpn)
+        viewModel.loadOvpnFile("pais.ovpn", goodOvpn)
 
         viewModel.start("otro")
 

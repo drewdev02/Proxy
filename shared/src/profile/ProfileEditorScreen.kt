@@ -26,6 +26,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,6 +44,7 @@ import org.uci.proxy.common.LOCAL_NETWORK_DENIED_FOR_TEST
 import org.uci.proxy.common.message
 import org.uci.proxy.core.model.CountryEngineKind
 import org.uci.proxy.core.model.ProxyProtocol
+import org.uci.proxy.core.model.RouteExit
 import org.uci.proxy.core.profile.ProfileDraft
 import org.uci.proxy.core.profile.ProfileField
 import org.uci.proxy.core.proxy.ProxyTestResult
@@ -65,27 +67,54 @@ internal fun ProfileEditorScreen(
     LaunchedEffect(profileId) { viewModel.start(profileId) }
     LaunchedEffect(state.saved) {
         if (state.saved) {
-            viewModel.onSavedHandled()
+            viewModel.savedHandled()
             onClose()
         }
     }
 
     val picker = LocalFilePicker.current
     val scope = rememberCoroutineScope()
+    // Los contratos de las secciones se traducen aquí a las funciones del ViewModel: a las secciones no les llega el ViewModel.
+    val exitActions = remember(viewModel) { viewModel.countryExitActions() }
+    val routingActions = remember(viewModel) { viewModel.routingActions() }
 
     ProfileEditorScreen(
         state = state,
         vpnAvailable = picker != null,
-        onVpnPickFile = { scope.launch { picker?.pickText()?.let { viewModel.onVpnFileChosen(it.name, it.text) } } },
-        exitActions = viewModel,
-        routingActions = viewModel,
+        onVpnPickFile = { scope.launch { picker?.pickText()?.let { viewModel.loadOvpnFile(it.name, it.text) } } },
+        exitActions = exitActions,
+        routingActions = routingActions,
         appCatalog = LocalAppCatalog.current,
-        onDraftChange = viewModel::onDraftChange,
-        onPasswordChange = viewModel::onPasswordChange,
+        onDraftChange = viewModel::updateDraft,
+        onPasswordChange = viewModel::updatePassword,
         onTest = viewModel::testProxy,
         onSave = viewModel::save,
         onCancel = onClose,
     )
+}
+
+private fun ProfileEditorViewModel.countryExitActions() = object : CountryExitActions {
+    override fun onVpnEnabledChange(enabled: Boolean) = setCountryExitEnabled(enabled)
+    override fun onEngineChange(engine: CountryEngineKind) = selectEngine(engine)
+    override fun onVpnUsernameChange(username: String) = updateVpnUsername(username)
+    override fun onVpnPasswordChange(password: String) = updateVpnPassword(password)
+    override fun onTailscaleControlUrlChange(url: String) = updateTailscaleControlUrl(url)
+    override fun onTailscaleAuthKeyChange(key: String) = updateTailscaleAuthKey(key)
+    override fun onTailscaleExitNodeChange(node: String) = selectTailscaleExitNode(node)
+    override fun onTailscaleHostnameChange(hostname: String) = updateTailscaleHostname(hostname)
+    override fun searchExitNodes() = this@countryExitActions.searchExitNodes()
+}
+
+private fun ProfileEditorViewModel.routingActions() = object : RoutingActions {
+    override fun onRoutingEnabledChange(enabled: Boolean) = setRoutingEnabled(enabled)
+    override fun onDefaultExitChange(exit: RouteExit) = setDefaultExit(exit)
+    override fun onNewRuleChange(text: String) = updateNewRule(text)
+    override fun onNewRuleExitChange(exit: RouteExit) = setNewRuleExit(exit)
+    override fun addRule() = this@routingActions.addRule()
+    override fun addAppRule(packageName: String) = this@routingActions.addAppRule(packageName)
+    override fun onRuleExitChange(index: Int, exit: RouteExit) = setRuleExit(index, exit)
+    override fun moveRule(index: Int, delta: Int) = this@routingActions.moveRule(index, delta)
+    override fun removeRule(index: Int) = this@routingActions.removeRule(index)
 }
 
 /** El editor sin estado: dibuja [state] y avisa de lo que se pulsa. */

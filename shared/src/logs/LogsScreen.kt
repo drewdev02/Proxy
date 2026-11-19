@@ -57,9 +57,9 @@ internal fun LogsScreen(onBack: (() -> Unit)? = null, viewModel: LogsViewModel =
     LogsScreen(
         state = state,
         onBack = onBack,
-        onLevelChange = viewModel::onLevelChange,
-        onTogglePause = viewModel::onTogglePause,
-        onClear = viewModel::onClear,
+        onLevelChange = viewModel::setMinLevel,
+        onTogglePause = viewModel::togglePause,
+        onClear = viewModel::clear,
         onCopy = { clipboard.setText(AnnotatedString(viewModel.textToCopy())) },
     )
 }

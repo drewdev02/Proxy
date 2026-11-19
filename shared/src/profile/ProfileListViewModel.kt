@@ -50,7 +50,8 @@ class ProfileListViewModel(
         )
     }.stateIn(
         viewModelScope,
-        SharingStarted.Eagerly,
+        // Solo mientras alguien lo mira, y 5 s más para no reiniciar al girar la pantalla (recomendación de Google).
+        SharingStarted.WhileSubscribed(5_000),
         ProfileListUiState(
             profiles = repository.profiles.value,
             tunnel = TunnelUiModel(isAvailable = control.isAvailable, state = monitor.state.value),

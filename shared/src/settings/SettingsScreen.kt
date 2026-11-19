@@ -69,15 +69,15 @@ internal fun SettingsScreen(onBack: (() -> Unit)? = null, viewModel: SettingsVie
         tests = state.tests,
         actions = SettingsActions(
             onBack = onBack,
-            onAnswerConnectivityChecksChange = viewModel::onAnswerConnectivityChecksChange,
-            onNameByIpChange = viewModel::onNameByIpChange,
-            onTryRawIpChange = viewModel::onTryRawIpChange,
-            onServiceEnabledChange = viewModel::onServiceEnabledChange,
-            onServiceMove = viewModel::onServiceMove,
+            onAnswerConnectivityChecksChange = viewModel::setAnswerConnectivityChecks,
+            onNameByIpChange = viewModel::setNameByIp,
+            onTryRawIpChange = viewModel::setTryRawIp,
+            onServiceEnabledChange = viewModel::setServiceEnabled,
+            onServiceMove = viewModel::moveService,
             onServiceTest = viewModel::testService,
             onServiceRemove = viewModel::removeService,
             onAddService = viewModel::addService,
-            onResetServices = viewModel::onResetServices,
+            onResetServices = viewModel::resetServices,
         ),
     )
 }

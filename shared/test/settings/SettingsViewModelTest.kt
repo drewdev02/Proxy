@@ -52,7 +52,7 @@ class SettingsViewModelTest : MainDispatcherTest() {
         SettingsViewModel(
             StoredSettingsRepository(store), profiles, tunnel, statusRepository, tester,
             IpNameServiceValidator(), { "custom-${nextId++}" }, localNetwork,
-        )
+        ).also { it.uiState.keepSubscribed() }
     }
 
     @Test
@@ -62,12 +62,12 @@ class SettingsViewModelTest : MainDispatcherTest() {
 
     @Test
     fun `switching it off and on is reflected and stored`() {
-        viewModel.onAnswerConnectivityChecksChange(false)
+        viewModel.setAnswerConnectivityChecks(false)
 
         assertFalse(viewModel.uiState.value.settings.answerConnectivityChecks)
         assertFalse(StoredSettingsRepository(store).settings.value.answerConnectivityChecks)
 
-        viewModel.onAnswerConnectivityChecksChange(true)
+        viewModel.setAnswerConnectivityChecks(true)
         assertTrue(viewModel.uiState.value.settings.answerConnectivityChecks)
     }
 
@@ -82,8 +82,8 @@ class SettingsViewModelTest : MainDispatcherTest() {
 
     @Test
     fun `the switches are reflected and stored`() {
-        viewModel.onNameByIpChange(false)
-        viewModel.onTryRawIpChange(false)
+        viewModel.setNameByIp(false)
+        viewModel.setTryRawIp(false)
 
         assertFalse(viewModel.uiState.value.settings.nameByIp)
         assertFalse(StoredSettingsRepository(store).settings.value.tryRawIp)
@@ -91,8 +91,8 @@ class SettingsViewModelTest : MainDispatcherTest() {
 
     @Test
     fun `a service can be switched off and moved`() {
-        viewModel.onServiceEnabledChange("sslip", false)
-        viewModel.onServiceMove("nip", -1)
+        viewModel.setServiceEnabled("sslip", false)
+        viewModel.moveService("nip", -1)
 
         val services = viewModel.uiState.value.settings.nameServices
         assertEquals(listOf("nip", "sslip"), services.map { it.id })
@@ -101,10 +101,10 @@ class SettingsViewModelTest : MainDispatcherTest() {
 
     @Test
     fun `restoring brings the services back`() {
-        viewModel.onServiceMove("nip", -1)
-        viewModel.onServiceEnabledChange("nip", false)
+        viewModel.moveService("nip", -1)
+        viewModel.setServiceEnabled("nip", false)
 
-        viewModel.onResetServices()
+        viewModel.resetServices()
 
         assertEquals(listOf("sslip", "nip"), viewModel.uiState.value.settings.nameServices.map { it.id })
         assertTrue(viewModel.uiState.value.settings.nameServices.all { it.enabled })
@@ -204,7 +204,7 @@ class SettingsViewModelTest : MainDispatcherTest() {
     fun `without any profile there is nothing to test with`() {
         val model = SettingsViewModel(
             StoredSettingsRepository(store), FakeProfileRepository(), tunnel, statusRepository, tester, IpNameServiceValidator(), { "x" }, localNetwork,
-        )
+        ).also { it.uiState.keepSubscribed() }
 
         model.testService("sslip")
 

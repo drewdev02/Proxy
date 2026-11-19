@@ -55,7 +55,7 @@ class ConnectionViewModelTest : MainDispatcherTest() {
         localNetworkPermission = permission,
         logBuffer = logs,
         timeSource = clock,
-    )
+    ).also { it.uiState.keepSubscribed() }
 
     @Test
     fun `without a choice the first profile is active`() {
@@ -78,6 +78,21 @@ class ConnectionViewModelTest : MainDispatcherTest() {
 
         assertEquals(listOf("p2"), tunnel.connectRequests)
         assertEquals(TunnelState.Connected("p2"), vm.uiState.value.tunnel)
+    }
+
+    @Test
+    fun `actions use the current data even when nobody is watching the screen`() {
+        // Sin suscriptor el uiState no se recalcula (WhileSubscribed): las acciones deben leer de las fuentes.
+        val unwatched = ConnectionViewModel(
+            repository, StoredActiveProfileStore(storage), tunnel, tunnel, tester, permission, logs, clock,
+        )
+        unwatched.selectProfile("p2")
+
+        unwatched.connect()
+
+        assertEquals(listOf("p2"), tunnel.connectRequests)
+        unwatched.selectProfile("p1")
+        assertEquals("p2", StoredActiveProfileStore(storage).activeProfileId.value, "conectado no se cambia de perfil")
     }
 
     @Test
@@ -210,7 +225,7 @@ class ConnectionViewModelTest : MainDispatcherTest() {
     fun `no profiles means nothing to connect`() {
         val empty = ConnectionViewModel(
             FakeProfileRepository(), StoredActiveProfileStore(storage), tunnel, tunnel, tester, permission, logs, clock,
-        )
+        ).also { it.uiState.keepSubscribed() }
 
         empty.connect()
 

@@ -94,10 +94,10 @@ class ConnectionViewModel(
     private val profiles: ProfileRepository,
     private val activeProfileStore: ActiveProfileStore,
     private val control: TunnelControl,
-    monitor: TunnelMonitor,
+    private val monitor: TunnelMonitor,
     private val proxyTester: ProxyTester,
     private val localNetworkPermission: LocalNetworkPermission,
-    logBuffer: LogBuffer,
+    private val logBuffer: LogBuffer,
     private val timeSource: TimeSource,
 ) : ViewModel() {
     private val check = MutableStateFlow<ProxyCheck>(ProxyCheck.Idle)
@@ -115,6 +115,10 @@ class ConnectionViewModel(
         }.launchIn(viewModelScope)
     }
 
+    /**
+     * Solo se calcula mientras alguien lo mira (y 5 s más, para no reiniciar al girar la pantalla), como recomienda Google.
+     * Por eso las acciones no leen de aquí: leen de las fuentes, que siempre están al día.
+     */
     val uiState: StateFlow<ConnectionUiState> = combine(
         profiles.profiles,
         activeProfileStore.activeProfileId,
@@ -122,27 +126,58 @@ class ConnectionViewModel(
         combine(check, connectedSince, ::Pair),
         logBuffer.entries,
     ) { list, chosen, tunnel, (check, since), log ->
+        buildState(list, chosen, tunnel, check, since, log)
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5_000),
+        // El primer fotograma ya con los datos de ahora, no vacío.
+        buildState(
+            profiles.profiles.value,
+            activeProfileStore.activeProfileId.value,
+            monitor.state.value,
+            check.value,
+            connectedSince.value,
+            logBuffer.entries.value,
+        ),
+    )
+
+    private fun buildState(
+        list: List<ProxyProfile>,
+        chosen: String?,
+        tunnel: TunnelState,
+        check: ProxyCheck,
+        since: TimeMark?,
+        log: List<LogEntry>,
+    ) = ConnectionUiState(
+        tunnelAvailable = control.isAvailable,
+        profiles = list,
+        activeProfile = activeProfile(list, chosen, tunnel),
+        tunnel = tunnel,
+        connectedSince = since,
+        check = check,
+        recentActivity = log.asReversed().asSequence().filter { it.level >= LogLevel.INFO }.take(RECENT_ACTIVITY).toList(),
+    )
+
+    private fun activeProfile(list: List<ProxyProfile>, chosen: String?, tunnel: TunnelState): ProxyProfile? {
         val activeId = resolveActiveProfileId(list.map { it.id }, chosen, tunnel.profileIdOrNull())
-        ConnectionUiState(
-            tunnelAvailable = control.isAvailable,
-            profiles = list,
-            activeProfile = list.firstOrNull { it.id == activeId },
-            tunnel = tunnel,
-            connectedSince = since,
-            check = check,
-            recentActivity = log.asReversed().asSequence().filter { it.level >= LogLevel.INFO }.take(RECENT_ACTIVITY).toList(),
-        )
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, ConnectionUiState(tunnelAvailable = control.isAvailable))
+        return list.firstOrNull { it.id == activeId }
+    }
+
+    /** El perfil activo según las fuentes, para las acciones (no depende de que la pantalla esté mirando). */
+    private fun currentActiveProfile(): ProxyProfile? =
+        activeProfile(profiles.profiles.value, activeProfileStore.activeProfileId.value, monitor.state.value)
 
     fun selectProfile(id: String) {
-        if (!uiState.value.canChangeProfile) return
+        // Con el túnel ocupado no se cambia de perfil: primero hay que desconectar.
+        val tunnel = monitor.state.value
+        if (tunnel !is TunnelState.Disconnected && tunnel !is TunnelState.Failed) return
         activeProfileStore.select(id)
         // El resultado anterior era de otro perfil.
         check.value = ProxyCheck.Idle
     }
 
     fun connect() {
-        val id = uiState.value.activeProfile?.id ?: return
+        val id = currentActiveProfile()?.id ?: return
         viewModelScope.launch { control.connect(id) }
     }
 
@@ -151,7 +186,7 @@ class ConnectionViewModel(
     }
 
     fun testProxy() {
-        val profile = uiState.value.activeProfile ?: return
+        val profile = currentActiveProfile() ?: return
         if (check.value == ProxyCheck.Running) return
         check.value = ProxyCheck.Running
         viewModelScope.launch {
@@ -163,7 +198,7 @@ class ConnectionViewModel(
                 ProxyCheck.Finished(result, took.inWholeMilliseconds)
             }
             // Si mientras tanto se eligió otro perfil, este resultado ya no le corresponde.
-            check.update { if (it == ProxyCheck.Running && uiState.value.activeProfile?.id == profile.id) outcome else it }
+            check.update { if (it == ProxyCheck.Running && currentActiveProfile()?.id == profile.id) outcome else it }
         }
     }
 

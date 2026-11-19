@@ -56,11 +56,11 @@ class ProfileEditorTailscaleTest : MainDispatcherTest() {
         ).also { it.start(id) }
 
     private fun ProfileEditorViewModel.tailscaleProfile(key: String = "tskey-auth-abc") {
-        onDraftChange(validDraft)
-        onPasswordChange("secreta")
-        onVpnEnabledChange(true)
-        onEngineChange(CountryEngineKind.TAILSCALE)
-        onTailscaleAuthKeyChange(key)
+        updateDraft(validDraft)
+        updatePassword("secreta")
+        setCountryExitEnabled(true)
+        selectEngine(CountryEngineKind.TAILSCALE)
+        updateTailscaleAuthKey(key)
     }
 
     @Test
@@ -75,7 +75,7 @@ class ProfileEditorTailscaleTest : MainDispatcherTest() {
     fun `an engine that is not available cannot be chosen`() {
         val viewModel = newViewModel(catalog = FakeCatalog(available = listOf(CountryEngineKind.OPENVPN)))
 
-        viewModel.onEngineChange(CountryEngineKind.TAILSCALE)
+        viewModel.selectEngine(CountryEngineKind.TAILSCALE)
 
         assertEquals(CountryEngineKind.OPENVPN, viewModel.uiState.value.vpn.engine)
     }
@@ -84,9 +84,9 @@ class ProfileEditorTailscaleTest : MainDispatcherTest() {
     fun `a Tailscale exit is saved with its configuration and the key goes to the secrets`() {
         val viewModel = newViewModel()
         viewModel.tailscaleProfile(key = "  tskey-auth-abc  ")
-        viewModel.onTailscaleControlUrlChange("https://headscale.ejemplo.org/")
-        viewModel.onTailscaleExitNodeChange("nodo-ca")
-        viewModel.onTailscaleHostnameChange("portatil")
+        viewModel.updateTailscaleControlUrl("https://headscale.ejemplo.org/")
+        viewModel.selectTailscaleExitNode("nodo-ca")
+        viewModel.updateTailscaleHostname("portatil")
 
         viewModel.save()
 
@@ -100,7 +100,7 @@ class ProfileEditorTailscaleTest : MainDispatcherTest() {
     fun `a Tailscale exit needs a key and a valid control server`() {
         val viewModel = newViewModel()
         viewModel.tailscaleProfile(key = "")
-        viewModel.onTailscaleControlUrlChange("headscale.ejemplo.org")
+        viewModel.updateTailscaleControlUrl("headscale.ejemplo.org")
 
         viewModel.save()
 
@@ -112,7 +112,7 @@ class ProfileEditorTailscaleTest : MainDispatcherTest() {
     fun `switching back to OpenVPN validates the OpenVPN fields instead of the Tailscale ones`() {
         val viewModel = newViewModel()
         viewModel.tailscaleProfile(key = "")
-        viewModel.onEngineChange(CountryEngineKind.OPENVPN)
+        viewModel.selectEngine(CountryEngineKind.OPENVPN)
 
         viewModel.save()
 
@@ -142,7 +142,7 @@ class ProfileEditorTailscaleTest : MainDispatcherTest() {
         catalog.listing = ExitNodeListing.Found(listOf(canada))
         val viewModel = newViewModel()
         viewModel.tailscaleProfile()
-        viewModel.onTailscaleExitNodeChange("otro")
+        viewModel.selectTailscaleExitNode("otro")
 
         viewModel.searchExitNodes()
 

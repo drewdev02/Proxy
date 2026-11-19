@@ -64,25 +64,26 @@ class SettingsViewModel(
         combine(repository.settings, statusRepository.statuses, mutableTests, ::SettingsUiState)
             .stateIn(
                 viewModelScope,
-                SharingStarted.Eagerly,
-                SettingsUiState(repository.settings.value, statusRepository.statuses.value, emptyMap()),
+                // Solo mientras alguien lo mira, y 5 s más para no reiniciar al girar la pantalla (recomendación de Google).
+                SharingStarted.WhileSubscribed(5_000),
+                SettingsUiState(repository.settings.value, statusRepository.statuses.value, mutableTests.value),
             )
 
     /** Los ajustes tal como están guardados: la fuente de verdad para validar y probar. */
     private val settings: AppSettings get() = repository.settings.value
 
-    fun onAnswerConnectivityChecksChange(enabled: Boolean) = repository.setAnswerConnectivityChecks(enabled)
+    fun setAnswerConnectivityChecks(enabled: Boolean) = repository.setAnswerConnectivityChecks(enabled)
 
-    fun onNameByIpChange(enabled: Boolean) = repository.setNameByIp(enabled)
+    fun setNameByIp(enabled: Boolean) = repository.setNameByIp(enabled)
 
-    fun onTryRawIpChange(enabled: Boolean) = repository.setTryRawIp(enabled)
+    fun setTryRawIp(enabled: Boolean) = repository.setTryRawIp(enabled)
 
-    fun onServiceEnabledChange(id: String, enabled: Boolean) = repository.setNameServiceEnabled(id, enabled)
+    fun setServiceEnabled(id: String, enabled: Boolean) = repository.setNameServiceEnabled(id, enabled)
 
     /** [delta] negativo sube el servicio en la lista, positivo lo baja. */
-    fun onServiceMove(id: String, delta: Int) = repository.moveNameService(id, delta)
+    fun moveService(id: String, delta: Int) = repository.moveNameService(id, delta)
 
-    fun onResetServices() {
+    fun resetServices() {
         repository.resetNameServices()
         mutableTests.value = emptyMap()
     }

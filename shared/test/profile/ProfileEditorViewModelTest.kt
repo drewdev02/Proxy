@@ -69,8 +69,8 @@ class ProfileEditorViewModelTest : MainDispatcherTest() {
         // El sistema recrea la actividad al rotar el móvil y la pantalla vuelve a pedir el arranque.
         val viewModel = newViewModel()
         viewModel.start(uci.id)
-        viewModel.onDraftChange(validDraft)
-        viewModel.onPasswordChange("clave")
+        viewModel.updateDraft(validDraft)
+        viewModel.updatePassword("clave")
 
         viewModel.start(uci.id)
 
@@ -82,7 +82,7 @@ class ProfileEditorViewModelTest : MainDispatcherTest() {
     fun `starting again for a new profile keeps the draft`() {
         val viewModel = newViewModel()
         viewModel.start(profileId = null)
-        viewModel.onDraftChange(validDraft)
+        viewModel.updateDraft(validDraft)
 
         viewModel.start(profileId = null)
 
@@ -93,8 +93,8 @@ class ProfileEditorViewModelTest : MainDispatcherTest() {
     fun `saving a valid new profile stores it with a generated id`() {
         val viewModel = newViewModel()
         viewModel.start(profileId = null)
-        viewModel.onDraftChange(validDraft)
-        viewModel.onPasswordChange("clave")
+        viewModel.updateDraft(validDraft)
+        viewModel.updatePassword("clave")
 
         viewModel.save()
 
@@ -108,10 +108,10 @@ class ProfileEditorViewModelTest : MainDispatcherTest() {
     fun `once the screen has handled the save the flag is cleared`() {
         val viewModel = newViewModel()
         viewModel.start(profileId = null)
-        viewModel.onDraftChange(validDraft)
+        viewModel.updateDraft(validDraft)
         viewModel.save()
 
-        viewModel.onSavedHandled()
+        viewModel.savedHandled()
 
         // El view model se reutiliza: si la marca quedara puesta, el siguiente formulario se cerraría solo.
         assertFalse(viewModel.uiState.value.saved)
@@ -121,7 +121,7 @@ class ProfileEditorViewModelTest : MainDispatcherTest() {
     fun `saving an edited profile keeps its id`() {
         val viewModel = newViewModel()
         viewModel.start(uci.id)
-        viewModel.onDraftChange(viewModel.uiState.value.draft.copy(port = "8080"))
+        viewModel.updateDraft(viewModel.uiState.value.draft.copy(port = "8080"))
 
         viewModel.save()
 
@@ -133,7 +133,7 @@ class ProfileEditorViewModelTest : MainDispatcherTest() {
     fun `saving an invalid draft shows the errors and stores nothing`() {
         val viewModel = newViewModel()
         viewModel.start(profileId = null)
-        viewModel.onDraftChange(validDraft.copy(host = "http://proxy", port = "abc"))
+        viewModel.updateDraft(validDraft.copy(host = "http://proxy", port = "abc"))
 
         viewModel.save()
 
@@ -147,10 +147,10 @@ class ProfileEditorViewModelTest : MainDispatcherTest() {
     fun `editing a field clears only that field's error`() {
         val viewModel = newViewModel()
         viewModel.start(profileId = null)
-        viewModel.onDraftChange(validDraft.copy(host = "", port = "abc"))
+        viewModel.updateDraft(validDraft.copy(host = "", port = "abc"))
         viewModel.save()
 
-        viewModel.onDraftChange(viewModel.uiState.value.draft.copy(host = "10.0.0.1"))
+        viewModel.updateDraft(viewModel.uiState.value.draft.copy(host = "10.0.0.1"))
 
         assertEquals(setOf(ProfileField.PORT), viewModel.uiState.value.errors)
     }
@@ -159,7 +159,7 @@ class ProfileEditorViewModelTest : MainDispatcherTest() {
     fun `a storage failure is shown and logged instead of closing the form`() {
         val viewModel = newViewModel()
         viewModel.start(profileId = null)
-        viewModel.onDraftChange(validDraft)
+        viewModel.updateDraft(validDraft)
         repository.failWrites = true
 
         viewModel.save()
@@ -175,8 +175,8 @@ class ProfileEditorViewModelTest : MainDispatcherTest() {
     fun `testing the proxy uses the form contents without saving anything`() {
         val viewModel = newViewModel()
         viewModel.start(profileId = null)
-        viewModel.onDraftChange(validDraft)
-        viewModel.onPasswordChange("clave")
+        viewModel.updateDraft(validDraft)
+        viewModel.updatePassword("clave")
 
         viewModel.testProxy()
 
@@ -231,7 +231,7 @@ class ProfileEditorViewModelTest : MainDispatcherTest() {
     fun `testing an invalid form shows the errors and does not call the proxy`() {
         val viewModel = newViewModel()
         viewModel.start(profileId = null)
-        viewModel.onDraftChange(validDraft.copy(port = "abc"))
+        viewModel.updateDraft(validDraft.copy(port = "abc"))
 
         viewModel.testProxy()
 
@@ -266,7 +266,7 @@ class ProfileEditorViewModelTest : MainDispatcherTest() {
         viewModel.start(uci.id)
         viewModel.testProxy()
 
-        viewModel.onPasswordChange("otra")
+        viewModel.updatePassword("otra")
 
         assertEquals(ProxyTestUiState.Idle, viewModel.uiState.value.test)
     }
@@ -275,11 +275,11 @@ class ProfileEditorViewModelTest : MainDispatcherTest() {
     fun `changing the form after a failure hides the failure message`() {
         val viewModel = newViewModel()
         viewModel.start(profileId = null)
-        viewModel.onDraftChange(validDraft)
+        viewModel.updateDraft(validDraft)
         repository.failWrites = true
         viewModel.save()
 
-        viewModel.onPasswordChange("otra")
+        viewModel.updatePassword("otra")
 
         assertFalse(viewModel.uiState.value.saveFailed)
     }

@@ -29,7 +29,7 @@ class ProfileListViewModelTest : MainDispatcherTest() {
     private val tunnel = FakeTunnel()
     private val logger = RecordingLogger()
     // Perezoso: su uiState arranca en viewModelScope, que necesita el Main de pruebas que se instala antes de cada prueba.
-    private val viewModel by lazy { ProfileListViewModel(repository, tunnel, tunnel, FakePlatformInfo(), logger) }
+    private val viewModel by lazy { ProfileListViewModel(repository, tunnel, tunnel, FakePlatformInfo(), logger).also { it.uiState.keepSubscribed() } }
 
     private val state get() = viewModel.uiState.value
 
@@ -83,7 +83,7 @@ class ProfileListViewModelTest : MainDispatcherTest() {
     @Test
     fun `without a tunnel on this platform connecting is not offered`() {
         val noTunnel = FakeTunnel(isAvailable = false)
-        val vm = ProfileListViewModel(repository, noTunnel, noTunnel, FakePlatformInfo(), logger)
+        val vm = ProfileListViewModel(repository, noTunnel, noTunnel, FakePlatformInfo(), logger).also { it.uiState.keepSubscribed() }
 
         assertFalse(vm.uiState.value.tunnel.isAvailable)
     }

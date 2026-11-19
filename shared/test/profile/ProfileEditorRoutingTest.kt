@@ -29,8 +29,8 @@ class ProfileEditorRoutingTest : MainDispatcherTest() {
     private val ProfileEditorViewModel.rules get() = uiState.value.routing.rules
 
     private fun ProfileEditorViewModel.add(text: String, exit: RouteExit) {
-        onNewRuleChange(text)
-        onNewRuleExitChange(exit)
+        updateNewRule(text)
+        setNewRuleExit(exit)
         addRule()
     }
 
@@ -61,7 +61,7 @@ class ProfileEditorRoutingTest : MainDispatcherTest() {
 
         assertTrue(viewModel.uiState.value.routing.newRuleInvalid)
         assertTrue(viewModel.rules.rules.isEmpty())
-        viewModel.onNewRuleChange("hola.com")
+        viewModel.updateNewRule("hola.com")
         assertFalse(viewModel.uiState.value.routing.newRuleInvalid, "al corregir se retira el aviso")
     }
 
@@ -77,8 +77,8 @@ class ProfileEditorRoutingTest : MainDispatcherTest() {
     @Test
     fun `a chosen app gets the exit picked for the new rule and keeps the typed text`() {
         val viewModel = newViewModel()
-        viewModel.onNewRuleChange("a medio escribir")
-        viewModel.onNewRuleExitChange(RouteExit.DIRECT)
+        viewModel.updateNewRule("a medio escribir")
+        viewModel.setNewRuleExit(RouteExit.DIRECT)
 
         viewModel.addAppRule("cu.uci.correo")
 
@@ -89,9 +89,9 @@ class ProfileEditorRoutingTest : MainDispatcherTest() {
     @Test
     fun `choosing the same app again replaces its rule`() {
         val viewModel = newViewModel()
-        viewModel.onNewRuleExitChange(RouteExit.VPN)
+        viewModel.setNewRuleExit(RouteExit.VPN)
         viewModel.addAppRule("com.netflix.mediaclient")
-        viewModel.onNewRuleExitChange(RouteExit.BLOCK)
+        viewModel.setNewRuleExit(RouteExit.BLOCK)
 
         viewModel.addAppRule("com.netflix.mediaclient")
 
@@ -118,7 +118,7 @@ class ProfileEditorRoutingTest : MainDispatcherTest() {
 
         viewModel.moveRule(2, -1)
         viewModel.moveRule(0, -1) // ya está arriba: no cambia nada
-        viewModel.onRuleExitChange(0, RouteExit.BLOCK)
+        viewModel.setRuleExit(0, RouteExit.BLOCK)
         viewModel.removeRule(2)
 
         assertEquals(listOf("a.com" to RouteExit.BLOCK, "c.com" to RouteExit.VPN), viewModel.rules.rules.map { it.value to it.exit })
@@ -127,9 +127,9 @@ class ProfileEditorRoutingTest : MainDispatcherTest() {
     @Test
     fun `the rules are saved with the profile`() {
         val viewModel = newViewModel()
-        viewModel.onDraftChange(ProfileDraft("UCI", "proxy.uci.cu", "3128", ProxyProtocol.HTTP, "andrey"))
-        viewModel.onRoutingEnabledChange(true)
-        viewModel.onDefaultExitChange(RouteExit.VPN)
+        viewModel.updateDraft(ProfileDraft("UCI", "proxy.uci.cu", "3128", ProxyProtocol.HTTP, "andrey"))
+        viewModel.setRoutingEnabled(true)
+        viewModel.setDefaultExit(RouteExit.VPN)
         viewModel.add("uci.cu", RouteExit.PROXY)
 
         viewModel.save()
