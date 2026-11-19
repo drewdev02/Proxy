@@ -161,10 +161,17 @@ class VpnLink(private val appAddress: Int, private val logger: Logger) {
         logger.log(LogLevel.DEBUG, TAG, "Resolviendo por Otro País: $name")
         current.writePacket(query)
         val answered = withTimeoutOrNull(timeoutMs) { done.await() } != null
-        lock.withLock {
+        val failed = lock.withLock {
             resolvingHosts.remove(name)
             resolving.entries.removeAll { it.value.first == name }
-            if (!answered || name !in addressByHost) unresolvable += name
+            val failed = !answered || name !in addressByHost
+            if (failed) unresolvable += name
+            failed
+        }
+        // A la vista en el registro: sin esto, la conexión sale por el proxy en silencio y parece que va por Otro País.
+        if (failed) {
+            val why = if (answered) "no tiene dirección para" else "no contestó por"
+            logger.log(LogLevel.WARN, TAG, "El DNS de Otro País $why $name: sus conexiones salen por el proxy")
         }
     }
 

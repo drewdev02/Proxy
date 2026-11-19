@@ -1,5 +1,11 @@
 package org.uci.proxy.core.engine
 
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
@@ -15,14 +21,15 @@ import org.uci.proxy.core.fakes.FakeTunnelConnection
 import org.uci.proxy.core.fakes.InMemoryKeyValueStore
 import org.uci.proxy.core.fakes.InMemorySecretStore
 import org.uci.proxy.core.fakes.RecordingLogger
+import org.uci.proxy.core.fakes.fakeEngines
+import org.uci.proxy.core.model.CountryExit
+import org.uci.proxy.core.model.CountryExitSecrets
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.ProxyProtocol
 import org.uci.proxy.core.model.RouteExit
 import org.uci.proxy.core.model.RouteRule
 import org.uci.proxy.core.model.RoutingRules
 import org.uci.proxy.core.model.RuleKind
-import org.uci.proxy.core.model.CountryExit
-import org.uci.proxy.core.model.CountryExitSecrets
 import org.uci.proxy.core.packet.Ipv4Packet
 import org.uci.proxy.core.packet.PROTOCOL_TCP
 import org.uci.proxy.core.packet.PROTOCOL_UDP
@@ -40,21 +47,15 @@ import org.uci.proxy.core.packet.sumWords
 import org.uci.proxy.core.packet.writeInt
 import org.uci.proxy.core.packet.writeU16
 import org.uci.proxy.core.port.ConnectionOwner
+import org.uci.proxy.core.port.LogLevel
 import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.profile.AppDispatchers
 import org.uci.proxy.core.profile.StoredProfileRepository
-import org.uci.proxy.core.fakes.fakeEngines
 import org.uci.proxy.core.vpn.CountryExitStart
-import org.uci.proxy.core.vpn.VpnNetwork
 import org.uci.proxy.core.vpn.VpnConnectResult
+import org.uci.proxy.core.vpn.VpnNetwork
 import org.uci.proxy.core.vpn.VpnSession
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
-import kotlin.time.Duration.Companion.seconds
 
 private val VPN_ADDRESS = parseIpv4("10.98.0.9")!!
 private val VPN_DNS = parseIpv4("10.98.0.1")!!
@@ -440,6 +441,8 @@ class SplitRoutingTest {
 
         assertEquals(1, session.sent.size, "solo la consulta")
         assertAnsweredByProxyStack(fake)
+        // Que salga por el proxy en vez de por Otro País tiene que verse en el registro, no pasar en silencio.
+        assertTrue(logger.entries.any { (level, message) -> level == LogLevel.WARN && "nada.invalid" in message && "proxy" in message })
     }
 
     @Test
