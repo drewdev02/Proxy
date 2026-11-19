@@ -94,9 +94,11 @@ jobs:
         with:
           go-version-file: tools/tsbridge/go.mod
           cache-dependency-path: tools/tsbridge/go.sum
+      # «bash» sería el de WSL (System32 va primero en el PATH): se usa el de Git.
       - name: Librería de Tailscale
-        shell: bash
-        run: tools/tsbridge/build.sh
+        run: |
+          & "C:\Program Files\Git\bin\bash.exe" tools/tsbridge/build.sh
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Construir el .exe
         run: ./tools/windows-exe/build-exe.ps1 -Version ${{ needs.version.outputs.version }}
       - name: Probar el .exe

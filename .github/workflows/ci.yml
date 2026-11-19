@@ -49,10 +49,19 @@ jobs:
           distribution: temurin
           java-version: "21"
       - name: Librería de Tailscale y red de pruebas
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           tools/tsbridge/build.sh
           tools/tsbridge/build.sh testnet
+      # En Windows, «bash» sería el de WSL (System32 va primero en el PATH): se usa el de Git.
+      - name: Librería de Tailscale y red de pruebas (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          & "C:\Program Files\Git\bin\bash.exe" tools/tsbridge/build.sh
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & "C:\Program Files\Git\bin\bash.exe" tools/tsbridge/build.sh testnet
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Pruebas del núcleo
         env:
           PROXYUCI_REQUIRE_TAILSCALE: "1"
@@ -110,9 +119,25 @@ jobs:
           $admin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
           "Administrador: $admin"
           if (-not $admin) { throw "El ejecutor no corre como Administrador" }
+      # Para «Otro País» con Tailscale sobre el adaptador real: la librería y la red de pruebas.
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: tools/tsbridge/go.mod
+          cache-dependency-path: tools/tsbridge/go.sum
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      # «bash» sería el de WSL (System32 va primero en el PATH): se usa el de Git.
+      - name: Librería de Tailscale y red de pruebas
+        run: |
+          & "C:\Program Files\Git\bin\bash.exe" tools/tsbridge/build.sh
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & "C:\Program Files\Git\bin\bash.exe" tools/tsbridge/build.sh testnet
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       # Los servidores de prueba y la prueba van en el MISMO paso: en los ejecutores de Windows los procesos que un
       # paso deja en segundo plano mueren al terminar ese paso (se comprobó: el paso siguiente ya no los encontraba).
-      - name: Prueba del túnel y de las reglas de salida (con su origen HTTP y su proxy NTLM)
+      - name: Prueba del túnel, de las reglas de salida y de Tailscale (con su origen HTTP y su proxy NTLM)
         env:
           PROXYUCI_E2E_WINDOWS: "1"
         run: |
@@ -140,6 +165,10 @@ jobs:
             # Las reglas de salida, en otro proceso: Windows no deja crear el adaptador dos veces en el mismo proceso
             # (error 52), y así se prueba además volver a conectar tras desconectar, como hace la app.
             ./kotlin.bat test -m core --platform jvm --include-classes 'org.uci.proxy.core.windows.WindowsSplitTunnelE2ETest'
+            if ($code -eq 0) { $code = $LASTEXITCODE }
+            # Otro País con Tailscale sobre el adaptador real, también en su propio proceso: el motor Tailscale de verdad
+            # y una red de pruebas, con todo lo de Tailscale pasando por un proxy NTLM propio de la prueba.
+            ./kotlin.bat test -m core --platform jvm --include-classes 'org.uci.proxy.core.windows.WindowsTailscaleE2ETest'
             if ($code -eq 0) { $code = $LASTEXITCODE }
           } finally {
             "--- registro del proxy de pruebas"
@@ -173,8 +202,9 @@ jobs:
           cache-dependency-path: tools/tsbridge/go.sum
       # El .exe lleva la librería de Tailscale; la autoprueba comprueba que carga con la Java recortada.
       - name: Librería de Tailscale
-        shell: bash
-        run: tools/tsbridge/build.sh
+        run: |
+          & "C:\Program Files\Git\bin\bash.exe" tools/tsbridge/build.sh
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Construir el .exe
         run: ./tools/windows-exe/build-exe.ps1
       # Autoprueba (dos veces) y ventana de Compose con la Java recortada: ver tools/windows-exe/smoke-test.ps1.
