@@ -1,6 +1,7 @@
 package org.uci.proxy.theme
 
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.runtime.Composable
@@ -61,8 +62,10 @@ fun ProxyUciTheme(content: @Composable () -> Unit) {
             colorScheme = ProxyUciColorScheme,
             typography = typography,
             shapes = ProxyUciShapes,
-            content = content,
-        )
+        ) {
+            // Texto claro por defecto aunque no haya un Surface encima (si no, Material lo deja negro).
+            CompositionLocalProvider(LocalContentColor provides ProxyUciColorScheme.onBackground, content = content)
+        }
     }
 }
 

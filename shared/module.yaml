@@ -28,6 +28,10 @@ test-dependencies:
   - $libs.koin.test
   - $libs.kotlinx.coroutines.test
 
+# Las pruebas de capturas (CatalogSnapshotTest) dibujan componentes sin ventana: necesitan Skia para el sistema actual.
+test-dependencies@jvm:
+  - $compose.desktop.currentOs
+
 settings:
   kotlin:
     # Las rutas de navegación son claves serializables: así se guarda la pila al recrear la actividad.

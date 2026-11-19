@@ -68,6 +68,8 @@ fun ProfileListScreen(
     onDismissDeleteError: () -> Unit,
     onConnect: (String) -> Unit,
     onDisconnect: () -> Unit,
+    /** Si no es null, se ofrece abrir el catálogo de componentes (solo en modo desarrollo). */
+    onOpenCatalog: (() -> Unit)? = null,
 ) {
     var pendingDelete by remember { mutableStateOf<ProxyProfile?>(null) }
 
@@ -76,6 +78,7 @@ fun ProfileListScreen(
             TopAppBar(
                 title = { Text("Perfiles de proxy") },
                 actions = {
+                    if (onOpenCatalog != null) TextButton(onClick = onOpenCatalog) { Text("Catálogo") }
                     TextButton(onClick = onOpenSettings) { Text("Ajustes") }
                     TextButton(onClick = onOpenLogs) { Text("Registro") }
                 },

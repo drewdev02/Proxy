@@ -101,6 +101,12 @@ data class ProxyUciColors(
     val latencyGood: Color = Emerald,
     val latencyFair: Color = Amber,
     val latencyPoor: Color = Crimson,
+    /** Fondo de la pantalla (nivel 0); también para recuadros hundidos dentro de una tarjeta. */
+    val canvas: Color = Canvas,
+    /** Texto secundario sobre fondos oscuros. */
+    val onSurfaceMuted: Color = TextSecondary,
+    /** Texto de apoyo poco importante: unidades, pistas. */
+    val onSurfaceFaint: Color = Outline,
     /** Tarjetas (nivel 1): fondo y borde de 1 px. */
     val card: Color = Card,
     val cardBorder: Color = CardBorder,

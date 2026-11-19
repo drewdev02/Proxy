@@ -28,6 +28,10 @@ internal sealed interface Route : NavKey {
     /** El registro en vivo. */
     @Serializable
     data object Logs : Route
+
+    /** El catálogo de componentes; solo en modo desarrollo. */
+    @Serializable
+    data object Catalog : Route
 }
 
 /**

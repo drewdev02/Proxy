@@ -1,6 +1,7 @@
 package org.uci.proxy
 
 import android.app.Activity
+import android.content.pm.ApplicationInfo
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
@@ -97,7 +98,11 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            App(filePicker = filePicker, appCatalog = appCatalog)
+            App(
+                filePicker = filePicker,
+                appCatalog = appCatalog,
+                developerMode = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0,
+            )
         }
     }
 

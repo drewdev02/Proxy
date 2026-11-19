@@ -29,6 +29,7 @@ import org.uci.proxy.profile.ProfileListViewModel
 import org.uci.proxy.profile.TunnelUiModel
 import org.uci.proxy.settings.SettingsRoute
 import org.uci.proxy.theme.ProxyUciTheme
+import org.uci.proxy.ui.catalog.ComponentCatalogScreen
 import org.uci.proxy.tunnel.TunnelViewModel
 
 /** Requiere que la app haya llamado antes a [org.uci.proxy.di.initKoin]. */
@@ -39,9 +40,11 @@ fun App() = App(filePicker = null)
 /**
  * @param filePicker el selector de archivos del sistema, o null donde no lo hay (iOS): sin él no se ofrece la VPN.
  * @param appCatalog las apps instaladas, o null donde no hay reglas por app (escritorio, iOS).
+ * @param developerMode muestra herramientas de desarrollo, como el catálogo de componentes. Solo en compilaciones de
+ * depuración (Android) o con la variable de entorno PROXYUCI_DEV=1 (escritorio).
  */
 @Composable
-fun App(filePicker: FilePicker?, appCatalog: AppCatalog? = null) = CompositionLocalProvider(
+fun App(filePicker: FilePicker?, appCatalog: AppCatalog? = null, developerMode: Boolean = false) = CompositionLocalProvider(
     LocalFilePicker provides filePicker,
     LocalAppCatalog provides appCatalog,
 ) {
@@ -64,7 +67,15 @@ fun App(filePicker: FilePicker?, appCatalog: AppCatalog? = null) = CompositionLo
                         onEdit = { backStack.add(Route.ProfileEditor(profileId = it)) },
                         onOpenLogs = { backStack.add(Route.Logs) },
                         onOpenSettings = { backStack.add(Route.Settings) },
+                        onOpenCatalog = if (developerMode) {
+                            { backStack.add(Route.Catalog) }
+                        } else {
+                            null
+                        },
                     )
+                }
+                entry<Route.Catalog> {
+                    ComponentCatalogScreen(onBack = { backStack.removeLastOrNull() })
                 }
                 entry<Route.Settings> {
                     SettingsRoute(onBack = { backStack.removeLastOrNull() })
@@ -84,7 +95,13 @@ fun App(filePicker: FilePicker?, appCatalog: AppCatalog? = null) = CompositionLo
 }
 
 @Composable
-private fun ProfileListRoute(onAdd: () -> Unit, onEdit: (String) -> Unit, onOpenLogs: () -> Unit, onOpenSettings: () -> Unit) {
+private fun ProfileListRoute(
+    onAdd: () -> Unit,
+    onEdit: (String) -> Unit,
+    onOpenLogs: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenCatalog: (() -> Unit)?,
+) {
     val viewModel = koinViewModel<ProfileListViewModel>()
     val home = koinViewModel<HomeViewModel>()
     val tunnel = koinViewModel<TunnelViewModel>()
@@ -101,6 +118,7 @@ private fun ProfileListRoute(onAdd: () -> Unit, onEdit: (String) -> Unit, onOpen
         onEdit = onEdit,
         onOpenLogs = onOpenLogs,
         onOpenSettings = onOpenSettings,
+        onOpenCatalog = onOpenCatalog,
         onDelete = viewModel::delete,
         onDismissDeleteError = viewModel::dismissDeleteError,
         onConnect = tunnel::connect,
