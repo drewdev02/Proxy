@@ -24,6 +24,8 @@ import org.uci.proxy.core.proxy.ProxyTester
 import org.uci.proxy.core.proxy.Socks5Connector
 import org.uci.proxy.core.settings.IpNameServiceValidator
 import org.uci.proxy.core.settings.NameServiceStatusRepository
+import org.uci.proxy.core.profile.ActiveProfileStore
+import org.uci.proxy.core.profile.StoredActiveProfileStore
 import org.uci.proxy.core.settings.SettingsRepository
 import org.uci.proxy.core.settings.StoredNameServiceStatusRepository
 import org.uci.proxy.core.settings.StoredSettingsRepository
@@ -43,6 +45,8 @@ val coreModule = module {
     singleOf(::ProfileValidator)
     singleOf(::StoredProfileRepository) { bind<ProfileRepository>() }
     singleOf(::StoredSettingsRepository) { bind<SettingsRepository>() }
+    // El perfil elegido en «Conexión», recordado entre sesiones.
+    singleOf(::StoredActiveProfileStore) { bind<ActiveProfileStore>() }
     // Cómo le fue a cada servicio de nombres para IP públicas, para mostrarlo en Ajustes.
     single<NameServiceStatusRepository> { StoredNameServiceStatusRepository(get(), get()) }
     singleOf(::IpNameServiceValidator)

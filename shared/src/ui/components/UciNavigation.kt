@@ -162,6 +162,9 @@ internal val WideLayoutBreakpoint = 600.dp
 /**
  * Estructura de las pantallas principales: barra inferior en móvil y barra lateral cuando la ventana es ancha
  * (tableta, escritorio). [content] recibe si se está en modo ancho, para ajustar márgenes.
+ *
+ * Con [showNavigation] en false se ocultan las barras (pantallas de detalle como el editor) sin cambiar la estructura,
+ * para que el contenido no pierda su estado al entrar y salir de ellas.
  */
 @Composable
 fun <K> UciNavigationScaffold(
@@ -169,20 +172,23 @@ fun <K> UciNavigationScaffold(
     selected: K,
     onSelect: (K) -> Unit,
     modifier: Modifier = Modifier,
+    showNavigation: Boolean = true,
     content: @Composable (wide: Boolean) -> Unit,
 ) {
     BoxWithConstraints(modifier.fillMaxSize()) {
         val wide = maxWidth >= WideLayoutBreakpoint
         if (wide) {
             Row(Modifier.fillMaxSize()) {
-                UciNavigationRail(items, selected, onSelect, Modifier.fillMaxHeight())
-                VerticalDivider(color = ProxyUciTheme.colors.cardBorder)
+                if (showNavigation) {
+                    UciNavigationRail(items, selected, onSelect, Modifier.fillMaxHeight())
+                    VerticalDivider(color = ProxyUciTheme.colors.cardBorder)
+                }
                 Box(Modifier.weight(1f).fillMaxHeight()) { content(true) }
             }
         } else {
             Column(Modifier.fillMaxSize()) {
                 Box(Modifier.weight(1f).fillMaxWidth()) { content(false) }
-                UciBottomNavBar(items, selected, onSelect)
+                if (showNavigation) UciBottomNavBar(items, selected, onSelect)
             }
         }
     }

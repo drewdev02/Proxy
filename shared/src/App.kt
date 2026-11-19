@@ -18,10 +18,20 @@ import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import org.jetbrains.compose.reload.DevelopmentEntryPoint
 import org.koin.compose.viewmodel.koinViewModel
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import org.uci.proxy.connection.ConnectionNavigation
+import org.uci.proxy.connection.ConnectionRoute
 import org.uci.proxy.home.HomeViewModel
 import org.uci.proxy.logs.LogsRoute
 import org.uci.proxy.navigation.Route
+import org.uci.proxy.navigation.currentTab
+import org.uci.proxy.navigation.isOnTab
 import org.uci.proxy.navigation.routesConfiguration
+import org.uci.proxy.navigation.selectTab
+import org.uci.proxy.ui.components.UciNavItem
+import org.uci.proxy.ui.components.UciNavigationScaffold
+import org.uci.proxy.ui.icons.UciIcons
 import org.uci.proxy.profile.ProfileEditorScreen
 import org.uci.proxy.profile.ProfileEditorViewModel
 import org.uci.proxy.profile.ProfileListScreen
@@ -49,48 +59,71 @@ fun App(filePicker: FilePicker?, appCatalog: AppCatalog? = null, developerMode: 
     LocalAppCatalog provides appCatalog,
 ) {
     ProxyUciTheme {
-        val backStack = rememberNavBackStack(routesConfiguration, Route.ProfileList)
-
-        NavDisplay(
-            backStack = backStack,
-            // También atiende el botón y el gesto de atrás del sistema.
-            onBack = { backStack.removeLastOrNull() },
-            // Un ViewModel por pantalla: se descarta al salir de ella, y no se arrastra el estado de la vez anterior.
-            entryDecorators = listOf(
-                rememberSaveableStateHolderNavEntryDecorator(),
-                rememberViewModelStoreNavEntryDecorator(),
-            ),
-            entryProvider = entryProvider {
-                entry<Route.ProfileList> {
-                    ProfileListRoute(
-                        onAdd = { backStack.add(Route.ProfileEditor(profileId = null)) },
-                        onEdit = { backStack.add(Route.ProfileEditor(profileId = it)) },
-                        onOpenLogs = { backStack.add(Route.Logs) },
-                        onOpenSettings = { backStack.add(Route.Settings) },
-                        onOpenCatalog = if (developerMode) {
-                            { backStack.add(Route.Catalog) }
-                        } else {
-                            null
-                        },
-                    )
-                }
-                entry<Route.Catalog> {
-                    ComponentCatalogScreen(onBack = { backStack.removeLastOrNull() })
-                }
-                entry<Route.Settings> {
-                    SettingsRoute(onBack = { backStack.removeLastOrNull() })
-                }
-                entry<Route.Logs> {
-                    LogsRoute(onBack = { backStack.removeLastOrNull() })
-                }
-                entry<Route.ProfileEditor> { route ->
-                    ProfileEditorRoute(
-                        profileId = route.profileId,
-                        onClose = { backStack.removeLastOrNull() },
-                    )
-                }
-            },
+        val backStack = rememberNavBackStack(routesConfiguration, Route.Connection)
+        val tabs = listOf<UciNavItem<Route>>(
+            UciNavItem(Route.Connection, "Conexión", UciIcons.Shield),
+            UciNavItem(Route.Logs, "Registros", UciIcons.Logs),
+            UciNavItem(Route.ProfileList, "Perfiles", UciIcons.Badge),
+            UciNavItem(Route.Settings, "Ajustes", UciIcons.Tune),
         )
+
+        Surface(color = MaterialTheme.colorScheme.background) {
+            UciNavigationScaffold(
+                items = tabs,
+                selected = backStack.currentTab(),
+                onSelect = { backStack.selectTab(it) },
+                // Las pantallas de detalle (editor, catálogo) ocupan todo, sin barra.
+                showNavigation = backStack.isOnTab(),
+            ) { wide ->
+                NavDisplay(
+                    backStack = backStack,
+                    // También atiende el botón y el gesto de atrás del sistema.
+                    onBack = { backStack.removeLastOrNull() },
+                    // Un ViewModel por pantalla: se descarta al salir de ella, y no se arrastra el estado de la vez anterior.
+                    entryDecorators = listOf(
+                        rememberSaveableStateHolderNavEntryDecorator(),
+                        rememberViewModelStoreNavEntryDecorator(),
+                    ),
+                    entryProvider = entryProvider {
+                        entry<Route.Connection> {
+                            ConnectionRoute(
+                                wide = wide,
+                                navigation = ConnectionNavigation(
+                                    onEditProfile = { backStack.add(Route.ProfileEditor(profileId = it)) },
+                                    onAddProfile = { backStack.add(Route.ProfileEditor(profileId = null)) },
+                                    onOpenLogs = { backStack.selectTab(Route.Logs) },
+                                ),
+                            )
+                        }
+                        entry<Route.ProfileList> {
+                            ProfileListRoute(
+                                onAdd = { backStack.add(Route.ProfileEditor(profileId = null)) },
+                                onEdit = { backStack.add(Route.ProfileEditor(profileId = it)) },
+                                onOpenLogs = { backStack.selectTab(Route.Logs) },
+                                onOpenSettings = { backStack.selectTab(Route.Settings) },
+                                onOpenCatalog = if (developerMode) {
+                                    { backStack.add(Route.Catalog) }
+                                } else {
+                                    null
+                                },
+                            )
+                        }
+                        entry<Route.Catalog> {
+                            ComponentCatalogScreen(onBack = { backStack.removeLastOrNull() })
+                        }
+                        // Pestañas: no tienen «Volver»; atrás lleva a Conexión.
+                        entry<Route.Settings> { SettingsRoute() }
+                        entry<Route.Logs> { LogsRoute() }
+                        entry<Route.ProfileEditor> { route ->
+                            ProfileEditorRoute(
+                                profileId = route.profileId,
+                                onClose = { backStack.removeLastOrNull() },
+                            )
+                        }
+                    },
+                )
+            }
+        }
     }
 }
 

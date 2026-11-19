@@ -82,6 +82,11 @@ class FakeTunnel(override val isAvailable: Boolean = true) : TunnelControl, Tunn
     override suspend fun disconnect() {
         mutableState.value = TunnelState.Disconnected
     }
+
+    /** Pone el túnel en [state] como si lo hubiera cambiado el motor (conectando, fallo, VPN caída…). */
+    fun emit(state: TunnelState) {
+        mutableState.value = state
+    }
 }
 
 class RecordingLogger : Logger {

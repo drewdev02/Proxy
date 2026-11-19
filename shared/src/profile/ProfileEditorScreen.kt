@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -17,24 +18,24 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.Alignment
-import androidx.compose.material3.Switch
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import org.uci.proxy.apps.AppCatalog
+import org.uci.proxy.common.LOCAL_NETWORK_DENIED_FOR_TEST
+import org.uci.proxy.common.message
 import org.uci.proxy.core.model.ProxyProtocol
 import org.uci.proxy.core.profile.ProfileDraft
 import org.uci.proxy.core.profile.ProfileField
-import org.uci.proxy.core.proxy.ProxyFailure
 import org.uci.proxy.core.proxy.ProxyTestResult
 import org.uci.proxy.theme.ProxyUciTheme
 
@@ -246,25 +247,8 @@ private fun ProfileTextField(
 
 private fun ProxyTestUiState.message(): String? = when (this) {
     ProxyTestUiState.Idle, ProxyTestUiState.Running -> null
-    ProxyTestUiState.LocalNetworkDenied ->
-        "La app necesita permiso para acceder a la red local y así poder conectar con el proxy."
+    ProxyTestUiState.LocalNetworkDenied -> LOCAL_NETWORK_DENIED_FOR_TEST
     is ProxyTestUiState.Finished -> result.message()
-}
-
-private fun ProxyTestResult.message(): String = when (this) {
-    ProxyTestResult.Success -> "Conexión correcta: el proxy aceptó los datos del perfil."
-    ProxyTestResult.Timeout -> "El proxy no respondió a tiempo."
-    is ProxyTestResult.Failure -> when (val failure = failure) {
-        ProxyFailure.AuthRequired -> "El proxy pide usuario y contraseña."
-        ProxyFailure.AuthRejected -> "El proxy rechazó el usuario o la contraseña."
-        is ProxyFailure.UnsupportedAuth -> {
-            val schemes = if (failure.schemes.isEmpty()) "" else " (${failure.schemes.joinToString()})"
-            "El proxy exige un tipo de autenticación que la app no admite$schemes."
-        }
-        is ProxyFailure.Refused -> "El proxy respondió, pero no permitió la conexión de prueba: ${failure.detail}"
-        is ProxyFailure.Unreachable -> "No se pudo conectar con el proxy. ${failure.detail}"
-        is ProxyFailure.ProtocolError -> "El servidor no respondió como se esperaba. ${failure.detail}"
-    }
 }
 
 @Preview

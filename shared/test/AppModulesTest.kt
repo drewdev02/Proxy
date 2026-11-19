@@ -18,6 +18,7 @@ import org.uci.proxy.fakes.FakeLocalNetworkPermission
 import org.uci.proxy.fakes.InMemoryKeyValueStore
 import org.uci.proxy.fakes.InMemorySecretStore
 import org.uci.proxy.fakes.RecordingLogger
+import org.uci.proxy.connection.ConnectionViewModel
 import org.uci.proxy.home.HomeViewModel
 import org.uci.proxy.logs.LogsViewModel
 import org.uci.proxy.profile.ProfileEditorViewModel
@@ -62,6 +63,11 @@ class AppModulesTest {
     @Test
     fun `settings view model resolves from the app modules`() {
         assertNotNull(koin.get<SettingsViewModel>())
+    }
+
+    @Test
+    fun `connection view model resolves from the app modules`() {
+        assertNotNull(koin.get<ConnectionViewModel>())
     }
 
     @Test

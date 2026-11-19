@@ -45,7 +45,8 @@ import org.uci.proxy.theme.ProxyUciTheme
 
 /** Todo lo que la pantalla de Ajustes puede pedir. Agrupado para no arrastrar una docena de parámetros sueltos. */
 class SettingsActions(
-    val onBack: () -> Unit = {},
+    /** Null cuando Ajustes es una pestaña de la navegación principal: no hay a dónde volver. */
+    val onBack: (() -> Unit)? = null,
     val onAnswerConnectivityChecksChange: (Boolean) -> Unit = {},
     val onNameByIpChange: (Boolean) -> Unit = {},
     val onTryRawIpChange: (Boolean) -> Unit = {},
@@ -58,7 +59,7 @@ class SettingsActions(
 )
 
 @Composable
-internal fun SettingsRoute(onBack: () -> Unit) {
+internal fun SettingsRoute(onBack: (() -> Unit)? = null) {
     val viewModel = koinViewModel<SettingsViewModel>()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val statuses by viewModel.statuses.collectAsStateWithLifecycle()
@@ -98,7 +99,7 @@ fun SettingsScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Ajustes") },
-                navigationIcon = { TextButton(onClick = actions.onBack) { Text("Volver") } },
+                navigationIcon = { actions.onBack?.let { TextButton(onClick = it) { Text("Volver") } } },
             )
         },
     ) { padding ->

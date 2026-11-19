@@ -47,7 +47,7 @@ private val levelFilters = listOf(
 )
 
 @Composable
-internal fun LogsRoute(onBack: () -> Unit) {
+internal fun LogsRoute(onBack: (() -> Unit)? = null) {
     val viewModel = koinViewModel<LogsViewModel>()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     // LocalClipboard (con ClipEntry) no tiene un constructor común a todas las plataformas; el gestor clásico sí.
@@ -69,7 +69,8 @@ internal fun LogsRoute(onBack: () -> Unit) {
 @Composable
 fun LogsScreen(
     state: LogsUiState,
-    onBack: () -> Unit,
+    /** Null cuando Registro es una pestaña de la navegación principal: no hay a dónde volver. */
+    onBack: (() -> Unit)?,
     onLevelChange: (LogLevel) -> Unit,
     onTogglePause: () -> Unit,
     onClear: () -> Unit,
@@ -86,7 +87,7 @@ fun LogsScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Registro") },
-                navigationIcon = { TextButton(onClick = onBack) { Text("Volver") } },
+                navigationIcon = { onBack?.let { TextButton(onClick = it) { Text("Volver") } } },
             )
         },
     ) { padding ->

@@ -31,9 +31,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import org.uci.proxy.common.message
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.ProxyProtocol
-import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.theme.ProxyUciTheme
 
@@ -202,24 +202,6 @@ private fun ProfileCard(
             }
         }
     }
-}
-
-private fun TunnelFailure.message(): String = when (this) {
-    TunnelFailure.VPN_PERMISSION_DENIED -> "No se pudo conectar: hace falta autorizar la conexión VPN."
-    TunnelFailure.LOCAL_NETWORK_DENIED ->
-        "No se pudo conectar: la app necesita permiso para acceder a la red local y alcanzar el proxy."
-    TunnelFailure.PROFILE_NOT_FOUND -> "No se pudo conectar: el perfil ya no existe."
-    TunnelFailure.INTERFACE_UNAVAILABLE -> "No se pudo conectar: el sistema no permitió crear la conexión VPN."
-    TunnelFailure.PROXY_HOST_UNRESOLVED -> "No se pudo conectar: no se encuentra el servidor del perfil."
-    TunnelFailure.PROXY_AUTH_FAILED -> "No se pudo conectar: el proxy rechazó el usuario o la contraseña."
-    TunnelFailure.VPN_PROFILE_INVALID ->
-        "No se pudo conectar: el archivo .ovpn del perfil no sirve. Debe ser OpenVPN sobre TCP; vuelve a elegirlo."
-    TunnelFailure.VPN_SERVER_UNREACHABLE -> "No se pudo conectar: el proxy no dejó llegar al servidor VPN."
-    TunnelFailure.VPN_SERVER_BLOCKED ->
-        "No se pudo conectar: la política del proxy bloqueó el acceso a los servidores VPN del archivo. " +
-            "Prueba con otro servidor, uno con puerto 443."
-    TunnelFailure.VPN_AUTH_FAILED -> "No se pudo conectar: el servidor VPN rechazó el usuario o la contraseña."
-    TunnelFailure.VPN_HANDSHAKE_FAILED -> "No se pudo conectar: el servidor VPN no completó el acuerdo de claves."
 }
 
 private fun ProxyProfile.summary(): String {
