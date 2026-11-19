@@ -199,6 +199,7 @@ class WindowsTunnelE2ETest {
 
             runBlocking { session.cancelAndJoin() }
             assertFalse(WindowsE2E.adapterExists(), "el adaptador sigue existiendo tras parar el túnel")
+            println("E2E-DIAG [adaptadores tras parar]\n" + WindowsE2E.allAdapters())
             println("E2E-WINDOWS: reglas ok")
         } finally {
             scope.cancel()
