@@ -62,6 +62,33 @@ class MacKeychainSecretStoreTest {
     }
 
     @Test
+    fun `a value longer than one keychain command fits, like an ovpn file`() {
+        if (!onMac) return
+        // Unos 13 KB en Base64: varias órdenes de `security -i`.
+        val ovpn = (1..400).joinToString("\n") { "línea $it del perfil ñ <tls-crypt> ABCDEF0123456789" }
+
+        store.put(key, ovpn)
+
+        assertEquals(ovpn, store.get(key))
+    }
+
+    @Test
+    fun `a long value can be replaced by a short one and removed without leftovers`() {
+        if (!onMac) return
+        val probe = MacKeychainSecretStore("org.uci.proxy.tests")
+        store.put(key, "x".repeat(9000))
+
+        store.put(key, "corta")
+        assertEquals("corta", store.get(key))
+        assertNull(probe.get("$key.part1"), "los trozos del valor largo se borran")
+
+        store.put(key, "y".repeat(9000))
+        store.remove(key)
+        assertNull(store.get(key))
+        assertNull(probe.get("$key.part1"))
+    }
+
+    @Test
     fun `keys that would need escaping are rejected`() {
         assertFailsWith<IllegalArgumentException> { store.put("clave con \"comillas\"", "x") }
         assertFailsWith<IllegalArgumentException> { store.get("a b") }
