@@ -41,6 +41,7 @@ import org.uci.proxy.core.settings.NameServiceStatus
 import org.uci.proxy.core.settings.ServiceError
 import org.uci.proxy.core.settings.ServiceValidation
 import kotlin.time.Clock
+import org.uci.proxy.theme.ProxyUciTheme
 
 /** Todo lo que la pantalla de Ajustes puede pedir. Agrupado para no arrastrar una docena de parámetros sueltos. */
 class SettingsActions(
@@ -339,7 +340,7 @@ private fun SettingSwitch(title: String, description: String, checked: Boolean, 
 @Preview
 @Composable
 private fun SettingsScreenPreview() {
-    MaterialTheme {
+    ProxyUciTheme {
         SettingsScreen(
             settings = AppSettings(nameServices = IpNameService.BUILT_IN + IpNameService("c", "Mío", "{ip-}.mio.com")),
             actions = SettingsActions(),

@@ -36,6 +36,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.koin.compose.viewmodel.koinViewModel
 import org.uci.proxy.core.log.LogEntry
 import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.theme.ProxyUciTheme
 
 /** Los niveles que se pueden elegir como filtro, con el nombre que se muestra. */
 private val levelFilters = listOf(
@@ -167,7 +168,7 @@ private fun LogLevel.color(): Color = when (this) {
 @Preview
 @Composable
 private fun LogsScreenPreview() {
-    MaterialTheme {
+    ProxyUciTheme {
         LogsScreen(
             state = LogsUiState(
                 entries = listOf(

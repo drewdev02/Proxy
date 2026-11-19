@@ -1,6 +1,5 @@
 package org.uci.proxy
 
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.CompositionLocalProvider
@@ -29,6 +28,7 @@ import org.uci.proxy.profile.ProfileListScreen
 import org.uci.proxy.profile.ProfileListViewModel
 import org.uci.proxy.profile.TunnelUiModel
 import org.uci.proxy.settings.SettingsRoute
+import org.uci.proxy.theme.ProxyUciTheme
 import org.uci.proxy.tunnel.TunnelViewModel
 
 /** Requiere que la app haya llamado antes a [org.uci.proxy.di.initKoin]. */
@@ -45,7 +45,7 @@ fun App(filePicker: FilePicker?, appCatalog: AppCatalog? = null) = CompositionLo
     LocalFilePicker provides filePicker,
     LocalAppCatalog provides appCatalog,
 ) {
-    MaterialTheme {
+    ProxyUciTheme {
         val backStack = rememberNavBackStack(routesConfiguration, Route.ProfileList)
 
         NavDisplay(

@@ -35,6 +35,7 @@ import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.ProxyProtocol
 import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.port.TunnelState
+import org.uci.proxy.theme.ProxyUciTheme
 
 /** Lo que la lista necesita saber del túnel. */
 data class TunnelUiModel(
@@ -233,7 +234,7 @@ internal val ProxyProtocol.label: String
 @Preview
 @Composable
 private fun ProfileListScreenPreview() {
-    MaterialTheme {
+    ProxyUciTheme {
         ProfileListScreen(
             profiles = listOf(ProxyProfile("1", "UCI", "proxy.uci.cu", 3128, ProxyProtocol.HTTP, "andrey")),
             platformLabel = "ProxyUCI en Android 17",

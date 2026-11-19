@@ -36,6 +36,7 @@ import org.uci.proxy.core.profile.ProfileDraft
 import org.uci.proxy.core.profile.ProfileField
 import org.uci.proxy.core.proxy.ProxyFailure
 import org.uci.proxy.core.proxy.ProxyTestResult
+import org.uci.proxy.theme.ProxyUciTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -269,7 +270,7 @@ private fun ProxyTestResult.message(): String = when (this) {
 @Preview
 @Composable
 private fun ProfileEditorScreenPreview() {
-    MaterialTheme {
+    ProxyUciTheme {
         ProfileEditorScreen(
             state = ProfileEditorUiState(
                 draft = ProfileDraft(name = "UCI", host = "http://proxy", port = "3128"),
