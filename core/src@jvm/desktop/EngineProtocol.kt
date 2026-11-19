@@ -16,7 +16,7 @@ import org.uci.proxy.core.vpn.VpnStart
  *
  *   motor   -> ventana : <token>                    se identifica con el token que recibió al arrancar
  *   ventana -> motor   : START <json de EngineStart>
- *   motor   -> ventana : STATE connected | STATE disconnected | STATE failed <TunnelFailure>
+ *   motor   -> ventana : STATE connected [vpn-down] | STATE disconnected | STATE failed <TunnelFailure>
  *   motor   -> ventana : LOG <json de EngineLog>    un mensaje de registro, para la pantalla «Registro» de la ventana
  *   motor   -> ventana : NAMESTAT <id del servicio> WORKED | REFUSED   cómo le fue a un servicio de nombres para IP
  *   ventana -> motor   : STOP
@@ -45,6 +45,9 @@ object EngineProtocol {
     private const val START_PREFIX = "START "
     private const val STATE_PREFIX = "STATE "
     private const val LOG_PREFIX = "LOG "
+
+    /** Tras «connected»: Otro País no está y su tráfico sale por el proxy. */
+    private const val VPN_DOWN = "vpn-down"
 
     private const val NAMESTAT_PREFIX = "NAMESTAT "
 
@@ -89,7 +92,7 @@ object EngineProtocol {
 
     /** Solo se transmiten los estados que produce el motor; "conectando" lo pone la propia ventana. */
     fun encodeState(state: TunnelState): String? = when (state) {
-        is TunnelState.Connected -> STATE_PREFIX + "connected"
+        is TunnelState.Connected -> STATE_PREFIX + "connected" + if (state.vpnDown) " $VPN_DOWN" else ""
         TunnelState.Disconnected -> STATE_PREFIX + "disconnected"
         is TunnelState.Failed -> STATE_PREFIX + "failed " + state.failure.name
         is TunnelState.Connecting -> null
@@ -100,7 +103,7 @@ object EngineProtocol {
         if (!line.startsWith(STATE_PREFIX)) return null
         val parts = line.removePrefix(STATE_PREFIX).split(' ')
         return when (parts[0]) {
-            "connected" -> TunnelState.Connected(profileId)
+            "connected" -> TunnelState.Connected(profileId, vpnDown = parts.getOrNull(1) == VPN_DOWN)
             "disconnected" -> TunnelState.Disconnected
             "failed" -> TunnelFailure.entries.firstOrNull { it.name == parts.getOrNull(1) }?.let(TunnelState::Failed)
             else -> null

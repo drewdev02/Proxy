@@ -11,6 +11,7 @@ import org.uci.proxy.core.packet.UdpDatagram
 import org.uci.proxy.core.packet.buildIcmpPortUnreachable
 import org.uci.proxy.core.packet.buildTcpPacket
 import org.uci.proxy.core.packet.buildUdpPacket
+import org.uci.proxy.core.port.ConnectionOwner
 import org.uci.proxy.core.port.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.PacketWriter
@@ -70,11 +71,14 @@ class DnsPacketHandler(
 class TcpPacketHandler(
     private val stack: TunTcpStack,
     private val fakeDns: FakeDnsTable,
+    /** El nombre de una IP real, si se conoce (la que dio el DNS de la VPN): así el proxy recibe el nombre y no la IP. */
+    private val realHostFor: suspend (Int) -> String? = { null },
 ) : PacketHandler {
     override suspend fun handle(packet: Ipv4Packet): List<ByteArray>? {
         val segment = TcpSegment.parse(packet) ?: return null
         // La consulta a la tabla se hace aquí, en el bucle del motor, que es su único usuario.
         val host = fakeDns.hostFor(packet.destination)
+            ?: if (fakeDns.contains(packet.destination)) null else realHostFor(packet.destination)
         if (host == null && fakeDns.contains(packet.destination)) {
             // Dirección inventada que ya no corresponde a ningún nombre (se recicló o es de otra sesión):
             // no hay a dónde conectar, así que se rechaza para que la app vuelva a resolver.
@@ -117,6 +121,8 @@ class TunnelEngineFactory(
     private val timeSource: TimeSource,
     private val logger: Logger,
     private val nameReporter: NameServiceReporter = NameServiceReporter.None,
+    /** Qué app abrió cada conexión, para las reglas de app. */
+    private val owner: ConnectionOwner = ConnectionOwner.Unknown,
 ) {
     /**
      * @param output interfaz por la que la pila TCP devuelve sus paquetes a las apps.
@@ -129,6 +135,8 @@ class TunnelEngineFactory(
         profile: ProxyProfile,
         password: String,
         settings: AppSettings = AppSettings(),
+        /** Con reglas de salida: cómo repartir las conexiones. Sin ellas, todo va por el proxy. */
+        split: SplitRouting? = null,
     ): TunnelEngine {
         val fakeDns = FakeDnsTable(plan.subnetBase)
         val connector = connectors.first { it.protocol == profile.protocol }
@@ -146,14 +154,19 @@ class TunnelEngineFactory(
         )
         tcp.start()
 
-        // El orden importa: DNS antes que el rechazo genérico de UDP.
-        return TunnelEngine(
+        val dns = DnsPacketHandler(DnsResponder(fakeDns, checks::dnsAddressFor), logger)
+        // El orden importa: DNS antes que el reparto por reglas, y este antes que el proxy y el rechazo genérico de UDP.
+        val handlers = if (split == null) {
+            listOf(dns, TcpPacketHandler(tcp, fakeDns), UdpRejectHandler())
+        } else {
             listOf(
-                DnsPacketHandler(DnsResponder(fakeDns, checks::dnsAddressFor), logger),
-                TcpPacketHandler(tcp, fakeDns),
+                SplitDnsHandler(split, dns) { checks.dnsAddressFor(it) != null },
+                ExitRouterHandler(split, fakeDns, logger, owner, scope),
+                TcpPacketHandler(tcp, fakeDns, split.link::hostFor),
                 UdpRejectHandler(),
-            ),
-        )
+            )
+        }
+        return TunnelEngine(handlers)
     }
 }
 

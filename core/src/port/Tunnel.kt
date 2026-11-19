@@ -37,6 +37,8 @@ data class TunConfig(
     val proxyAddress: String,
     /** Máscara de la dirección de la interfaz. Con la VPN la fija el servidor; sin ella, la subred virtual (/16). */
     val netmask: String = "255.255.0.0",
+    /** Apps (paquetes de Android) que no entran en el túnel y salen por la red real. Solo Android lo aplica. */
+    val excludedApps: List<String> = emptyList(),
 )
 
 class TunnelUnavailableException(message: String) : Exception(message)
@@ -87,7 +89,11 @@ sealed interface TunnelState {
 
     data class Connecting(val profileId: String) : TunnelState
 
-    data class Connected(val profileId: String) : TunnelState
+    /**
+     * @param vpnDown con reglas de salida que usan «Otro País»: la VPN no está (no conectó o se cayó), así que lo que iba
+     *   por ella sale por el proxy mientras se reintenta.
+     */
+    data class Connected(val profileId: String, val vpnDown: Boolean = false) : TunnelState
 
     data class Failed(val failure: TunnelFailure) : TunnelState
 }

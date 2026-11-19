@@ -18,6 +18,8 @@ import org.uci.proxy.core.platform.JavaHostResolver
 import org.uci.proxy.core.platform.JavaSecureRandomBytes
 import org.uci.proxy.core.platform.LogcatLogger
 import org.uci.proxy.core.platform.SharedPreferencesKeyValueStore
+import org.uci.proxy.core.platform.AndroidConnectionOwner
+import org.uci.proxy.core.port.ConnectionOwner
 import org.uci.proxy.core.port.HostResolver
 import org.uci.proxy.core.port.KeyValueStore
 import org.uci.proxy.core.port.LocalAddresses
@@ -52,6 +54,8 @@ actual val platformModule: Module = module {
     single { AndroidLocalNetworkPermission(get<Context>(), ActivityPrompt()) } bind LocalNetworkPermission::class
     single { AndroidVpnConsent(get<Context>(), ActivityPrompt()) }
     singleOf(::AndroidLocalAddresses) { bind<LocalAddresses>() }
+    // Para las reglas de salida por app: qué app abrió cada conexión.
+    single<ConnectionOwner> { AndroidConnectionOwner(get<Context>()) }
     single<HostResolver> { JavaHostResolver(get<AppDispatchers>().background) }
     single<KeyValueStore> { SharedPreferencesKeyValueStore(get<Context>(), SETTINGS_FILE) }
     single<SecretStore> {

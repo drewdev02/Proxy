@@ -1,5 +1,6 @@
 package org.uci.proxy.core.platform
 
+import android.content.pm.PackageManager
 import android.net.VpnService
 import android.os.ParcelFileDescriptor
 import kotlinx.coroutines.CoroutineDispatcher
@@ -31,6 +32,14 @@ class AndroidPlatformTunnel(
             // La propia app queda fuera del túnel: sus conexiones al proxy salen por la red real.
             .addDisallowedApplication(service.packageName)
         config.routes.forEach { builder.addRoute(it.addressText, it.prefixLength) }
+        // Las apps con salida «Directo»: el sistema ni las mete en la VPN. Una que ya no esté instalada se salta.
+        config.excludedApps.filter { it != service.packageName }.forEach { app ->
+            try {
+                builder.addDisallowedApplication(app)
+            } catch (_: PackageManager.NameNotFoundException) {
+                // Desinstalada desde que se creó la regla.
+            }
+        }
 
         // establish() devuelve null si la app dejó de ser la VPN preparada (otra app tomó el relevo).
         val descriptor = builder.establish()

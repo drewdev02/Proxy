@@ -64,7 +64,7 @@ jobs:
           if (-not $admin) { throw "El ejecutor no corre como Administrador" }
       # Los servidores de prueba y la prueba van en el MISMO paso: en los ejecutores de Windows los procesos que un
       # paso deja en segundo plano mueren al terminar ese paso (se comprobó: el paso siguiente ya no los encontraba).
-      - name: Prueba del túnel (con su origen HTTP y su proxy NTLM)
+      - name: Prueba del túnel y de las reglas de salida (con su origen HTTP y su proxy NTLM)
         env:
           PROXYUCI_E2E_WINDOWS: "1"
         run: |
@@ -89,6 +89,10 @@ jobs:
 
             ./kotlin.bat test -m core --platform jvm --include-classes 'org.uci.proxy.core.windows.WindowsTunnelE2ETest'
             $code = $LASTEXITCODE
+            # Las reglas de salida, en otro proceso: Windows no deja crear el adaptador dos veces en el mismo proceso
+            # (error 52), y así se prueba además volver a conectar tras desconectar, como hace la app.
+            ./kotlin.bat test -m core --platform jvm --include-classes 'org.uci.proxy.core.windows.WindowsSplitTunnelE2ETest'
+            if ($code -eq 0) { $code = $LASTEXITCODE }
           } finally {
             "--- registro del proxy de pruebas"
             Get-Content $proxyLog, $proxyErr -ErrorAction SilentlyContinue | Select-Object -Last 40

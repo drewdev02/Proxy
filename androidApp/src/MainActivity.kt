@@ -12,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import org.koin.android.ext.android.inject
+import org.uci.proxy.apps.PackageManagerAppCatalog
 import org.uci.proxy.core.platform.AndroidLocalNetworkPermission
 import org.uci.proxy.core.platform.AndroidVpnConsent
 import org.uci.proxy.files.FilePicker
@@ -23,6 +24,9 @@ class MainActivity : ComponentActivity() {
     // Punto de entrada que crea el sistema: aquí sí se obtienen las dependencias de Koin directamente.
     private val localNetworkPermission: AndroidLocalNetworkPermission by inject()
     private val vpnConsent: AndroidVpnConsent by inject()
+
+    // Las apps instaladas, para elegirlas en las reglas de salida.
+    private val appCatalog by lazy { PackageManagerAppCatalog(applicationContext) }
 
     // Los diálogos del sistema solo los puede lanzar una Activity, y hay que registrarlos antes de onStart.
     private var onPermissionResult: ((Boolean) -> Unit)? = null
@@ -87,7 +91,7 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            App(filePicker = filePicker)
+            App(filePicker = filePicker, appCatalog = appCatalog)
         }
     }
 

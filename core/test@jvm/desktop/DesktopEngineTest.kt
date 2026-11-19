@@ -131,6 +131,7 @@ class EngineProtocolTest {
         fun roundTrip(state: TunnelState) = EngineProtocol.decodeState(EngineProtocol.encodeState(state)!!, "p1")
 
         assertEquals(TunnelState.Connected("p1"), roundTrip(TunnelState.Connected("otro-id-del-motor")))
+        assertEquals(TunnelState.Connected("p1", vpnDown = true), roundTrip(TunnelState.Connected("p1", vpnDown = true)))
         assertEquals(TunnelState.Disconnected, roundTrip(TunnelState.Disconnected))
         TunnelFailure.entries.forEach { assertEquals(TunnelState.Failed(it), roundTrip(TunnelState.Failed(it))) }
     }

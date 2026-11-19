@@ -87,6 +87,18 @@ internal object WindowsE2E {
     fun sha256(bytes: ByteArray): String =
         MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 
+    /** Todos los adaptadores, también los ocultos y los que Windows está retirando, para diagnosticar. */
+    fun allAdapters(): String = ProcessCommandRunner().run(
+        listOf("powershell", "-NoProfile", "-Command", "Get-NetAdapter -IncludeHidden | Format-Table -AutoSize Name, InterfaceDescription, Status | Out-String -Width 200"),
+        null,
+    ).output.trim()
+
+    /** El nombre de la interfaz por la que Windows mandaría el tráfico hacia [address]. */
+    fun routeInterface(address: String): String = ProcessCommandRunner().run(
+        listOf("powershell", "-NoProfile", "-Command", "(Find-NetRoute -RemoteIPAddress $address | Select-Object -First 1).InterfaceAlias"),
+        null,
+    ).output.trim()
+
     /** Windows tarda un instante en retirar el adaptador: se espera un poco antes de darlo por presente. */
     fun adapterExists(): Boolean = runBlocking {
         withContext(Dispatchers.IO) {

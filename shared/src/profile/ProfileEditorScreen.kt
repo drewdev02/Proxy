@@ -30,6 +30,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import org.uci.proxy.apps.AppCatalog
 import org.uci.proxy.core.model.ProxyProtocol
 import org.uci.proxy.core.profile.ProfileDraft
 import org.uci.proxy.core.profile.ProfileField
@@ -51,6 +52,9 @@ fun ProfileEditorScreen(
     onVpnPickFile: () -> Unit = {},
     onVpnUsernameChange: (String) -> Unit = {},
     onVpnPasswordChange: (String) -> Unit = {},
+    routingActions: RoutingActions = RoutingActions.None,
+    /** Las apps instaladas, para las reglas por app; null donde no se aplican. */
+    appCatalog: AppCatalog? = null,
 ) {
     val draft = state.draft
     Scaffold(
@@ -135,6 +139,13 @@ fun ProfileEditorScreen(
                     onUsernameChange = onVpnUsernameChange,
                     onPasswordChange = onVpnPasswordChange,
                 )
+                RoutingSection(
+                    routing = state.routing,
+                    vpnEnabled = state.vpn.enabled,
+                    enabled = !state.isBusy,
+                    actions = routingActions,
+                    appCatalog = appCatalog,
+                )
             }
 
             if (state.saveFailed) {
@@ -174,8 +185,8 @@ private fun VpnSection(
             Column(Modifier.weight(1f)) {
                 Text("Salir por otro país (VPN)", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "Carga un archivo .ovpn y el tráfico saldrá por ese servidor, pasando por el proxy. " +
-                        "Solo perfiles OpenVPN sobre TCP.",
+                    "Carga un archivo .ovpn y el tráfico saldrá por ese servidor, pasando por el proxy " +
+                        "(con reglas de salida, solo lo que elijas). Solo perfiles OpenVPN sobre TCP.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

@@ -50,7 +50,10 @@ val NON_PUBLIC_RANGES: List<Ipv4Route> = listOf(
  *
  * Android solo permite añadir rutas, no excluirlas, hasta el API 33; por eso se calcula el complemento.
  */
-fun routesExcluding(excluded: List<Ipv4Route>): List<Ipv4Route> {
+fun routesExcluding(excluded: List<Ipv4Route>): List<Ipv4Route> = routesExcluding(excluded, from = listOf(Ipv4Route(0, 0)))
+
+/** Los bloques de [from] salvo lo que cubren los [excluded], partiendo solo los que se solapan. */
+fun routesExcluding(excluded: List<Ipv4Route>, from: List<Ipv4Route>): List<Ipv4Route> {
     val routes = mutableListOf<Ipv4Route>()
 
     fun cover(block: Ipv4Route) {
@@ -66,6 +69,6 @@ fun routesExcluding(excluded: List<Ipv4Route>): List<Ipv4Route> {
         }
     }
 
-    cover(Ipv4Route(0, 0))
+    from.forEach(::cover)
     return routes
 }

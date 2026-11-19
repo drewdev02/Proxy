@@ -13,7 +13,12 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import org.uci.proxy.core.port.TunnelMonitor
+import org.uci.proxy.core.port.TunnelState
 import org.koin.android.ext.android.inject
 import org.uci.proxy.MainActivity
 import org.uci.proxy.R
@@ -32,6 +37,7 @@ class ProxyVpnService : VpnService() {
     private val runner: TunnelRunner by inject()
     private val dispatchers: AppDispatchers by inject()
     private val settings: SettingsRepository by inject()
+    private val monitor: TunnelMonitor by inject()
 
     private val scope by lazy { CoroutineScope(SupervisorJob() + dispatchers.background) }
     // Lo tocan el hilo principal (órdenes) y el de fondo (fin del túnel).
@@ -55,9 +61,13 @@ class ProxyVpnService : VpnService() {
     private fun startTunnel(profileId: String) {
         tunnelJob?.cancel()
         val job = scope.launch(start = CoroutineStart.LAZY) {
+            // Avisa cuando Otro País cae o vuelve (con reglas de salida, su tráfico pasa al proxy mientras tanto).
+            val alerts = launch { watchVpnDown() }
             try {
                 runner.run(AndroidPlatformTunnel(this@ProxyVpnService, dispatchers.background), profileId, settings.settings.value)
             } finally {
+                alerts.cancel()
+                getSystemService(NotificationManager::class.java).cancel(ALERT_NOTIFICATION_ID)
                 // El túnel terminó, por orden o porque el sistema cerró la interfaz. Si ya hay otro
                 // túnel en marcha, la notificación y el servicio son suyos y no se tocan.
                 val replaced = tunnelJob.let { it != null && it !== coroutineContext[Job] }
@@ -95,6 +105,31 @@ class ProxyVpnService : VpnService() {
         super.onDestroy()
     }
 
+    /** Un aviso cada vez que Otro País cambia de estado; la primera vez solo si arrancó caído. */
+    private suspend fun watchVpnDown() {
+        var wasDown = false
+        monitor.state
+            .map { (it as? TunnelState.Connected)?.vpnDown }
+            .filterNotNull()
+            .distinctUntilChanged()
+            .collect { down ->
+                if (down == wasDown) return@collect
+                wasDown = down
+                val manager = getSystemService(NotificationManager::class.java)
+                manager.createNotificationChannel(
+                    NotificationChannel(ALERT_CHANNEL_ID, getString(R.string.vpn_alerts_channel_name), NotificationManager.IMPORTANCE_DEFAULT),
+                )
+                val notification = Notification.Builder(this, ALERT_CHANNEL_ID)
+                    .setSmallIcon(R.drawable.ic_vpn_notification)
+                    .setContentTitle(getString(if (down) R.string.vpn_down_title else R.string.vpn_back_title))
+                    .setContentText(getString(if (down) R.string.vpn_down_text else R.string.vpn_back_text))
+                    .setContentIntent(PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE))
+                    .setAutoCancel(true)
+                    .build()
+                manager.notify(ALERT_NOTIFICATION_ID, notification)
+            }
+    }
+
     private fun showForegroundNotification() {
         val manager = getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
@@ -125,5 +160,7 @@ class ProxyVpnService : VpnService() {
     private companion object {
         const val CHANNEL_ID = "vpn"
         const val NOTIFICATION_ID = 1
+        const val ALERT_CHANNEL_ID = "vpn-alerts"
+        const val ALERT_NOTIFICATION_ID = 2
     }
 }
