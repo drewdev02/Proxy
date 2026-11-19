@@ -43,7 +43,7 @@ private val DOMAIN_PATTERN = Regex("[a-z0-9*]([a-z0-9*-]*[a-z0-9*])?(\\.[a-z0-9*
 /**
  * Las reglas de un perfil listas para consultar en cada conexión. Se recorren por orden y gana la primera que coincide.
  *
- * Las reglas de app aún no se aplican: se saltan.
+ * Las reglas de app solo coinciden donde la plataforma dice qué app abrió cada conexión (Android).
  */
 class RuleSet(private val routing: RoutingRules) {
     private sealed interface Matcher {
@@ -63,11 +63,13 @@ class RuleSet(private val routing: RoutingRules) {
 
     private class IpMatcher(val route: Ipv4Route, override val exit: RouteExit) : Matcher
 
+    private class AppMatcher(val packageName: String, override val exit: RouteExit) : Matcher
+
     private val matchers: List<Matcher> = routing.rules.mapNotNull { rule ->
         when (rule.kind) {
             RuleKind.DOMAIN -> DomainMatcher(rule.value.lowercase(), rule.exit)
             RuleKind.IP -> parseRoute(rule.value)?.let { IpMatcher(it, rule.exit) }
-            RuleKind.APP -> null
+            RuleKind.APP -> AppMatcher(rule.value, rule.exit)
         }
     }
 
@@ -79,18 +81,26 @@ class RuleSet(private val routing: RoutingRules) {
      */
     val directRoutes: List<Ipv4Route> = matchers.filterIsInstance<IpMatcher>().filter { it.exit == RouteExit.DIRECT }.map { it.route }
 
+    /** Apps que no deben entrar en el túnel: las de las reglas de app con salida directa. Como los rangos, ganan siempre. */
+    val directApps: List<String> = matchers.filterIsInstance<AppMatcher>().filter { it.exit == RouteExit.DIRECT }.map { it.packageName }
+
+    /** Si hace falta averiguar la app de cada conexión. */
+    val hasAppRules: Boolean = matchers.any { it is AppMatcher && it.exit != RouteExit.DIRECT }
+
     /**
      * La salida de una conexión.
      *
      * @param host el nombre del destino si se conoce (por el DNS del túnel).
      * @param address la IP real del destino, o null si es una dirección inventada del DNS falso.
+     * @param apps los paquetes de la app que abrió la conexión, si se saben.
      */
-    fun exitFor(host: String?, address: Int?): RouteExit {
+    fun exitFor(host: String?, address: Int?, apps: List<String> = emptyList()): RouteExit {
         val name = host?.lowercase()?.trimEnd('.')
         for (matcher in matchers) {
             val matches = when (matcher) {
                 is DomainMatcher -> name != null && matcher.matches(name)
                 is IpMatcher -> address != null && matcher.route.contains(address)
+                is AppMatcher -> matcher.packageName in apps
             }
             if (matches) return matcher.exit
         }

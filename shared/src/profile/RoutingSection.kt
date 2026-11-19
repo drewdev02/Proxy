@@ -1,15 +1,23 @@
 package org.uci.proxy.profile
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -22,15 +30,19 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import org.uci.proxy.apps.AppCatalog
+import org.uci.proxy.apps.InstalledApp
 import org.uci.proxy.core.model.RouteExit
 import org.uci.proxy.core.model.RoutingRules
 import org.uci.proxy.core.model.RuleKind
@@ -46,8 +58,17 @@ internal fun RoutingSection(
     vpnEnabled: Boolean,
     enabled: Boolean,
     actions: RoutingActions,
+    /** Las apps instaladas, para las reglas por app; null donde no se aplican. */
+    appCatalog: AppCatalog? = null,
 ) {
     val rules = routing.rules
+    var pickingApp by remember { mutableStateOf(false) }
+    val hasAppRules = rules.rules.any { it.kind == RuleKind.APP }
+    // Las apps se cargan solo si hacen falta: para mostrar las reglas de app o para elegir una.
+    val installed by produceState<List<InstalledApp>?>(null, appCatalog, hasAppRules || pickingApp) {
+        if (appCatalog != null && (hasAppRules || pickingApp) && value == null) value = appCatalog.installedApps()
+    }
+    val appsByPackage = remember(installed) { installed.orEmpty().associateBy { it.packageName } }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
         Row(
             modifier = Modifier
@@ -92,10 +113,18 @@ internal fun RoutingSection(
             Text("Reglas (gana la primera que coincide)", style = MaterialTheme.typography.labelLarge)
         }
         rules.rules.forEachIndexed { index, rule ->
+            val installedApp = if (rule.kind == RuleKind.APP) appsByPackage[rule.value] else null
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                installedApp?.icon?.let { AppIcon(it) }
                 Column(Modifier.weight(1f)) {
-                    Text(rule.value, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(rule.kind.label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(installedApp?.label ?: rule.value, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        if (rule.kind == RuleKind.APP) "App · ${rule.value}" else rule.kind.label,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
                 ExitPicker(
                     selected = rule.exit,
@@ -135,16 +164,99 @@ internal fun RoutingSection(
                 onSelect = actions::onNewRuleExitChange,
             )
         }
-        OutlinedButton(onClick = actions::addRule, enabled = enabled && routing.newRule.isNotBlank(), modifier = Modifier.fillMaxWidth()) {
-            Text("Añadir regla")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(onClick = actions::addRule, enabled = enabled && routing.newRule.isNotBlank(), modifier = Modifier.weight(1f)) {
+                Text("Añadir regla")
+            }
+            if (appCatalog != null) {
+                OutlinedButton(onClick = { pickingApp = true }, enabled = enabled, modifier = Modifier.weight(1f)) {
+                    Text("Elegir app")
+                }
+            }
         }
         Text(
-            "Un dominio incluye sus subdominios. «Directo» (sin proxy) solo vale para IP y rangos. " +
+            "Un dominio incluye sus subdominios. «Directo» (sin proxy) vale para apps, IP y rangos, no para dominios. " +
+                "Una app que sale por Otro País puede tardar un segundo más en su primera conexión. " +
                 "Si Otro País se cae, su tráfico sale por el proxy hasta que vuelva.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
+
+    if (pickingApp) {
+        AppPickerDialog(
+            apps = installed,
+            exit = routing.newRuleExit,
+            onPick = { packageName ->
+                pickingApp = false
+                actions.addAppRule(packageName)
+            },
+            onDismiss = { pickingApp = false },
+        )
+    }
+}
+
+/** Elige una app instalada; la regla toma la salida elegida para la regla nueva. */
+@Composable
+private fun AppPickerDialog(
+    apps: List<InstalledApp>?,
+    exit: RouteExit,
+    onPick: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var query by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("App que sale por ${exit.label}") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    label = { Text("Buscar") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (apps == null) {
+                    Text("Cargando apps…", style = MaterialTheme.typography.bodyMedium)
+                } else {
+                    val filtered = apps.filter {
+                        query.isBlank() || it.label.contains(query.trim(), ignoreCase = true) || it.packageName.contains(query.trim(), ignoreCase = true)
+                    }
+                    LazyColumn(Modifier.heightIn(max = 420.dp)) {
+                        items(filtered, key = { it.packageName }) { app ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onPick(app.packageName) }
+                                    .padding(vertical = 8.dp),
+                            ) {
+                                app.icon?.let { AppIcon(it) }
+                                Column(Modifier.weight(1f)) {
+                                    Text(app.label, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(
+                                        app.packageName,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
+    )
+}
+
+@Composable
+private fun AppIcon(icon: ImageBitmap) {
+    Image(bitmap = icon, contentDescription = null, modifier = Modifier.padding(end = 12.dp).size(32.dp))
 }
 
 /** Un botón con la salida elegida que abre la lista de las posibles. */

@@ -11,7 +11,10 @@ enum class RouteExit {
     /** La VPN del perfil («Otro País»). Sin VPN configurada o con ella caída, sale por el proxy. */
     VPN,
 
-    /** La red real, sin proxy ni túnel. Por ahora solo en reglas de IP o rango: esos destinos no entran en el túnel. */
+    /**
+     * La red real, sin proxy ni túnel. Solo en reglas de IP o rango (esos destinos no entran en el túnel) y de app (en
+     * Android la app queda fuera de la VPN).
+     */
     DIRECT,
 
     /** No sale: la conexión se rechaza al instante. */
@@ -26,7 +29,7 @@ enum class RuleKind {
     /** Una IP (`1.2.3.4`) o un rango CIDR (`149.22.0.0/16`). */
     IP,
 
-    /** El paquete de una app de Android. Se guarda ya, pero el motor aún no lo aplica. */
+    /** El paquete de una app de Android (`com.netflix.mediaclient`). En escritorio aún no se aplica. */
     APP,
 }
 
@@ -49,8 +52,8 @@ data class RoutingRules(
     companion object {
         /** Las salidas que admite cada tipo de regla. */
         fun exitsFor(kind: RuleKind): List<RouteExit> = when (kind) {
-            RuleKind.IP -> RouteExit.entries
-            RuleKind.DOMAIN, RuleKind.APP -> listOf(RouteExit.PROXY, RouteExit.VPN, RouteExit.BLOCK)
+            RuleKind.IP, RuleKind.APP -> RouteExit.entries
+            RuleKind.DOMAIN -> listOf(RouteExit.PROXY, RouteExit.VPN, RouteExit.BLOCK)
         }
 
         /** Las que puede tener [defaultExit]. */

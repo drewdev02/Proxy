@@ -6,6 +6,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
+import org.uci.proxy.apps.AppCatalog
+import org.uci.proxy.apps.LocalAppCatalog
 import org.uci.proxy.files.FilePicker
 import org.uci.proxy.files.LocalFilePicker
 import androidx.compose.runtime.getValue
@@ -34,9 +36,15 @@ import org.uci.proxy.tunnel.TunnelViewModel
 @DevelopmentEntryPoint
 fun App() = App(filePicker = null)
 
-/** @param filePicker el selector de archivos del sistema, o null donde no lo hay (iOS): sin él no se ofrece la VPN. */
+/**
+ * @param filePicker el selector de archivos del sistema, o null donde no lo hay (iOS): sin él no se ofrece la VPN.
+ * @param appCatalog las apps instaladas, o null donde no hay reglas por app (escritorio, iOS).
+ */
 @Composable
-fun App(filePicker: FilePicker?) = CompositionLocalProvider(LocalFilePicker provides filePicker) {
+fun App(filePicker: FilePicker?, appCatalog: AppCatalog? = null) = CompositionLocalProvider(
+    LocalFilePicker provides filePicker,
+    LocalAppCatalog provides appCatalog,
+) {
     MaterialTheme {
         val backStack = rememberNavBackStack(routesConfiguration, Route.ProfileList)
 
@@ -125,6 +133,7 @@ private fun ProfileEditorRoute(profileId: String?, onClose: () -> Unit) {
         onVpnUsernameChange = viewModel::onVpnUsernameChange,
         onVpnPasswordChange = viewModel::onVpnPasswordChange,
         routingActions = viewModel,
+        appCatalog = LocalAppCatalog.current,
         onDraftChange = viewModel::onDraftChange,
         onPasswordChange = viewModel::onPasswordChange,
         onTest = viewModel::testProxy,

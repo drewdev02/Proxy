@@ -51,3 +51,23 @@ private fun skipName(message: ByteArray, start: Int): Int? {
 
 private const val HEADER_SIZE = 12
 private const val FLAG_RESPONSE = 0x8000
+
+/** Una consulta DNS de tipo A por [name], con recursión, para preguntar a un servidor real. */
+fun buildDnsQuery(name: String, id: Int): ByteArray {
+    val labels = name.trimEnd('.').split('.').filter { it.isNotEmpty() }.map { it.encodeToByteArray() }
+    val message = ByteArray(HEADER_SIZE + labels.sumOf { it.size + 1 } + 1 + 4)
+    message[0] = (id ushr 8).toByte()
+    message[1] = id.toByte()
+    message[2] = 0x01 // recursión deseada
+    message[5] = 1 // una pregunta
+    var position = HEADER_SIZE
+    for (label in labels) {
+        message[position++] = label.size.toByte()
+        label.copyInto(message, position)
+        position += label.size
+    }
+    message[position++] = 0
+    message[position + 1] = DnsResponder.TYPE_A.toByte()
+    message[position + 3] = 1 // clase IN
+    return message
+}

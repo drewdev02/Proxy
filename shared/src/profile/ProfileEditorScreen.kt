@@ -30,6 +30,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import org.uci.proxy.apps.AppCatalog
 import org.uci.proxy.core.model.ProxyProtocol
 import org.uci.proxy.core.profile.ProfileDraft
 import org.uci.proxy.core.profile.ProfileField
@@ -52,6 +53,8 @@ fun ProfileEditorScreen(
     onVpnUsernameChange: (String) -> Unit = {},
     onVpnPasswordChange: (String) -> Unit = {},
     routingActions: RoutingActions = RoutingActions.None,
+    /** Las apps instaladas, para las reglas por app; null donde no se aplican. */
+    appCatalog: AppCatalog? = null,
 ) {
     val draft = state.draft
     Scaffold(
@@ -141,6 +144,7 @@ fun ProfileEditorScreen(
                     vpnEnabled = state.vpn.enabled,
                     enabled = !state.isBusy,
                     actions = routingActions,
+                    appCatalog = appCatalog,
                 )
             }
 

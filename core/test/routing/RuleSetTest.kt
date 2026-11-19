@@ -62,10 +62,22 @@ class RuleSetTest {
     }
 
     @Test
-    fun `app rules are kept but not applied yet`() {
-        val set = rules(RouteRule(RuleKind.APP, "com.netflix.mediaclient", RouteExit.VPN))
+    fun `app rules match the app that opened the connection`() {
+        val set = rules(
+            RouteRule(RuleKind.APP, "com.netflix.mediaclient", RouteExit.VPN),
+            RouteRule(RuleKind.APP, "cu.uci.correo", RouteExit.DIRECT),
+        )
 
-        assertEquals(RouteExit.PROXY, set.exitFor("com.netflix.mediaclient", null))
+        assertEquals(RouteExit.VPN, set.exitFor("www.google.com", null, apps = listOf("com.netflix.mediaclient")))
+        assertEquals(RouteExit.PROXY, set.exitFor("www.google.com", null, apps = listOf("com.android.chrome")))
+        assertEquals(RouteExit.PROXY, set.exitFor("com.netflix.mediaclient", null), "el nombre de la app no es un dominio")
+        assertTrue(set.hasAppRules)
+        assertEquals(listOf("cu.uci.correo"), set.directApps)
+    }
+
+    @Test
+    fun `direct-only app rules need no lookup`() {
+        assertFalse(rules(RouteRule(RuleKind.APP, "cu.uci.correo", RouteExit.DIRECT)).hasAppRules)
     }
 
     @Test

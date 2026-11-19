@@ -7,6 +7,7 @@ import org.uci.proxy.core.engine.TunAddressPlanner
 import org.uci.proxy.core.engine.TunnelEngineFactory
 import org.uci.proxy.core.engine.TunnelRunner
 import org.uci.proxy.core.engine.TunnelStateStore
+import org.uci.proxy.core.port.ConnectionOwner
 import org.uci.proxy.core.port.TunnelMonitor
 import org.uci.proxy.core.proxy.HttpConnectConnector
 import org.uci.proxy.core.proxy.Socks5Connector
@@ -32,6 +33,8 @@ val tunnelModule = module {
             randomBytes = get(),
             timeSource = get(),
             logger = get(),
+            // Solo Android lo enlaza; sin él las reglas de app no coinciden.
+            owner = getOrNull<ConnectionOwner>() ?: ConnectionOwner.Unknown,
         )
     }
     single<VpnExit> {

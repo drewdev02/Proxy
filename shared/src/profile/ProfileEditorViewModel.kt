@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.RouteExit
+import org.uci.proxy.core.model.RouteRule
+import org.uci.proxy.core.model.RuleKind
 import org.uci.proxy.core.model.RoutingRules
 import org.uci.proxy.core.routing.parseRule
 import org.uci.proxy.core.model.VpnProfile
@@ -74,6 +76,9 @@ interface RoutingActions {
 
     fun addRule()
 
+    /** Añade una regla para la app [packageName], con la salida elegida para la regla nueva. */
+    fun addAppRule(packageName: String)
+
     fun onRuleExitChange(index: Int, exit: RouteExit)
 
     /** Sube ([delta] negativo) o baja una regla. */
@@ -88,6 +93,7 @@ interface RoutingActions {
         override fun onNewRuleChange(text: String) = Unit
         override fun onNewRuleExitChange(exit: RouteExit) = Unit
         override fun addRule() = Unit
+        override fun addAppRule(packageName: String) = Unit
         override fun onRuleExitChange(index: Int, exit: RouteExit) = Unit
         override fun moveRule(index: Int, delta: Int) = Unit
         override fun removeRule(index: Int) = Unit
@@ -224,7 +230,7 @@ class ProfileEditorViewModel(
         state.update { it.copy(routing = it.routing.copy(newRuleExit = exit)) }
     }
 
-    /** Añade lo escrito al final de la lista. Si es un dominio con salida «Directo», que aún no existe, pasa a «Proxy». */
+    /** Añade lo escrito al final de la lista. Si es un dominio con salida «Directo», que no existe para dominios, pasa a «Proxy». */
     override fun addRule() {
         val routing = state.value.routing
         val parsed = parseRule(routing.newRule, routing.newRuleExit)
@@ -233,12 +239,22 @@ class ProfileEditorViewModel(
             return
         }
         val rule = if (parsed.exit in RoutingRules.exitsFor(parsed.kind)) parsed else parsed.copy(exit = RouteExit.PROXY)
+        appendRule(rule, clearText = true)
+    }
+
+    override fun addAppRule(packageName: String) {
+        if (packageName.isBlank()) return
+        appendRule(RouteRule(RuleKind.APP, packageName, state.value.routing.newRuleExit), clearText = false)
+    }
+
+    /** Al final de la lista; si ya había una para lo mismo, se sustituye. */
+    private fun appendRule(rule: RouteRule, clearText: Boolean) {
         state.update {
             it.copy(
                 routing = it.routing.copy(
                     rules = it.routing.rules.copy(rules = it.routing.rules.rules.filterNot { r -> r.kind == rule.kind && r.value == rule.value } + rule),
-                    newRule = "",
-                    newRuleInvalid = false,
+                    newRule = if (clearText) "" else it.routing.newRule,
+                    newRuleInvalid = if (clearText) false else it.routing.newRuleInvalid,
                 ),
                 saveFailed = false,
             )

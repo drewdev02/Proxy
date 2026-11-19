@@ -11,6 +11,7 @@ import org.uci.proxy.core.packet.UdpDatagram
 import org.uci.proxy.core.packet.buildIcmpPortUnreachable
 import org.uci.proxy.core.packet.buildTcpPacket
 import org.uci.proxy.core.packet.buildUdpPacket
+import org.uci.proxy.core.port.ConnectionOwner
 import org.uci.proxy.core.port.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.PacketWriter
@@ -118,6 +119,8 @@ class TunnelEngineFactory(
     private val randomBytes: RandomBytes,
     private val timeSource: TimeSource,
     private val logger: Logger,
+    /** Qué app abrió cada conexión, para las reglas de app. */
+    private val owner: ConnectionOwner = ConnectionOwner.Unknown,
 ) {
     /**
      * @param output interfaz por la que la pila TCP devuelve sus paquetes a las apps.
@@ -156,7 +159,7 @@ class TunnelEngineFactory(
         } else {
             listOf(
                 SplitDnsHandler(split, dns) { checks.dnsAddressFor(it) != null },
-                ExitRouterHandler(split, fakeDns, logger),
+                ExitRouterHandler(split, fakeDns, logger, owner, scope),
                 TcpPacketHandler(tcp, fakeDns, split.link::hostFor),
                 UdpRejectHandler(),
             )

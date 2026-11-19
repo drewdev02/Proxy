@@ -34,9 +34,11 @@ import org.uci.proxy.core.packet.formatIpv4
 import org.uci.proxy.core.packet.internetChecksum
 import org.uci.proxy.core.packet.parseIpv4
 import org.uci.proxy.core.packet.readInt
+import org.uci.proxy.core.packet.readU16
 import org.uci.proxy.core.packet.sumWords
 import org.uci.proxy.core.packet.writeInt
 import org.uci.proxy.core.packet.writeU16
+import org.uci.proxy.core.port.ConnectionOwner
 import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.profile.AppDispatchers
@@ -102,6 +104,10 @@ class SplitRoutingTest {
     )
     private val profile = ProxyProfile("p1", "UCI", "proxy.uci.cu", 3128, ProxyProtocol.HTTP, "andrey", VpnProfile("pais.ovpn", "vpnuser"), rules)
 
+    /** La app dueña de cada conexión, por su puerto de origen. */
+    private val appsByPort = mutableMapOf<Int, List<String>>()
+    private val owner = ConnectionOwner { _, _, sourcePort, _, _ -> appsByPort[sourcePort].orEmpty() }
+
     /** Lo que devuelve cada intento de abrir la VPN, por orden; el último se repite. */
     private val results = ArrayDeque<VpnConnectResult>()
     private val sessions = mutableListOf<ScriptedVpnSession>()
@@ -118,7 +124,7 @@ class SplitRoutingTest {
         val runner = TunnelRunner(
             profiles = StoredProfileRepository(InMemoryKeyValueStore(), InMemorySecretStore(), dispatchers, logger),
             addressPlanner = TunAddressPlanner(localAddresses = { emptyList() }, randomBytes = { ByteArray(it) { 56 } }),
-            engineFactory = TunnelEngineFactory(listOf(connector), { ByteArray(it) { 1 } }, testScheduler.timeSource, logger),
+            engineFactory = TunnelEngineFactory(listOf(connector), { ByteArray(it) { 1 } }, testScheduler.timeSource, logger, owner),
             hostResolver = { "10.8.0.20" },
             stateStore = stateStore,
             dispatchers = dispatchers,
@@ -145,8 +151,23 @@ class SplitRoutingTest {
     private fun TestScope.askDns(name: String, port: Int = 41000) =
         send(buildUdpPacket(app, tunDns, sourcePort = port, destinationPort = 53, payload = dnsQuery(name, id = 0x4242)))
 
-    private fun syn(destination: Int, port: Int = 443) =
-        buildTcpPacket(app, destination, 50000, port, sequence = 100, acknowledgment = 0, flags = TcpFlags.SYN, window = 65535)
+    private fun syn(destination: Int, port: Int = 443, sourcePort: Int = 50000) =
+        buildTcpPacket(app, destination, sourcePort, port, sequence = 100, acknowledgment = 0, flags = TcpFlags.SYN, window = 65535)
+
+    /** La pila TCP del túnel (el camino del proxy) contestó al SYN en nombre de [destination]. */
+    private fun assertAnsweredByProxyStack(destination: Int) {
+        val reply = lastToApp()
+        val segment = assertNotNull(TcpSegment.parse(reply))
+        assertEquals(destination, reply.source)
+        assertTrue(segment.has(TcpFlags.SYN) && segment.has(TcpFlags.ACK), "SYN-ACK de la pila local")
+    }
+
+    /** La dirección inventada que el DNS del túnel da a [name]. */
+    private fun TestScope.fakeAddressOf(name: String): Int {
+        askDns(name, port = 42000)
+        val payload = UdpDatagram.parse(lastToApp())!!.payload
+        return payload.readInt(payload.size - 4)
+    }
 
     private fun lastToApp() = assertNotNull(Ipv4Packet.parse(tun.written.last()))
 
@@ -158,8 +179,12 @@ class SplitRoutingTest {
     }
 
     /** La respuesta del DNS de la VPN a la consulta 0x4242 por [name], con la IP [address]. */
-    private fun vpnDnsAnswer(name: String, address: String, port: Int = 41000): ByteArray {
-        val query = dnsQuery(name, id = 0x4242)
+    private fun vpnDnsAnswer(name: String, address: String?, port: Int = 41000, id: Int = 0x4242): ByteArray {
+        val query = dnsQuery(name, id = id)
+        if (address == null) {
+            query.writeU16(2, 0x8183) // NXDOMAIN, sin respuestas
+            return buildUdpPacket(VPN_DNS, VPN_ADDRESS, sourcePort = 53, destinationPort = port, payload = query)
+        }
         val answer = ByteArray(16).also {
             it.writeU16(0, 0xC00C)
             it.writeU16(2, 1)
@@ -337,5 +362,92 @@ class SplitRoutingTest {
         assertTrue(current.closed)
         assertTrue(tun.closed)
         assertEquals(TunnelState.Disconnected, stateStore.state.value)
+    }
+
+    private val appRules = RoutingRules(
+        enabled = true,
+        rules = listOf(
+            RouteRule(RuleKind.APP, "com.netflix.mediaclient", RouteExit.VPN),
+            RouteRule(RuleKind.APP, "com.tiktok", RouteExit.BLOCK),
+            RouteRule(RuleKind.APP, "cu.uci.correo", RouteExit.DIRECT),
+        ),
+    )
+
+    @Test
+    fun `an app that goes abroad has its fake address resolved by the VPN and its connection translated both ways`() =
+        runTest(UnconfinedTestDispatcher()) {
+            connect(profile.copy(routing = appRules))
+            val fake = fakeAddressOf("www.netflix.com")
+            appsByPort[50000] = listOf("com.netflix.mediaclient")
+
+            // El primer SYN dispara la resolución por la VPN y se descarta: la app lo reintentará.
+            send(syn(fake, sourcePort = 50000))
+            val query = assertNotNull(Ipv4Packet.parse(session.sent.single()))
+            val queryDns = UdpDatagram.parse(query)!!
+            assertEquals(VPN_DNS, query.destination)
+            assertEquals(53, queryDns.destinationPort)
+            assertTrue(connector.targets.isEmpty(), "ni por el proxy")
+            fromVpn(vpnDnsAnswer("www.netflix.com", "52.1.2.3", port = queryDns.sourcePort, id = queryDns.payload.readU16(0)))
+            assertTrue(tun.written.size == 1, "la respuesta a la resolución propia no llega a las apps")
+
+            // El reintento sale ya hacia la IP real.
+            send(syn(fake, sourcePort = 50000))
+            val out = assertNotNull(Ipv4Packet.parse(session.sent.last()))
+            assertEquals(VPN_ADDRESS, out.source)
+            assertEquals("52.1.2.3", formatIpv4(out.destination))
+            assertValidChecksums(session.sent.last())
+
+            // Y la respuesta vuelve con la dirección inventada, que es a la que la app conectó.
+            fromVpn(buildTcpPacket(parseIpv4("52.1.2.3")!!, VPN_ADDRESS, 443, 50000, 7000, 101, TcpFlags.SYN or TcpFlags.ACK, 65535))
+            val back = lastToApp()
+            assertEquals(fake, back.source)
+            assertEquals(app, back.destination)
+            assertValidChecksums(tun.written.last())
+        }
+
+    @Test
+    fun `other apps going to the same name still use the proxy`() = runTest(UnconfinedTestDispatcher()) {
+        connect(profile.copy(routing = appRules))
+        val fake = fakeAddressOf("www.netflix.com")
+        appsByPort[50001] = listOf("com.android.chrome")
+
+        send(syn(fake, sourcePort = 50001))
+
+        assertTrue(session.sent.isEmpty())
+        assertAnsweredByProxyStack(fake)
+    }
+
+    @Test
+    fun `a blocked app is refused at once`() = runTest(UnconfinedTestDispatcher()) {
+        connect(profile.copy(routing = appRules))
+        val fake = fakeAddressOf("www.tiktok.com")
+        appsByPort[50002] = listOf("com.tiktok")
+
+        send(syn(fake, sourcePort = 50002))
+
+        assertTrue(assertNotNull(TcpSegment.parse(lastToApp())).has(TcpFlags.RST))
+        assertTrue(connector.targets.isEmpty())
+    }
+
+    @Test
+    fun `a name the VPN cannot resolve sends the app's connection through the proxy`() = runTest(UnconfinedTestDispatcher()) {
+        connect(profile.copy(routing = appRules))
+        val fake = fakeAddressOf("nada.invalid")
+        appsByPort[50003] = listOf("com.netflix.mediaclient")
+
+        send(syn(fake, sourcePort = 50003))
+        val query = UdpDatagram.parse(assertNotNull(Ipv4Packet.parse(session.sent.single())))!!
+        fromVpn(vpnDnsAnswer("nada.invalid", null, port = query.sourcePort, id = query.payload.readU16(0)))
+        send(syn(fake, sourcePort = 50003))
+
+        assertEquals(1, session.sent.size, "solo la consulta")
+        assertAnsweredByProxyStack(fake)
+    }
+
+    @Test
+    fun `direct apps are left out of the interface`() = runTest(UnconfinedTestDispatcher()) {
+        connect(profile.copy(routing = appRules))
+
+        assertEquals(listOf("cu.uci.correo"), assertNotNull(platformTunnel.config).excludedApps)
     }
 }

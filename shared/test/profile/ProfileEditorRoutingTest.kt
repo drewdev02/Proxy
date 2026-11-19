@@ -75,6 +75,30 @@ class ProfileEditorRoutingTest : MainDispatcherTest() {
     }
 
     @Test
+    fun `a chosen app gets the exit picked for the new rule and keeps the typed text`() {
+        val viewModel = newViewModel()
+        viewModel.onNewRuleChange("a medio escribir")
+        viewModel.onNewRuleExitChange(RouteExit.DIRECT)
+
+        viewModel.addAppRule("cu.uci.correo")
+
+        assertEquals(listOf(RouteRule(RuleKind.APP, "cu.uci.correo", RouteExit.DIRECT)), viewModel.rules.rules)
+        assertEquals("a medio escribir", viewModel.uiState.value.routing.newRule)
+    }
+
+    @Test
+    fun `choosing the same app again replaces its rule`() {
+        val viewModel = newViewModel()
+        viewModel.onNewRuleExitChange(RouteExit.VPN)
+        viewModel.addAppRule("com.netflix.mediaclient")
+        viewModel.onNewRuleExitChange(RouteExit.BLOCK)
+
+        viewModel.addAppRule("com.netflix.mediaclient")
+
+        assertEquals(RouteExit.BLOCK, viewModel.rules.rules.single().exit)
+    }
+
+    @Test
     fun `adding the same rule again replaces it at the end`() {
         val viewModel = newViewModel()
         viewModel.add("a.com", RouteExit.VPN)
