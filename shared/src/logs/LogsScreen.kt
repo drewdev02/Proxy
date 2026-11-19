@@ -46,9 +46,9 @@ private val levelFilters = listOf(
     LogLevel.ERROR to "Errores",
 )
 
+/** El registro a nivel de pantalla: obtiene su ViewModel y pasa solo estado y acciones a la versión sin estado. */
 @Composable
-internal fun LogsRoute(onBack: (() -> Unit)? = null) {
-    val viewModel = koinViewModel<LogsViewModel>()
+internal fun LogsScreen(onBack: (() -> Unit)? = null, viewModel: LogsViewModel = koinViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     // LocalClipboard (con ClipEntry) no tiene un constructor común a todas las plataformas; el gestor clásico sí.
     @Suppress("DEPRECATION")

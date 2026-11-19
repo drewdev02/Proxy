@@ -1,5 +1,6 @@
 package org.uci.proxy.profile
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -23,6 +24,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
@@ -30,8 +34,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.horizontalScroll
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.launch
+import org.koin.compose.viewmodel.koinViewModel
 import org.uci.proxy.apps.AppCatalog
+import org.uci.proxy.apps.LocalAppCatalog
 import org.uci.proxy.common.LOCAL_NETWORK_DENIED_FOR_TEST
 import org.uci.proxy.common.message
 import org.uci.proxy.core.model.CountryEngineKind
@@ -39,8 +46,49 @@ import org.uci.proxy.core.model.ProxyProtocol
 import org.uci.proxy.core.profile.ProfileDraft
 import org.uci.proxy.core.profile.ProfileField
 import org.uci.proxy.core.proxy.ProxyTestResult
+import org.uci.proxy.files.LocalFilePicker
 import org.uci.proxy.theme.ProxyUciTheme
 
+/**
+ * El editor de perfil a nivel de pantalla: obtiene su ViewModel y pasa solo estado y acciones a la versión sin estado.
+ * [profileId] null es un perfil nuevo; [onClose] se llama al guardar o cancelar.
+ */
+@Composable
+internal fun ProfileEditorScreen(
+    profileId: String?,
+    onClose: () -> Unit,
+    viewModel: ProfileEditorViewModel = koinViewModel(),
+) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    // El view model se reutiliza entre aperturas: cada vez que se entra se prepara para ese perfil.
+    LaunchedEffect(profileId) { viewModel.start(profileId) }
+    LaunchedEffect(state.saved) {
+        if (state.saved) {
+            viewModel.onSavedHandled()
+            onClose()
+        }
+    }
+
+    val picker = LocalFilePicker.current
+    val scope = rememberCoroutineScope()
+
+    ProfileEditorScreen(
+        state = state,
+        vpnAvailable = picker != null,
+        onVpnPickFile = { scope.launch { picker?.pickText()?.let { viewModel.onVpnFileChosen(it.name, it.text) } } },
+        exitActions = viewModel,
+        routingActions = viewModel,
+        appCatalog = LocalAppCatalog.current,
+        onDraftChange = viewModel::onDraftChange,
+        onPasswordChange = viewModel::onPasswordChange,
+        onTest = viewModel::testProxy,
+        onSave = viewModel::save,
+        onCancel = onClose,
+    )
+}
+
+/** El editor sin estado: dibuja [state] y avisa de lo que se pulsa. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileEditorScreen(

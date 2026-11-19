@@ -77,9 +77,16 @@ class ConnectionNavigation(
     val onOpenLogs: () -> Unit = {},
 )
 
+/**
+ * La pantalla Conexión a nivel de pantalla: obtiene su ViewModel y pasa solo estado y acciones a la versión sin estado.
+ * El ViewModel va como parámetro con valor por defecto, como recomienda Google, para poder sustituirlo en pruebas.
+ */
 @Composable
-internal fun ConnectionRoute(wide: Boolean, navigation: ConnectionNavigation) {
-    val viewModel = koinViewModel<ConnectionViewModel>()
+internal fun ConnectionScreen(
+    wide: Boolean,
+    navigation: ConnectionNavigation,
+    viewModel: ConnectionViewModel = koinViewModel(),
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     ConnectionScreen(
         state = state,
@@ -103,11 +110,12 @@ class ConnectionActions(
 )
 
 /**
- * La pantalla principal. En móvil, una columna; con [wide] (tableta, escritorio), dos: a la izquierda el perfil y el
- * botón de conexión, a la derecha la prueba, las reglas y la actividad.
+ * La pantalla principal, sin estado: solo dibuja [state] y avisa de lo que se pulsa. En móvil, una columna; con [wide]
+ * (tableta, escritorio), dos: a la izquierda el perfil y el botón de conexión, a la derecha la prueba, las reglas y la
+ * actividad.
  */
 @Composable
-fun ConnectionScreen(
+internal fun ConnectionScreen(
     state: ConnectionUiState,
     wide: Boolean,
     actions: ConnectionActions = ConnectionActions(),

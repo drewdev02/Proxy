@@ -58,9 +58,9 @@ class SettingsActions(
     val onResetServices: () -> Unit = {},
 )
 
+/** Ajustes a nivel de pantalla: obtiene su ViewModel y pasa solo estado y acciones a la versión sin estado. */
 @Composable
-internal fun SettingsRoute(onBack: (() -> Unit)? = null) {
-    val viewModel = koinViewModel<SettingsViewModel>()
+internal fun SettingsScreen(onBack: (() -> Unit)? = null, viewModel: SettingsViewModel = koinViewModel()) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val statuses by viewModel.statuses.collectAsStateWithLifecycle()
     val tests by viewModel.tests.collectAsStateWithLifecycle()

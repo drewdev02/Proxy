@@ -31,11 +31,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.koin.compose.viewmodel.koinViewModel
 import org.uci.proxy.common.message
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.ProxyProtocol
 import org.uci.proxy.core.port.TunnelState
+import org.uci.proxy.home.HomeViewModel
 import org.uci.proxy.theme.ProxyUciTheme
+import org.uci.proxy.tunnel.TunnelViewModel
 
 /** Lo que la lista necesita saber del túnel. */
 data class TunnelUiModel(
@@ -50,6 +54,42 @@ data class TunnelUiModel(
             is TunnelState.Connected -> state.profileId
             else -> null
         }
+}
+
+/**
+ * La lista de perfiles a nivel de pantalla: obtiene sus ViewModels y pasa solo estado y acciones a la versión sin estado.
+ * Usa tres ViewModels de forma provisional; al rediseñarla se juntan en uno solo, uno por pantalla.
+ */
+@Composable
+internal fun ProfileListScreen(
+    onAdd: () -> Unit,
+    onEdit: (String) -> Unit,
+    onOpenLogs: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenCatalog: (() -> Unit)?,
+    viewModel: ProfileListViewModel = koinViewModel(),
+    home: HomeViewModel = koinViewModel(),
+    tunnel: TunnelViewModel = koinViewModel(),
+) {
+    val profiles by viewModel.profiles.collectAsStateWithLifecycle()
+    val deleteFailed by viewModel.deleteFailed.collectAsStateWithLifecycle()
+    val tunnelState by tunnel.state.collectAsStateWithLifecycle()
+
+    ProfileListScreen(
+        profiles = profiles,
+        platformLabel = "ProxyUCI en ${home.uiState.platformName} ${home.uiState.osVersion}",
+        deleteFailed = deleteFailed,
+        tunnel = TunnelUiModel(isAvailable = tunnel.isAvailable, state = tunnelState),
+        onAdd = onAdd,
+        onEdit = onEdit,
+        onOpenLogs = onOpenLogs,
+        onOpenSettings = onOpenSettings,
+        onOpenCatalog = onOpenCatalog,
+        onDelete = viewModel::delete,
+        onDismissDeleteError = viewModel::dismissDeleteError,
+        onConnect = tunnel::connect,
+        onDisconnect = tunnel::disconnect,
+    )
 }
 
 /** Sin estado propio salvo el diálogo de confirmación: recibe los datos y avisa de las acciones. */
