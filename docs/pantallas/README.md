@@ -24,6 +24,12 @@ Escritorio y tableta (dos columnas, barra lateral):
 
 ![](../../shared/test@jvm/snapshots/macos/connection/desktop-connected.png)
 
+## Perfiles
+
+| Con un perfil conectado | Sin perfiles | Con fallos (túnel y borrado) |
+|---|---|---|
+| ![](../../shared/test@jvm/snapshots/macos/profile-list/phone-connected.png) | ![](../../shared/test@jvm/snapshots/macos/profile-list/phone-empty.png) | ![](../../shared/test@jvm/snapshots/macos/profile-list/phone-errors.png) |
+
 ## Editar perfil
 
 | Perfil nuevo con errores | OpenVPN y reglas de salida | Tailscale con nodos encontrados |
@@ -44,4 +50,4 @@ Todos los componentes `Uci` en todos sus estados (en la app: modo desarrollo, pe
 
 ## Pendientes de rediseño
 
-Perfiles, Registros y Ajustes todavía tienen el aspecto anterior (con el tema oscuro ya aplicado).
+Registros y Ajustes todavía tienen el aspecto anterior (con el tema oscuro ya aplicado).

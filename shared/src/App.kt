@@ -88,8 +88,6 @@ fun App(filePicker: FilePicker?, appCatalog: AppCatalog? = null, developerMode: 
                             ProfileListScreen(
                                 onAdd = { backStack.add(Route.ProfileEditor(profileId = null)) },
                                 onEdit = { backStack.add(Route.ProfileEditor(profileId = it)) },
-                                onOpenLogs = { backStack.selectTab(Route.Logs) },
-                                onOpenSettings = { backStack.selectTab(Route.Settings) },
                                 onOpenCatalog = if (developerMode) {
                                     { backStack.add(Route.Catalog) }
                                 } else {

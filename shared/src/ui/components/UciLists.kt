@@ -4,6 +4,8 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -146,6 +148,7 @@ private fun RowLayout(
  * Fila de un perfil: indicador de estado, nombre, dirección en monoespaciada y etiquetas ([tags]).
  * Con [tone] distinto de neutro se resalta el borde (por ejemplo el perfil conectado).
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun UciProfileRow(
     name: String,
@@ -168,7 +171,8 @@ fun UciProfileRow(
             trailing?.invoke(this)
         }
         if (tags != null) {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically, content = tags)
+            // Si no caben en una línea, pasan a la siguiente en vez de cortarse.
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp), content = tags)
         }
     }
 }
