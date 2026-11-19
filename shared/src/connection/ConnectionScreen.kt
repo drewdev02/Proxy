@@ -31,6 +31,7 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlin.time.Duration
@@ -42,10 +43,15 @@ import org.uci.proxy.common.isFixedInProfile
 import org.uci.proxy.common.message
 import org.uci.proxy.common.reason
 import org.uci.proxy.core.log.LogEntry
+import org.uci.proxy.core.model.CountryExit
 import org.uci.proxy.core.model.ProxyProfile
+import org.uci.proxy.core.model.ProxyProtocol
 import org.uci.proxy.core.model.RouteExit
+import org.uci.proxy.core.model.RouteRule
+import org.uci.proxy.core.model.RoutingRules
 import org.uci.proxy.core.model.RuleKind
 import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.proxy.ProxyTestResult
 import org.uci.proxy.logs.formatLogTime
@@ -485,5 +491,57 @@ private fun ProfilePicker(state: ConnectionUiState, onSelect: (String) -> Unit, 
             }
         }
         UciButton("Añadir perfil", onAdd, variant = UciButtonVariant.Secondary, icon = UciIcons.Add, modifier = Modifier.fillMaxWidth())
+    }
+}
+
+private val previewProfile = ProxyProfile(
+    id = "p1",
+    name = "UCI Docente",
+    host = "proxy.uci.cu",
+    port = 8080,
+    protocol = ProxyProtocol.HTTP,
+    username = "ana.perez",
+    countryExit = CountryExit.OpenVpn("canada_tcp.ovpn", "vpnuser"),
+    routing = RoutingRules(
+        enabled = true,
+        rules = listOf(
+            RouteRule(RuleKind.DOMAIN, "netflix.com", RouteExit.VPN),
+            RouteRule(RuleKind.APP, "com.whatsapp", RouteExit.DIRECT),
+        ),
+    ),
+)
+
+private val previewState = ConnectionUiState(
+    profiles = listOf(previewProfile),
+    activeProfile = previewProfile,
+    recentActivity = listOf(
+        LogEntry(2, 1_700_000_000_000, LogLevel.INFO, "Tunnel", "Túnel listo con el perfil UCI Docente"),
+        LogEntry(1, 1_699_999_990_000, LogLevel.WARN, "Dns", "nip.io no respondió; se usa sslip.io"),
+    ),
+)
+
+@Preview(widthDp = 412, heightDp = 900)
+@Composable
+private fun ConnectionScreenPhonePreview() {
+    ProxyUciTheme { ConnectionScreen(previewState, wide = false) }
+}
+
+@Preview(widthDp = 412, heightDp = 900)
+@Composable
+private fun ConnectionScreenFailedPreview() {
+    ProxyUciTheme { ConnectionScreen(previewState.copy(tunnel = TunnelState.Failed(TunnelFailure.PROXY_AUTH_FAILED)), wide = false) }
+}
+
+@Preview(widthDp = 1100, heightDp = 760)
+@Composable
+private fun ConnectionScreenDesktopPreview() {
+    ProxyUciTheme {
+        ConnectionScreen(
+            previewState.copy(
+                tunnel = TunnelState.Connected("p1"),
+                check = ProxyCheck.Finished(ProxyTestResult.Success, 184),
+            ),
+            wide = true,
+        )
     }
 }
