@@ -36,6 +36,16 @@ Escritorio y tableta (dos columnas, barra lateral):
 |---|---|---|
 | ![](../../shared/test@jvm/snapshots/macos/profile-editor/phone-new-with-errors.png) | ![](../../shared/test@jvm/snapshots/macos/profile-editor/phone-openvpn-rules.png) | ![](../../shared/test@jvm/snapshots/macos/profile-editor/phone-tailscale-nodes.png) |
 
+## Registro
+
+| En vivo | En pausa, solo avisos y errores | Vacío |
+|---|---|---|
+| ![](../../shared/test@jvm/snapshots/macos/logs/phone-live.png) | ![](../../shared/test@jvm/snapshots/macos/logs/phone-paused-filtered.png) | ![](../../shared/test@jvm/snapshots/macos/logs/phone-empty.png) |
+
+Escritorio:
+
+![](../../shared/test@jvm/snapshots/macos/logs/desktop-live.png)
+
 ## Catálogo de componentes
 
 Todos los componentes `Uci` en todos sus estados (en la app: modo desarrollo, pestaña Perfiles → Catálogo).
@@ -50,4 +60,4 @@ Todos los componentes `Uci` en todos sus estados (en la app: modo desarrollo, pe
 
 ## Pendientes de rediseño
 
-Registros y Ajustes todavía tienen el aspecto anterior (con el tema oscuro ya aplicado).
+Ajustes todavía tiene el aspecto anterior (con el tema oscuro ya aplicado).

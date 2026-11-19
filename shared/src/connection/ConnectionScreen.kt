@@ -55,7 +55,9 @@ import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.proxy.ProxyTestResult
 import org.uci.proxy.logs.formatLogTime
+import org.uci.proxy.logs.tone
 import org.uci.proxy.profile.label
+import org.uci.proxy.profile.tone
 import org.uci.proxy.theme.ProxyUciTheme
 import org.uci.proxy.ui.components.UciBottomSheet
 import org.uci.proxy.ui.components.UciButton
@@ -411,7 +413,7 @@ private fun RoutingCard(summary: RoutingSummary?, onEdit: () -> Unit) {
 private fun ExitRow(label: String, exit: RouteExit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-        UciStatusPill(exit.label(), tone = exit.tone())
+        UciStatusPill(exit.label(), tone = exit.tone)
     }
 }
 
@@ -420,13 +422,6 @@ private fun RouteExit.label(): String = when (this) {
     RouteExit.VPN -> "Otro País"
     RouteExit.DIRECT -> "Directo"
     RouteExit.BLOCK -> "Bloqueado"
-}
-
-private fun RouteExit.tone(): UciTone = when (this) {
-    RouteExit.PROXY -> UciTone.Active
-    RouteExit.VPN -> UciTone.Routing
-    RouteExit.DIRECT -> UciTone.Neutral
-    RouteExit.BLOCK -> UciTone.Danger
 }
 
 /** «2 sitios, 1 app» a partir de cuántas reglas hay de cada tipo. */
@@ -450,7 +445,7 @@ private fun RecentActivity(entries: List<LogEntry>, onOpenLogs: () -> Unit) {
         entries.forEachIndexed { index, entry ->
             if (index > 0) UciDivider()
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
-                UciStatusDot(entry.level.tone(), modifier = Modifier.padding(top = 6.dp))
+                UciStatusDot(entry.level.tone, modifier = Modifier.padding(top = 6.dp))
                 Column(Modifier.weight(1f)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(formatLogTime(entry.epochMillis).substringBefore('.'), style = ProxyUciTheme.mono.badge, color = ProxyUciTheme.colors.onSurfaceFaint)
@@ -461,13 +456,6 @@ private fun RecentActivity(entries: List<LogEntry>, onOpenLogs: () -> Unit) {
             }
         }
     }
-}
-
-private fun LogLevel.tone(): UciTone = when (this) {
-    LogLevel.ERROR -> UciTone.Danger
-    LogLevel.WARN -> UciTone.Warning
-    LogLevel.INFO -> UciTone.Active
-    LogLevel.DEBUG -> UciTone.Neutral
 }
 
 @Composable

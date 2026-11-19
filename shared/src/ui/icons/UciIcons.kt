@@ -56,6 +56,8 @@ object UciIcons {
     val Sync: ImageVector @Composable get() = icon(Res.drawable.ic_sync)
     val Download: ImageVector @Composable get() = icon(Res.drawable.ic_download)
     val Upload: ImageVector @Composable get() = icon(Res.drawable.ic_upload)
+    val Pause: ImageVector @Composable get() = icon(Res.drawable.ic_pause)
+    val Play: ImageVector @Composable get() = icon(Res.drawable.ic_play_arrow)
 }
 
 @Composable
