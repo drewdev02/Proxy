@@ -93,7 +93,7 @@ internal fun RoutingSection(
         subtitle = "Qué sale por el proxy, por Otro País, directo o se bloquea",
         icon = UciIcons.Split,
         tone = if (rules.enabled) UciTone.Routing else UciTone.Neutral,
-        trailing = { UciSwitch(rules.enabled, actions::onRoutingEnabledChange, enabled = enabled) },
+        trailing = { UciSwitch(rules.enabled, actions::onRoutingEnabledChange, enabled = enabled, contentDescription = "Activar reglas de salida") },
     ) {
         if (!rules.enabled) return@UciSectionCard
 

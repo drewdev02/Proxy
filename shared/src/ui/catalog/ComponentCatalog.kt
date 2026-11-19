@@ -182,7 +182,7 @@ private fun ContainersSection() {
         subtitle = "Canadá · OpenVPN tras el proxy",
         icon = UciIcons.Globe,
         tone = UciTone.Routing,
-        trailing = { UciSwitch(on, { on = it }) },
+        trailing = { UciSwitch(on, { on = it }, contentDescription = "Activar Otro País") },
     ) {
         Text(
             "El tráfico pasa primero por el proxy para autenticarse y luego sale por la VPN.",

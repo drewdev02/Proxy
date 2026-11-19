@@ -163,7 +163,7 @@ private fun NameServicesCard(
         title = "Servicios de nombres",
         subtitle = "Para pedir al proxy las IP públicas por un nombre",
         icon = UciIcons.Dns,
-        trailing = { UciSwitch(settings.nameByIp, actions.onNameByIpChange) },
+        trailing = { UciSwitch(settings.nameByIp, actions.onNameByIpChange, contentDescription = "Usar servicios de nombres") },
     ) {
         Text(
             "El proxy de la UCI rechaza las conexiones a una IP escrita como número, pero acepta el mismo destino con un " +

@@ -312,7 +312,7 @@ private fun CountryExitSection(state: ProfileEditorUiState, actions: CountryExit
         subtitle = "El tráfico sale por un servidor en otro país, pasando por el proxy",
         icon = UciIcons.Globe,
         tone = if (vpn.enabled) UciTone.Routing else UciTone.Neutral,
-        trailing = { UciSwitch(vpn.enabled, actions::onVpnEnabledChange, enabled = !state.isBusy) },
+        trailing = { UciSwitch(vpn.enabled, actions::onVpnEnabledChange, enabled = !state.isBusy, contentDescription = "Activar Otro País") },
     ) {
         if (!vpn.enabled) return@UciSectionCard
         if (state.engines.size > 1) {

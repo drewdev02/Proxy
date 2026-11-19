@@ -33,6 +33,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -174,15 +176,22 @@ fun UciSearchField(
 
 /**
  * Interruptor del diseño: pista azul intenso encendido, gris pizarra apagado, botón blanco.
- * Normalmente va dentro de [UciSwitchRow], que hace pulsable toda la fila; suelto, pasar [onCheckedChange].
+ * Normalmente va dentro de [UciSwitchRow], que hace pulsable toda la fila; suelto, pasar [onCheckedChange] y
+ * [contentDescription], que es lo que dicen los lectores de pantalla (si no, solo oirían «interruptor»).
  */
 @Composable
-fun UciSwitch(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, modifier: Modifier = Modifier, enabled: Boolean = true) {
+fun UciSwitch(
+    checked: Boolean,
+    onCheckedChange: ((Boolean) -> Unit)?,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    contentDescription: String? = null,
+) {
     val c = ProxyUciTheme.colors
     Switch(
         checked = checked,
         onCheckedChange = onCheckedChange,
-        modifier = modifier,
+        modifier = if (contentDescription != null) modifier.semantics { this.contentDescription = contentDescription } else modifier,
         enabled = enabled,
         colors = SwitchDefaults.colors(
             checkedThumbColor = c.switchThumb,
