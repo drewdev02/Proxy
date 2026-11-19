@@ -20,6 +20,7 @@ import org.uci.proxy.core.port.TunDevice
 import org.uci.proxy.core.proxy.IpNamer
 import org.uci.proxy.core.proxy.ProxyConnector
 import org.uci.proxy.core.settings.AppSettings
+import org.uci.proxy.core.settings.NameServiceReporter
 import org.uci.proxy.core.tcp.TunTcpStack
 import kotlin.time.TimeSource
 
@@ -119,6 +120,7 @@ class TunnelEngineFactory(
     private val randomBytes: RandomBytes,
     private val timeSource: TimeSource,
     private val logger: Logger,
+    private val nameReporter: NameServiceReporter = NameServiceReporter.None,
     /** Qué app abrió cada conexión, para las reglas de app. */
     private val owner: ConnectionOwner = ConnectionOwner.Unknown,
 ) {
@@ -140,7 +142,7 @@ class TunnelEngineFactory(
         val connector = connectors.first { it.protocol == profile.protocol }
         val health = ProxyHealth(timeSource)
         val checks = ConnectivityChecks(settings.answerConnectivityChecks, health)
-        val relay = TunnelRelay(connector, profile, password, logger, health, checks, IpNamer(settings))
+        val relay = TunnelRelay(connector, profile, password, logger, health, checks, IpNamer(settings, nameReporter, timeSource))
 
         val start = timeSource.markNow()
         val tcp = TunTcpStack(

@@ -119,4 +119,54 @@ class StoredSettingsRepositoryTest {
 
         assertEquals(listOf("nip", "sslip"), reopened().settings.value.nameServices.map { it.id })
     }
+
+    private val custom = IpNameService(id = "custom-1", name = "Mío", template = "{ip-}.mio.com")
+
+    @Test
+    fun `a custom service is added at the end and active and survives a restart`() {
+        reopened().addNameService(custom)
+
+        val services = reopened().settings.value.nameServices
+        assertEquals(listOf("sslip", "nip", "custom-1"), services.map { it.id })
+        assertTrue(services.last().enabled)
+        assertFalse(services.last().builtIn)
+    }
+
+    @Test
+    fun `a service added by hand is never marked as factory made`() {
+        reopened().addNameService(custom.copy(builtIn = true))
+
+        assertFalse(reopened().settings.value.nameServices.last().builtIn)
+    }
+
+    @Test
+    fun `adding the same id twice keeps one`() {
+        val repository = reopened()
+        repository.addNameService(custom)
+        repository.addNameService(custom.copy(name = "Otro"))
+
+        assertEquals(1, repository.settings.value.nameServices.count { it.id == "custom-1" })
+    }
+
+    @Test
+    fun `a custom service can be removed but a factory one cannot`() {
+        val repository = reopened()
+        repository.addNameService(custom)
+
+        repository.removeNameService("custom-1")
+        repository.removeNameService("sslip")
+
+        assertEquals(listOf("sslip", "nip"), repository.settings.value.nameServices.map { it.id })
+        assertEquals(listOf("sslip", "nip"), reopened().settings.value.nameServices.map { it.id })
+    }
+
+    @Test
+    fun `restoring also deletes the custom services`() {
+        val repository = reopened()
+        repository.addNameService(custom)
+
+        repository.resetNameServices()
+
+        assertEquals(IpNameService.BUILT_IN, repository.settings.value.nameServices)
+    }
 }

@@ -4,6 +4,7 @@ product:
 
 dependencies:
   - //core: exported
+  - //database
   - $compose.runtime
   - $compose.foundation
   - $compose.material3

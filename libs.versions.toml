@@ -10,6 +10,9 @@ androidx-core = "1.19.1"
 koin = "4.2.2"
 slf4j = "2.0.19"
 kotlinx-datetime = "0.7.1"
+room = "2.8.5"
+# La que pide room-runtime 2.8.5
+sqlite = "2.6.2"
 
 [libraries]
 # Inyección de dependencias (solo en paquetes di/ y puntos de entrada)
@@ -26,6 +29,10 @@ androidx-lifecycle-runtime-compose = { module = "org.jetbrains.androidx.lifecycl
 # Navegación entre pantallas (Navigation 3, versión de JetBrains para Compose Multiplatform) y un ViewModel por pantalla
 androidx-navigation3-ui = { module = "org.jetbrains.androidx.navigation3:navigation3-ui", version.ref = "androidx-navigation3" }
 androidx-lifecycle-viewmodel-navigation3 = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-navigation3", version.ref = "androidx-lifecycle" }
+# database: Room (KMP) con el SQLite incluido en la app, igual en todas las plataformas
+room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
+room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
+sqlite-bundled = { module = "androidx.sqlite:sqlite-bundled", version.ref = "sqlite" }
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
 kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines" }
 

@@ -48,14 +48,36 @@ class LogBufferTest {
     }
 
     @Test
-    fun `clearing empties the buffer and ids start again`() {
+    fun `clearing empties the buffer and ids keep growing`() {
         val buffer = LogBuffer()
         buffer.append(0, LogLevel.INFO, "T", "antes")
 
         buffer.clear()
         buffer.append(1, LogLevel.INFO, "T", "después")
 
-        assertEquals(listOf(LogEntry(0, 1, LogLevel.INFO, "T", "después")), buffer.entries.value)
+        assertEquals(listOf(LogEntry(1, 1, LogLevel.INFO, "T", "después")), buffer.entries.value)
+    }
+
+    @Test
+    fun `restored lines go first with negative ids and new ones keep counting from zero`() {
+        val buffer = LogBuffer()
+        buffer.append(5, LogLevel.INFO, "T", "de hoy")
+
+        buffer.restore(listOf(LogEntry(40, 1, LogLevel.WARN, "T", "a"), LogEntry(41, 2, LogLevel.INFO, "T", "b")))
+        buffer.append(6, LogLevel.INFO, "T", "otra")
+
+        assertEquals(listOf("a", "b", "de hoy", "otra"), buffer.entries.value.map { it.message })
+        assertEquals(listOf(-2L, -1L, 0L, 1L), buffer.entries.value.map { it.id })
+    }
+
+    @Test
+    fun `restoring never goes over the capacity`() {
+        val buffer = LogBuffer(capacity = 3)
+        buffer.append(5, LogLevel.INFO, "T", "de hoy")
+
+        buffer.restore((1..5).map { LogEntry(it.toLong(), it.toLong(), LogLevel.INFO, "T", "$it") })
+
+        assertEquals(listOf("4", "5", "de hoy"), buffer.entries.value.map { it.message })
     }
 
     @Test

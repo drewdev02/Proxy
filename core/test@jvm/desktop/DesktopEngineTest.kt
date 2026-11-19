@@ -4,6 +4,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -23,6 +24,7 @@ import org.uci.proxy.core.log.BufferedLogger
 import org.uci.proxy.core.log.LogBuffer
 import org.uci.proxy.core.log.LogEntry
 import org.uci.proxy.core.settings.AppSettings
+import org.uci.proxy.core.settings.NameOutcome
 import org.uci.proxy.core.settings.StoredSettingsRepository
 import org.uci.proxy.core.port.LogLevel
 import kotlin.time.Clock
@@ -87,6 +89,17 @@ class EngineProtocolTest {
 
         assertFalse('\n' in line)
         assertEquals(start, EngineProtocol.decodeStart(line))
+    }
+
+    @Test
+    fun `a name service report survives the round trip and bad lines are rejected`() {
+        val line = EngineProtocol.encodeNameStat("sslip", NameOutcome.REFUSED)
+
+        assertEquals("sslip" to NameOutcome.REFUSED, EngineProtocol.decodeNameStat(line))
+        assertNull(EngineProtocol.decodeNameStat("NAMESTAT sslip"))
+        assertNull(EngineProtocol.decodeNameStat("NAMESTAT sslip A_MEDIAS"))
+        assertNull(EngineProtocol.decodeNameStat("NAMESTAT  WORKED"))
+        assertNull(EngineProtocol.decodeNameStat("STATE connected"))
     }
 
     @Test
@@ -202,9 +215,11 @@ class DesktopTunnelIntegrationTest {
                 vpnResult
             },
         )
-        return EngineSession(runner, stateStore, platformTunnel, Dispatchers.IO, engineLogger, engineLogs, maxDuration)
+        return EngineSession(runner, stateStore, platformTunnel, Dispatchers.IO, engineLogger, engineLogs, maxDuration, nameForwarder)
     }
 
+    private val nameForwarder = EngineNameForwarder()
+    private val windowNameStatus = java.util.concurrent.CopyOnWriteArrayList<Pair<String, NameOutcome>>()
     private var receivedVpn: Triple<ProxyProfile, String, VpnStart>? = null
     private var vpnResult: VpnConnectResult = VpnConnectResult.Failed(TunnelFailure.VPN_AUTH_FAILED)
     private var receivedHost: String? = null
@@ -233,6 +248,7 @@ class DesktopTunnelIntegrationTest {
         logger = logger,
         logBuffer = windowLogs,
         settings = StoredSettingsRepository(InMemoryKeyValueStore()),
+        nameStatus = { id, outcome -> windowNameStatus += id to outcome },
         launchTimeout = 5.seconds,
     )
 
@@ -292,6 +308,21 @@ class DesktopTunnelIntegrationTest {
         assertEquals(TunnelState.Failed(TunnelFailure.VPN_PROFILE_INVALID), controller.state.value)
         assertNull(receivedVpn)
         assertNull(tokenFileSeen, "no se lanzó el motor, que pediría privilegios para nada")
+    }
+
+    @Test
+    fun `what the engine says about a name service reaches the window`() = runBlocking {
+        repository.save(profile, "secreta")
+        controller.connect(profile.id)
+        awaitState { it is TunnelState.Connected }
+
+        nameForwarder.report("sslip", NameOutcome.REFUSED)
+        nameForwarder.report("nip", NameOutcome.WORKED)
+
+        withTimeout(10.seconds) { while (windowNameStatus.size < 2) delay(20) }
+        assertEquals(listOf("sslip" to NameOutcome.REFUSED, "nip" to NameOutcome.WORKED), windowNameStatus.toList())
+        controller.disconnect()
+        awaitState { it == TunnelState.Disconnected }
     }
 
     @Test

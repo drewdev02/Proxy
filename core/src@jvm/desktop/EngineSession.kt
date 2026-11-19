@@ -36,6 +36,8 @@ class EngineSession(
     /** Los mensajes de registro de este proceso: se reenvían a la ventana, que no puede ver los del motor. */
     private val logBuffer: LogBuffer,
     private val maxDuration: Duration? = null,
+    /** Cómo le fue a cada servicio de nombres: se reenvía a la ventana, que lo muestra en Ajustes. */
+    private val nameForwarder: EngineNameForwarder? = null,
 ) {
     suspend fun serve(socket: Socket, token: String) = coroutineScope {
         val reader = socket.getInputStream().bufferedReader()
@@ -47,6 +49,8 @@ class EngineSession(
             logger.log(LogLevel.ERROR, TAG, "La ventana no envió una orden de arranque válida")
             return@coroutineScope
         }
+
+        nameForwarder?.sink = { line -> synchronized(writer) { writer.println(line) } }
 
         // Lo que el motor registró desde que arrancó (incluido lo anterior a esta orden) y, a partir de ahí, lo nuevo.
         var lastLogSent = -1L

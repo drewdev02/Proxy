@@ -17,10 +17,15 @@ import org.uci.proxy.core.proxy.BasicAuthScheme
 import org.uci.proxy.core.proxy.ConnectingProxyTester
 import org.uci.proxy.core.proxy.HttpConnectConnector
 import org.uci.proxy.core.proxy.NtlmAuthScheme
+import org.uci.proxy.core.proxy.ConnectingNameServiceTester
+import org.uci.proxy.core.proxy.NameServiceTester
 import org.uci.proxy.core.proxy.ProxyTarget
 import org.uci.proxy.core.proxy.ProxyTester
 import org.uci.proxy.core.proxy.Socks5Connector
+import org.uci.proxy.core.settings.IpNameServiceValidator
+import org.uci.proxy.core.settings.NameServiceStatusRepository
 import org.uci.proxy.core.settings.SettingsRepository
+import org.uci.proxy.core.settings.StoredNameServiceStatusRepository
 import org.uci.proxy.core.settings.StoredSettingsRepository
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
@@ -38,6 +43,10 @@ val coreModule = module {
     singleOf(::ProfileValidator)
     singleOf(::StoredProfileRepository) { bind<ProfileRepository>() }
     singleOf(::StoredSettingsRepository) { bind<SettingsRepository>() }
+    // Cómo le fue a cada servicio de nombres para IP públicas, para mostrarlo en Ajustes.
+    single<NameServiceStatusRepository> { StoredNameServiceStatusRepository(get(), get()) }
+    singleOf(::IpNameServiceValidator)
+    single<NameServiceTester> { ConnectingNameServiceTester(listOf(get<HttpConnectConnector>(), get<Socks5Connector>())) }
 
     single { SelectorManager(get<AppDispatchers>().background) }
     singleOf(::KtorTcpConnector) { bind<TcpConnector>() }

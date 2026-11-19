@@ -1,0 +1,15 @@
+package org.uci.proxy.database.di
+
+import org.koin.core.module.Module
+import org.koin.dsl.module
+import org.uci.proxy.core.platform.JvmAppDirectories
+import org.uci.proxy.core.profile.AppDispatchers
+import org.uci.proxy.database.ProxyDatabase
+import org.uci.proxy.database.buildProxyDatabase
+import org.uci.proxy.database.proxyDatabaseBuilder
+
+actual val platformDatabaseModule: Module = module {
+    single<ProxyDatabase> {
+        proxyDatabaseBuilder(get<JvmAppDirectories>().dataDir).buildProxyDatabase(get<AppDispatchers>().background)
+    }
+}

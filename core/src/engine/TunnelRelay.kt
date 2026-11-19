@@ -98,6 +98,7 @@ class TunnelRelay(
             }
             // Solo un rechazo del proxy justifica probar otro nombre; un tiempo agotado o un fallo de red no.
             if ((result as? ProxyConnectResult.Failed)?.failure !is ProxyFailure.Refused) break
+            namer.refused(attempt)
         }
 
         return when (result) {

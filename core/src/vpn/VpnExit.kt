@@ -7,6 +7,7 @@ import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.RandomBytes
 import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.settings.AppSettings
+import org.uci.proxy.core.settings.NameServiceReporter
 import org.uci.proxy.core.proxy.IpNamer
 import org.uci.proxy.core.proxy.NameAttempt
 import org.uci.proxy.core.proxy.ProxyConnectResult
@@ -53,6 +54,8 @@ class OpenVpnExit(
     private val random: RandomBytes,
     private val logger: Logger,
     private val connectTimeout: Duration = 20.seconds,
+    /** A quién se avisa de qué servicio de nombres funcionó o fue rechazado, para mostrarlo en Ajustes. */
+    private val reporter: NameServiceReporter = NameServiceReporter.None,
 ) : VpnExit {
     override suspend fun connect(proxy: ProxyProfile, proxyPassword: String, vpn: VpnStart, settings: AppSettings): VpnConnectResult {
         val config = try {
@@ -69,7 +72,7 @@ class OpenVpnExit(
         val ordered = if (config.remoteRandom) config.remotes.shuffled(randomSource()) else config.remotes
         val remotes = ordered.sortedBy { if (it.port == PREFERRED_PORT) 0 else 1 }
 
-        val namer = IpNamer(settings)
+        val namer = IpNamer(settings, reporter)
         var proxyRefused = false
         var handshakeFailed = false
         for (remote in remotes.take(MAX_ATTEMPTS)) {
@@ -87,6 +90,7 @@ class OpenVpnExit(
                 used = attempt
                 if (result is ProxyConnectResult.Connected) break
                 if ((result as? ProxyConnectResult.Failed)?.failure !is ProxyFailure.Refused) break
+                namer.refused(attempt)
             }
             val connection = when (result) {
                 is ProxyConnectResult.Connected -> result.connection.also { used?.let(namer::succeeded) }

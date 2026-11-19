@@ -20,7 +20,7 @@ class KoinVerifyTest {
     fun `app modules have no missing definitions`() {
         module { includes(appModules) }.verify(
             // Parámetros que los módulos pasan a mano al construir, no tipos que Koin deba resolver.
-            extraTypes = listOf(CoroutineDispatcher::class, Function1::class),
+            extraTypes = listOf(CoroutineDispatcher::class, Function1::class, Duration::class, Int::class),
             injections = injectedParameters(
                 definition<HttpConnectConnector>(List::class),
                 definition<ConnectingProxyTester>(List::class, ProxyTarget::class, Duration::class),

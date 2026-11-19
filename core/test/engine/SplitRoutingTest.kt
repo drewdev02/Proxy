@@ -124,7 +124,7 @@ class SplitRoutingTest {
         val runner = TunnelRunner(
             profiles = StoredProfileRepository(InMemoryKeyValueStore(), InMemorySecretStore(), dispatchers, logger),
             addressPlanner = TunAddressPlanner(localAddresses = { emptyList() }, randomBytes = { ByteArray(it) { 56 } }),
-            engineFactory = TunnelEngineFactory(listOf(connector), { ByteArray(it) { 1 } }, testScheduler.timeSource, logger, owner),
+            engineFactory = TunnelEngineFactory(listOf(connector), { ByteArray(it) { 1 } }, testScheduler.timeSource, logger, owner = owner),
             hostResolver = { "10.8.0.20" },
             stateStore = stateStore,
             dispatchers = dispatchers,

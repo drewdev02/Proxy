@@ -1,0 +1,26 @@
+product:
+  type: kmp/lib
+  platforms: [ jvm, android, iosArm64, iosSimulatorArm64 ]
+
+# Base de datos local (Room). Va aparte de core para que la extensión de iOS, que enlaza core y tiene un límite de
+# memoria estricto, no cargue SQLite. Aquí solo van datos que crecen o se consultan; los secretos siguen en SecretStore.
+dependencies:
+  - //core
+  - $libs.room.runtime: exported
+  - $libs.sqlite.bundled
+
+test-dependencies:
+  - $libs.kotlinx.coroutines.test
+
+settings:
+  kotlin:
+    # Room exige un `expect object` (ProxyDatabaseConstructor) cuyo `actual` genera KSP en cada plataforma.
+    freeCompilerArgs: [ -Xexpect-actual-classes ]
+    ksp:
+      processors:
+        - $libs.room.compiler
+      processorOptions:
+        room.generateKotlin: "true"
+  android:
+    namespace: org.uci.proxy.database
+    minSdk: 26
