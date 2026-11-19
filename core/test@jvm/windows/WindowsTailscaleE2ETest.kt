@@ -104,7 +104,14 @@ class WindowsTailscaleE2ETest {
             }
             assertEquals(TunnelState.Connected("ts"), state, "el túnel por Tailscale no conectó")
 
-            val route = WindowsE2E.routeInterface("203.0.113.42")
+            // Windows tarda unos segundos en dejar lista la dirección y las rutas del adaptador recién creado.
+            var route = ""
+            val deadline = System.currentTimeMillis() + 30_000
+            while (System.currentTimeMillis() < deadline) {
+                route = WindowsE2E.routeInterface("203.0.113.42")
+                if (route == WinPlatformTunnel.ADAPTER_NAME) break
+                Thread.sleep(1_000)
+            }
             println("E2E-WINDOWS: 203.0.113.42 por «$route»")
             assertEquals(WinPlatformTunnel.ADAPTER_NAME, route)
 
