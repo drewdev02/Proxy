@@ -7,11 +7,13 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
@@ -148,6 +150,9 @@ fun ProfileEditorScreen(
     appCatalog: AppCatalog? = null,
 ) {
     Scaffold(
+        // Con el teclado abierto, la barra de Guardar sube sobre él: siempre a mano y sin un hueco vacío encima del
+        // teclado. También permite desplazar el formulario hasta el final sin cerrarlo, que en iOS no siempre se puede.
+        modifier = Modifier.imePadding(),
         topBar = {
             UciTopBar(
                 title = if (state.isNew) "Nuevo perfil" else "Editar perfil",
@@ -163,9 +168,6 @@ fun ProfileEditorScreen(
                 modifier = Modifier
                     .widthIn(max = 720.dp)
                     .fillMaxSize()
-                    // Deja libre el espacio del teclado: así el formulario se puede desplazar hasta el final sin
-                    // tener que cerrarlo, cosa que en iOS no siempre es posible.
-                    .imePadding()
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = ProxyUciTheme.spacing.screenMargin, vertical = ProxyUciTheme.spacing.md),
                 verticalArrangement = Arrangement.spacedBy(ProxyUciTheme.spacing.md),
@@ -198,7 +200,8 @@ private fun SaveBar(state: ProfileEditorUiState, onSave: () -> Unit, onCancel: (
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.navigationBars)
+                    // El hueco de la barra de navegación del sistema, salvo con el teclado abierto (ya lo cubre).
+                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
                     .padding(horizontal = ProxyUciTheme.spacing.screenMargin, vertical = ProxyUciTheme.spacing.gutterSmall),
                 horizontalArrangement = Arrangement.spacedBy(ProxyUciTheme.spacing.sm, Alignment.End),
                 verticalAlignment = Alignment.CenterVertically,
