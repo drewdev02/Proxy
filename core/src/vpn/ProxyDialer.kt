@@ -44,7 +44,7 @@ class ProxyDialer(
     private val connectors: List<ProxyConnector>,
     private val logger: Logger,
     /** A quién se avisa de qué servicio de nombres funcionó o fue rechazado, para mostrarlo en Ajustes. */
-    private val reporter: NameServiceReporter = NameServiceReporter.None,
+    internal val reporter: NameServiceReporter = NameServiceReporter.None,
     private val connectTimeout: Duration = 20.seconds,
 ) {
     /** Una tanda de conexiones con el mismo contexto: recuerda qué servicio de nombres funcionó la última vez. */

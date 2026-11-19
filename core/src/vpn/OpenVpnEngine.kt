@@ -14,7 +14,7 @@ import org.uci.proxy.core.port.TunnelFailure
  */
 class OpenVpnEngine(
     private val client: OpenVpnClient,
-    private val dialer: ProxyDialer,
+    internal val dialer: ProxyDialer,
     private val random: RandomBytes,
     private val logger: Logger,
     /** False donde no hay cliente OpenVPN (iOS): el motor existe, pero no se ofrece. */

@@ -43,7 +43,7 @@ interface CountryEngineCatalog {
 /** El catálogo real: OpenVPN si hay cliente, Tailscale si su librería cargó. */
 class EngineCatalog(
     openVpnAvailable: Boolean,
-    private val tailscale: TailscaleEngine?,
+    internal val tailscale: TailscaleEngine?,
 ) : CountryEngineCatalog {
     override val available: List<CountryEngineKind> by lazy {
         buildList {

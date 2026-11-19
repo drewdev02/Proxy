@@ -64,7 +64,7 @@ sealed interface ExitNodeListing {
  */
 class TailscaleEngine(
     private val bridge: TailscaleBridge,
-    private val dialer: ProxyDialer,
+    internal val dialer: ProxyDialer,
     private val selector: SelectorManager,
     private val random: RandomBytes,
     private val logger: Logger,
