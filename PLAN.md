@@ -4,10 +4,13 @@ Objetivo: una app que autentica contra el proxy institucional y enruta todo el t
 con **un solo núcleo en Kotlin común** y adaptadores mínimos por plataforma, enlazados con Koin a través de un
 módulo `expect`/`actual`. Todo el código sigue SOLID e inyección por constructor (sección 3).
 
+Este archivo describe el diseño **tal como está en el código**. El orden de entrega y el estado de cada función están
+en [`ROADMAP.md`](./ROADMAP.md).
+
 Referencias de comportamiento:
 
 - `superproxy/1/ANALISIS.md` (carpeta junto al proyecto, sin versionar): cómo lo hace Super Proxy en Android (VPN local, DNS falso, `CONNECT`).
-- `superproxy/windows/src/*.cs`: port propio para Windows, con NTLMv2 y pila TCP en memoria. Es la base del
+- `superproxy/windows/src/*.cs`: port propio para Windows, con NTLMv2 y pila TCP en memoria. Fue la base del
   port a Kotlin.
 
 ---
@@ -27,61 +30,69 @@ el núcleo no depende de cómo cada kernel reinyecta paquetes.
 | Capa | Dónde vive | Compartido |
 |---|---|---|
 | Interfaz Compose, pantallas, view models | `shared/src` | Sí |
-| Modelo de perfil, estados, eventos | `core/src` | Sí |
-| Parseo IP/TCP/UDP, checksums, sniffing de `Host`/SNI | `core/src` | Sí |
-| Pila TCP en memoria | `core/src` | Sí |
-| DNS falso | `core/src` | Sí |
-| Clientes `HTTP CONNECT` (Basic, NTLMv2) y SOCKS5 | `core/src` | Sí |
-| MD4, MD5, HMAC-MD5 para NTLMv2 | `core/src` | Sí |
-| Motor del túnel (bucle, relé, estadísticas) | `core/src` | Sí |
-| Sockets TCP/UDP salientes | `core/src` con `ktor-network` | Sí (a validar en fase 0) |
+| Modelo de perfil y reglas de salida | `core/src/model` | Sí |
+| Parseo IP/TCP/UDP, checksums, rutas, sniffing de `Host`/SNI | `core/src/packet` | Sí |
+| Pila TCP en memoria | `core/src/tcp` | Sí |
+| DNS falso | `core/src/dns` | Sí |
+| Clientes `HTTP CONNECT` (Basic, NTLMv2) y SOCKS5, nombres para IP públicas | `core/src/proxy` | Sí |
+| MD4, MD5, HMAC-MD5 para NTLMv2 | `core/src/auth` | Sí |
+| Motor del túnel (bucle, relé, reparto por reglas, comprobaciones de conectividad) | `core/src/engine` | Sí |
+| Cliente OpenVPN de «Otro País» | `core/src/vpn` | Sí; criptografía y TLS en `src@jvmAndAndroid` |
+| Sockets TCP salientes | `core/src/net` con `ktor-network` | Sí |
+| Registro en memoria y su guardado | `core/src/log` y módulo `database` (Room) | Sí |
 | Apertura de TUN, rutas, DNS del sistema | `core/src@<plataforma>` | No |
 | Ciclo de vida del túnel y permisos | `core/src@<plataforma>` y apps | No |
-| Almacenamiento seguro de la contraseña | `core/src@<plataforma>` | No |
-| Modo "Otro País": reescritura del `.ovpn` y proxy local de encadenado | `core/src` | Sí |
-| Modo "Otro País": localizar y lanzar `openvpn` | `core/src@jvm` | No (solo escritorio) |
+| Almacenamiento seguro de contraseñas y `.ovpn` | `core/src@<plataforma>` | No |
 
 ---
 
 ## 2. Estructura de módulos
 
-El proyecto usa Kotlin Toolchain (Amper 0.13.0). Hoy `shared` mezcla interfaz y lógica; se separa en dos módulos
-porque la extensión de iOS no puede cargar Compose (límite de memoria, ver sección 7).
+El proyecto usa Kotlin Toolchain (Amper 0.13.0). La interfaz y la lógica van en módulos separados porque la
+extensión de iOS no puede cargar Compose (límite de memoria, ver sección 7); por lo mismo, la base de datos va en un
+módulo propio que la extensión no enlaza.
 
 ```
 ./                             raíz del repositorio
 ├── core/                      kmp/lib sin Compose: motor + adaptadores
-│   ├── module.yaml            platforms: jvm, android, iosArm64, iosSimulatorArm64
+│   ├── module.yaml            platforms: jvm, android, iosArm64, iosSimulatorArm64; alias jvmAndAndroid
 │   ├── src/                   código común (todo el núcleo)
-│   │   ├── model/             ProxyProfile, VpnState, TunnelStats, TunnelEvent
-│   │   ├── packet/            Ipv4, Tcp, Udp, checksums, HostSniffer
-│   │   ├── tcp/               TunTcpStack, TunTcpConnection
-│   │   ├── dns/               FakeDnsTable, DnsResponder
-│   │   ├── auth/              Md4, Md5, HmacMd5, Ntlm
-│   │   ├── proxy/             ProxyConnector, HttpConnectConnector, Socks5Connector
-│   │   ├── engine/            TunnelEngine, Relay
-│   │   ├── ovpn/              OvpnConfigRewriter, LocalConnectProxy (modo Otro País)
+│   │   ├── model/             ProxyProfile, RoutingRules
+│   │   ├── packet/            Ipv4, Tcp, Routes, HostSniffer
+│   │   ├── tcp/               TunTcpStack
+│   │   ├── dns/               FakeDnsTable, DnsResponder, DnsAnswers
+│   │   ├── auth/              Md4/Md5/HmacMd5 (Digests), Ntlm
+│   │   ├── proxy/             HttpConnectConnector, Socks5Connector, esquemas Basic/NTLM, ProxyTester, IpNamer
+│   │   ├── net/               KtorTcpConnector
+│   │   ├── engine/            TunnelEngine, TunnelRelay, TunnelRunner, SplitRouting, ConnectivityChecks
+│   │   ├── routing/           RuleSet
+│   │   ├── vpn/               OvpnConfig, OpenVpnClient, OpenVpnExit (modo Otro País)
+│   │   ├── profile/           ProfileRepository, ProfileValidator
+│   │   ├── settings/          AppSettings, servicios de nombres y su estado
+│   │   ├── storage/           EncryptedSecretStore
+│   │   ├── log/               LogBuffer, BufferedLogger, LogRecorder
 │   │   ├── port/              interfaces que implementa cada plataforma
-│   │   └── di/                coreModule y expect val platformModule
-│   ├── src@android/           adaptadores VpnService + actual platformModule
-│   ├── src@jvm/               adaptadores Wintun, utun, OpenVpnRunner + actual platformModule
-│   ├── src@ios/               adaptadores NEPacketTunnelFlow + actual platformModule
+│   │   └── di/                coreModule, tunnelModule y expect val platformModule
+│   ├── src@android/           VpnService, Keystore, dueño de cada conexión + actual platformModule
+│   ├── src@jvm/               utun y Wintun, motor elevado e IPC (desktop/) + actual platformModule
+│   ├── src@jvmAndAndroid/     JcaOpenVpnCrypto, SslEngineTlsSession
+│   ├── src@ios/               Keychain, NSUserDefaults, NSLog + actual platformModule (túnel aún no disponible)
 │   └── test/                  pruebas comunes con dobles en memoria
-├── shared/                    kmp/lib con Compose: interfaz y uiModule, depende de //core
-├── androidApp/                Activity + ProxyVpnService
+├── database/                  kmp/lib con Room y SQLite incluido: el registro guardado (databaseModule)
+├── shared/                    kmp/lib con Compose: interfaz y uiModule, depende de //core y //database
+├── androidApp/                Activity, ProxyVpnService, catálogo de apps
 ├── desktopApp/                ventana Compose + modo --engine elevado
-└── iosApp/                    app + target PacketTunnel (extensión)
+└── iosApp/                    app (la extensión PacketTunnel llegará con la capa 7)
 ```
 
 `jvm` es un único target para Windows y macOS. `expect`/`actual` se resuelve en compilación por target, así que
-dentro de `src@jvm` la elección entre Wintun y utun se hace **en tiempo de ejecución** según `os.name`.
+la elección entre Wintun y utun se hace **en tiempo de ejecución** según `PlatformInfo.kind`, en `EngineMain`.
 
 ---
 
 ## 3. Puertos, inyección por constructor y SOLID
 
-La inyección de dependencias es con **Koin**, siempre por constructor. Esto cambia cómo se usa
-`expect`/`actual` respecto a la primera versión del plan: los adaptadores ya no son `expect class`, sino
+La inyección de dependencias es con **Koin**, siempre por constructor. Los adaptadores no son `expect class`, sino
 **interfaces comunes (puertos)** con una implementación por plataforma, y el único `expect` es el módulo de Koin
 que las enlaza. Una `expect class` no se puede sustituir por un doble en las pruebas y ataría el núcleo a una
 clase concreta; una interfaz sí cumple la inversión de dependencias.
@@ -97,142 +108,108 @@ clase concreta; una interfaz sí cumple la inversión de dependencias.
    `ProxyVpnService` en Android, la subclase de `NEPacketTunnelProvider` en iOS, `main` en escritorio, y
    `koinViewModel()` en Compose.
 4. **Lo que necesita datos de ejecución lo crea una fábrica inyectada.** Una sesión de túnel (perfil, TUN) o una
-   conexión TCP no se piden a Koin: las crea una clase fábrica que sí llega por constructor.
+   conexión TCP no se piden a Koin: las crea una clase fábrica que sí llega por constructor (`TunnelEngineFactory`).
 5. **Sin estado global.** Reloj, aleatoriedad y dispatchers se inyectan, lo que hace deterministas las pruebas
    de la pila TCP y de la elección de dirección de la TUN.
 
-### Puertos (`core/src/port`)
+### Puertos principales (`core/src/port`)
+
+Extracto; las firmas completas y su documentación están en el código.
 
 ```kotlin
 interface PacketReader { suspend fun readPacket(): ByteArray? }   // null = interfaz cerrada
-interface PacketWriter { suspend fun writePacket(packet: ByteArray) }
-interface TunDevice : PacketReader, PacketWriter {
-    val mtu: Int
-    fun close()
-}
+fun interface PacketWriter { suspend fun writePacket(packet: ByteArray) }
+interface TunDevice : PacketReader, PacketWriter { fun close() }
 
 data class TunConfig(
-    val address: String,            // 10.A.B.C
-    val virtualSubnet: String,      // 10.A.0.0/16, usada por el DNS falso
-    val dnsServer: String,          // IP señuelo que el motor intercepta
+    val sessionName: String,
+    val address: String,              // 10.A.0.1, o la que empuja el servidor VPN
+    val dnsServer: String,            // dentro de la subred virtual; lo atiende el motor
     val mtu: Int,
-    val proxyHost: String,          // debe quedar fuera del túnel
-    val routePrivateNetworks: Boolean,
+    val routes: List<Ipv4Route>,      // subred virtual + IPv4 público, menos los rangos directos
+    val proxyAddress: String,         // debe salir por la red real
+    val netmask: String = "255.255.0.0",
+    val excludedApps: List<String> = emptyList(),   // solo Android: apps directas
 )
 
-/** Abre la TUN y aplica dirección, rutas y DNS. Deshace todo en close(). */
-interface PlatformTunnel {
-    suspend fun establish(config: TunConfig): TunDevice
-    fun close()
-}
+fun interface PlatformTunnel { suspend fun establish(config: TunConfig): TunDevice }
 
-sealed interface ExitMode {
-    data object Direct : ExitMode                                   // todas las plataformas
-    data class OtherCountry(val ovpnPath: String, val ovpnUser: String) : ExitMode   // solo escritorio
+sealed interface TunnelState {
+    data object Disconnected : TunnelState
+    data class Connecting(val profileId: String) : TunnelState
+    data class Connected(val profileId: String, val vpnDown: Boolean = false) : TunnelState
+    data class Failed(val failure: TunnelFailure) : TunnelState
 }
 
 /** Lo que la interfaz usa para mandar. */
 interface TunnelControl {
-    val supportedModes: Set<KClass<out ExitMode>>
-    suspend fun connect(profile: ProxyProfile, mode: ExitMode)
+    val isAvailable: Boolean          // false donde aún no hay túnel (iOS): la interfaz oculta «Conectar»
+    suspend fun connect(profileId: String)
     suspend fun disconnect()
 }
 
 /** Lo que la interfaz usa para observar. */
-interface TunnelMonitor {
-    val state: StateFlow<VpnState>
-    val stats: StateFlow<TunnelStats>
-    val events: Flow<TunnelEvent>
-}
+interface TunnelMonitor { val state: StateFlow<TunnelState> }
 
-interface SecretStore {
-    fun put(key: String, value: String)
-    fun get(key: String): String?
-    fun remove(key: String)
-}
+interface SecretStore { fun put(key: String, value: String); fun get(key: String): String?; fun remove(key: String) }
+interface KeyValueStore { fun getString(key: String): String?; fun putString(key: String, value: String); fun remove(key: String) }
+interface DataProtector { fun protect(plain: ByteArray): ByteArray; fun unprotect(protectedData: ByteArray): ByteArray }
 
-interface KeyValueStore {
-    fun getString(key: String): String?
-    fun putString(key: String, value: String)
-}
-
-interface Logger { fun log(level: LogLevel, tag: String, message: String) }
-
-enum class PlatformKind { ANDROID, IOS, WINDOWS, MACOS, LINUX }
-
-interface PlatformInfo {
-    val kind: PlatformKind
-    val osVersion: String
-    val isDesktop: Boolean get() = kind in setOf(PlatformKind.WINDOWS, PlatformKind.MACOS, PlatformKind.LINUX)
-}
+fun interface TcpConnector { suspend fun connect(host: String, port: Int): TcpConnection }
+fun interface RandomBytes { fun next(size: Int): ByteArray }
+fun interface LocalAddresses { /* redes 10.x locales, para no chocar con la subred virtual */ }
+fun interface HostResolver { /* resuelve el proxy con el DNS real antes de levantar el túnel */ }
+fun interface ConnectionOwner { fun appsFor(protocol: Int, source: Int, sourcePort: Int, destination: Int, destinationPort: Int): List<String> }
+interface LogHistory { /* registro guardado: append, latest, deleteBefore, trimTo */ }
+interface Logger
+interface PlatformInfo           // kind (ANDROID, IOS, WINDOWS, MACOS, LINUX) y versión
+interface LocalNetworkPermission
 ```
 
-`PlatformInfo` sustituye al `Platform`/`getPlatform()` de la plantilla. Se usa en la raíz de composición de
-`jvm` y para diagnósticos y registros. No se usa para ramificar comportamiento en el núcleo ni en la interfaz:
-para eso se pregunta por la capacidad, como `TunnelControl.supportedModes`.
+`PlatformInfo` se usa en la raíz de composición de `jvm` y para diagnósticos y registros. No se usa para ramificar
+comportamiento en el núcleo ni en la interfaz: para eso se pregunta por la capacidad, como `TunnelControl.isAvailable`.
 
-### El único `expect`: el módulo de plataforma
+### Módulos de Koin
 
-```kotlin
-// core/src/di/CoreModule.kt
-expect val platformModule: Module
+| Módulo | Dónde | Qué enlaza |
+|---|---|---|
+| `platformModule` (`expect`) | `core/src@<plataforma>/di` | Dispatchers, `PlatformInfo`, `Logger` (envuelto en `BufferedLogger`), almacenes, aleatoriedad, criptografía de OpenVPN, `LocalAddresses`, `HostResolver`, y en Android `ConnectionOwner` |
+| `coreModule` | `core/src/di` | Reloj, `LogBuffer`, perfiles, ajustes, estado de servicios de nombres, `KtorTcpConnector`, esquemas NTLM y Basic (NTLM primero), conectores HTTP y SOCKS5, `ProxyTester` |
+| `tunnelModule` | `core/src/di` | Solo procesos que ejecutan el túnel: `TunnelStateStore` (como `TunnelMonitor`), `TunAddressPlanner`, `TunnelEngineFactory`, `OpenVpnExit` (como `VpnExit`), `TunnelRunner` |
+| `databaseModule` | `database/src/di` | Room, `RoomLogHistory` (como `LogHistory`) y `LogRecorder` |
+| `uiModule` | `shared/src/di` | View models |
+| `androidAppModule`, `desktopAppModule` | apps | El `TunnelControl` real de cada sistema (servicio de Android, cliente IPC del motor de escritorio) |
 
-val coreModule = module {
-    singleOf(::NtlmAuthenticator) bind ProxyAuthenticator::class
-    singleOf(::BasicAuthenticator) bind ProxyAuthenticator::class
-    singleOf(::HttpConnectConnector) bind ProxyConnector::class
-    singleOf(::Socks5Connector) bind ProxyConnector::class
-    // Varias implementaciones del mismo puerto: quien las consume recibe la lista completa
-    single { ProxyConnectorRegistry(connectors = getAll(), authenticators = getAll()) }
-    singleOf(::FakeDnsTable)
-    singleOf(::TunTcpStackFactory)
-    singleOf(::TunnelSessionFactory)
-    singleOf(::OvpnConfigRewriter)
-}
-
-// core/src@android/di/PlatformModule.android.kt
-actual val platformModule = module {
-    singleOf(::AndroidSecretStore) bind SecretStore::class
-    singleOf(::AndroidKeyValueStore) bind KeyValueStore::class
-    singleOf(::AndroidTunnelController) { binds(listOf(TunnelControl::class, TunnelMonitor::class)) }
-    singleOf(::LogcatLogger) bind Logger::class
-}
-```
-
-En `jvm`, la elección entre Windows y macOS se hace en el `actual` del módulo, que es raíz de composición:
-`single<PlatformTunnel> { if (get<PlatformInfo>().kind == PlatformKind.WINDOWS) WintunTunnel(get()) else UtunTunnel(get()) }`.
-El resto del código no sabe en qué sistema corre.
+En `jvm` el `platformModule` enlaza un túnel «no disponible»; la ventana de escritorio lo sustituye por
+`DesktopTunnelController`, y el proceso `--engine` construye `MacPlatformTunnel` o `WinPlatformTunnel` según el sistema.
 
 ### Implementaciones por plataforma
 
 | Puerto | Android | iOS | JVM en Windows | JVM en macOS |
 |---|---|---|---|---|
-| `PlatformTunnel` | `VpnService.Builder` → descriptor de archivo | `NEPacketTunnelNetworkSettings` → `packetFlow` | `wintun.dll` por JNA, rutas con `netsh`/`route` | `utun` por JNA, `ifconfig`/`route`/`networksetup` |
-| `LocalAddresses` | `NetworkInterface` | Pendiente (capa 7) | Pendiente (capa 6) | Pendiente (capa 5) |
-| `TunnelControl` y `TunnelMonitor` | `Intent` a `ProxyVpnService`, permiso `VpnService.prepare()` | `NETunnelProviderManager` | Cliente IPC del proceso `--engine` elevado (UAC) | Igual, con elevación por `osascript` |
-| `SecretStore` | `EncryptedSecretStore` común + clave AES-GCM en Android Keystore | Keychain; grupo compartido app/extensión a partir de la capa 7 | `EncryptedSecretStore` común + DPAPI | Llavero mediante `/usr/bin/security`, con la orden por la entrada estándar |
-| `KeyValueStore` | `SharedPreferences` | `NSUserDefaults` de App Group | Archivo en `%LOCALAPPDATA%` | Archivo en `~/Library/Application Support` |
-| `Logger` | Logcat | `NSLog` (válido también en la extensión) | SLF4J, con Logback en `desktopApp` | SLF4J, con Logback en `desktopApp` |
-| `LocalNetworkPermission` | Pide `ACCESS_LOCAL_NETWORK` en Android 17 o superior, mediante la Activity | Sin acción: iOS muestra su propio aviso | Sin acción | Sin acción |
+| `PlatformTunnel` | `AndroidPlatformTunnel` (`VpnService.Builder`) | Pendiente (capa 7) | `WinPlatformTunnel`: `wintun.dll` por JNA, `netsh`/`route` | `MacPlatformTunnel`: `utun` por JNA, `ifconfig`/`route`, DNS con `scutil` |
+| `LocalAddresses` | `AndroidLocalAddresses` | — | `JvmLocalAddresses` | `JvmLocalAddresses` |
+| `TunnelControl` y `TunnelMonitor` | `AndroidTunnelController` → `ProxyVpnService`, permiso `VpnService.prepare()` | `UnavailableTunnel` | `DesktopTunnelController`: IPC con el proceso `--engine` elevado (UAC) | Igual, con elevación por `osascript` |
+| `SecretStore` | `EncryptedSecretStore` + clave AES-GCM en Android Keystore | Keychain | `EncryptedSecretStore` + DPAPI | Llavero mediante `/usr/bin/security` (valores largos por trozos) |
+| `KeyValueStore` | `SharedPreferences` | `NSUserDefaults` | `settings.properties` en `%LOCALAPPDATA%\ProxyUCI` | `settings.properties` en `~/Library/Application Support/ProxyUCI` |
+| `Logger` | Logcat | `NSLog` | SLF4J, con Logback en `desktopApp` | SLF4J, con Logback en `desktopApp` |
+| `LocalNetworkPermission` | Pide `ACCESS_LOCAL_NETWORK` en Android 17 o superior, mediante la Activity | Concedido: iOS muestra su propio aviso | Concedido | Concedido |
+| `ConnectionOwner` | `getConnectionOwnerUid` (Android 10+) | No se sabe | No se sabe | No se sabe |
+| `OpenVpnCrypto`, `TlsSessionFactory` | JCA y `SSLEngine` (`src@jvmAndAndroid`) | «No disponible» | JCA y `SSLEngine` | JCA y `SSLEngine` |
 | `RandomBytes` | `SecureRandom` | `SecRandomCopyBytes` | `SecureRandom` | `SecureRandom` |
-| `PlatformInfo` | Constante, versión de `Build.VERSION` | Constante, versión de `NSProcessInfo` (válido también en la extensión) | `os.name` en ejecución | `os.name` en ejecución |
-
-En Android e iOS el `PlatformTunnel` necesita el objeto que crea el sistema (`VpnService`,
-`NEPacketTunnelProvider`). Ese punto de entrada es raíz de composición: construye su adaptador pasándose a sí
-mismo y se lo entrega a `TunnelSessionFactory`, que ya le llega resuelto por Koin.
 
 ### Raíces de composición por proceso
 
-El túnel corre en un proceso distinto de la interfaz en iOS y en escritorio, así que cada proceso arranca su
-propio Koin con los módulos que le tocan.
+El túnel corre en un proceso distinto de la interfaz en escritorio (y lo hará en iOS), así que cada proceso arranca
+su propio Koin con los módulos que le tocan.
 
 | Proceso | Módulos |
 |---|---|
-| App Android (incluye `ProxyVpnService`) | `coreModule`, `platformModule`, `uiModule` |
-| App iOS | `platformModule`, `uiModule` |
-| Extensión `PacketTunnel` de iOS | `coreModule`, `platformModule` (sin Compose) |
-| Ventana de escritorio | `platformModule`, `uiModule` |
-| Proceso `--engine` de escritorio | `coreModule`, `platformModule` |
+| App Android (incluye `ProxyVpnService`) | `platformModule`, `coreModule`, `databaseModule`, `uiModule`, `tunnelModule`, `androidAppModule` |
+| App iOS | `platformModule`, `coreModule`, `databaseModule`, `uiModule` |
+| Extensión `PacketTunnel` de iOS (capa 7) | `platformModule`, `coreModule`, `tunnelModule` (sin Compose ni Room) |
+| Ventana de escritorio | `platformModule`, `coreModule`, `databaseModule`, `uiModule`, `desktopAppModule` |
+| Proceso `--engine` de escritorio | `platformModule`, `coreModule`, `tunnelModule` |
 
 Los `single` de Koin son perezosos: un proceso solo instancia lo que usa, aunque el módulo declare más.
 
@@ -240,43 +217,43 @@ Los `single` de Koin son perezosos: un proceso solo instancia lo que usa, aunque
 
 | Principio | En este proyecto |
 |---|---|
-| Responsabilidad única | `LocalProxyRelay.cs` (1438 líneas) se parte en conector, autenticador, relé y proxy local. `TunnelEngine` solo reparte paquetes |
-| Abierto/cerrado | Un `ProxyConnector` por protocolo, un `ProxyAuthenticator` por esquema y un `PacketHandler` por protocolo IP. Añadir SOCKS5 sobre TLS o Digest es una clase nueva más una línea en el módulo |
-| Sustitución de Liskov | Una misma batería de pruebas de contrato para `TunDevice` corre contra el doble en memoria y contra cada adaptador real |
+| Responsabilidad única | `LocalProxyRelay.cs` (1438 líneas) se partió en conectores, esquemas de autenticación y relé. `TunnelEngine` solo reparte paquetes |
+| Abierto/cerrado | Un `ProxyConnector` por protocolo y un esquema de autenticación por tipo. Añadir SOCKS5 sobre TLS o Digest es una clase nueva más una línea en el módulo |
+| Sustitución de Liskov | Las pruebas de `TunDevice` corren contra el doble en memoria y, en CI, contra Wintun real |
 | Segregación de interfaces | `PacketReader`/`PacketWriter`, `TunnelControl`/`TunnelMonitor`, `SecretStore`/`KeyValueStore`: cada consumidor ve solo lo que usa |
 | Inversión de dependencias | El núcleo define los puertos y las plataformas los implementan; ninguna clase común importa API de plataforma ni Koin |
 
-Pruebas: los dobles se pasan por constructor, sin arrancar Koin. Además, una prueba por plataforma ejecuta
-`verify()` sobre los módulos para detectar dependencias sin enlazar antes de ejecutar la app.
+Pruebas: los dobles se pasan por constructor, sin arrancar Koin. Además, `verify()` comprueba los módulos para
+detectar dependencias sin enlazar antes de ejecutar la app.
 
 ### Cómo evita cada plataforma el bucle (los sockets hacia el proxy no deben entrar en la TUN)
 
 | Plataforma | Mecanismo |
 |---|---|
-| Android | `addDisallowedApplication(paquetePropio)`; la red `10.0.0.0/8` no se enruta |
+| Android | `addDisallowedApplication(paquetePropio)` |
 | iOS | Los sockets de la extensión salen fuera del túnel por diseño del sistema |
 | Windows y macOS | Ruta `/32` al proxy por la puerta de enlace física, como hace `VpnTunnelEngine.cs` |
 
-Con esto los sockets salientes pueden ser comunes (`ktor-network`) sin un `protect()` por socket.
+Con esto los sockets salientes son comunes (`ktor-network`) sin un `protect()` por socket.
 
 ---
 
-## 4. Núcleo común: qué se porta y de dónde
+## 4. Núcleo común: qué se portó y de dónde
 
 | Componente Kotlin (`core/src`) | Origen | Líneas en C# |
 |---|---|---|
 | `packet/*` | `PacketUtils.cs` | 428 |
 | `dns/FakeDnsTable` | `PacketUtils.cs` (`FakeDnsTable`) | incluido arriba |
 | `tcp/TunTcpStack` | `TunTcpStack.cs` | 1094 |
-| `auth/Ntlm`, `Md4` | `NtlmAuth.cs` | 284 |
-| `proxy/*`, `engine/Relay` | `LocalProxyRelay.cs` | 1438 |
-| `engine/TunnelEngine` | parte de `VpnTunnelEngine.cs` (la parte de rutas va a `PlatformTunnel`) | 685 |
-| `ovpn/OvpnConfigRewriter`, `ovpn/LocalConnectProxy` | `OpenVpnRunner.cs` (sanitización) y `LocalProxyRelay.cs` (puente loopback) | parte de 666 y 1438 |
-| `src@jvm/OpenVpnRunner` | `OpenVpnRunner.cs` (descubrimiento y proceso hijo) | resto de 666 |
-| `test/*` | `SelfTest.cs` (9 pruebas) | 578 |
+| `auth/Ntlm`, `auth/Digests` | `NtlmAuth.cs` | 284 |
+| `proxy/*`, `engine/TunnelRelay` | `LocalProxyRelay.cs` | 1438 |
+| `engine/TunnelEngine`, `engine/TunnelRunner` | parte de `VpnTunnelEngine.cs` (la parte de rutas va a `PlatformTunnel`) | 685 |
+| `vpn/*` | Nuevo: cliente OpenVPN propio (no viene de `OpenVpnRunner.cs`, que lanzaba un `openvpn` externo) | — |
+| `test/*` | `SelfTest.cs` (9 pruebas), muy ampliado | 578 |
 
-No se portan `MainForm.cs`, `AppleControls.cs`, `AppleTheme.cs` ni `AppIconGenerator.cs`: la interfaz se rehace
-en Compose. `ProcessTracker.cs` queda para la versión 2 y solo en escritorio.
+No se portan `MainForm.cs`, `AppleControls.cs`, `AppleTheme.cs`, `AppIconGenerator.cs` ni `OpenVpnRunner.cs`: la
+interfaz se rehízo en Compose y Otro País tiene su propio cliente. `ProcessTracker.cs` (reglas por proceso en
+escritorio) queda para después de la versión 1.
 
 Flujo del motor, igual en todas las plataformas:
 
@@ -286,32 +263,37 @@ flowchart LR
     ENG -->|TCP| TCP["TunTcpStack"]
     ENG -->|UDP 53| DNS["DnsResponder + FakeDnsTable"]
     ENG -->|otro UDP| DROP["ICMP port unreachable"]
-    TCP --> REL["Relay"]
+    TCP --> REL["TunnelRelay"]
     REL --> CON["HttpConnectConnector / Socks5Connector"]
     CON -->|socket fuera del túnel| PX["Proxy institucional"]
     DNS -->|respuesta A sintética| TUN
     TCP -->|segmentos de respuesta| TUN
 ```
 
+Con reglas de salida, `SplitRouting` se coloca delante: decide por cada conexión si va al relé (proxy), a la VPN de
+Otro País (también UDP), sale directa o se bloquea (ROADMAP, capa 11).
+
 Comportamientos que se conservan del port en C# y del análisis:
 
 - DNS falso: cada nombre recibe una IP sintética en `10.A.0.0/16`; al conectar, la IP se traduce de vuelta al
   nombre y el `CONNECT` se hace por nombre, de modo que resuelve el proxy.
 - Sniffing de `Host` y SNI cuando la app conecta por IP.
-- Alternativa `.sslip.io` cuando el proxy rechaza `CONNECT` a una IP literal.
+- IP públicas por nombre: se piden al proxy primero por un servicio como `sslip.io` (configurable en Ajustes,
+  `IpNamer`) y la IP tal cual como último recurso, porque el Squid de la UCI rechaza IP literales.
 - La dirección de la TUN se elige evitando el segundo octeto de las redes `10.x` locales.
 - UDP que no es DNS se rechaza con ICMP para que QUIC caiga a TCP rápido.
+- Las comprobaciones de conectividad del sistema (Android, Windows, macOS) se contestan en local
+  (`ConnectivityChecks`), con un ajuste para desactivarlo.
 
 ---
 
 ## 5. Alcance
 
-| | Versión 1 | Versión 2 |
+| | Versión 1 | Después |
 |---|---|---|
 | Proxy | HTTP con Basic y NTLMv2, SOCKS5 | HTTPS y SOCKS5 sobre TLS |
-| Tráfico | TCP sobre IPv4, DNS por el proxy | UDP por SOCKS5, DNS externos |
-| Funciones | Perfiles, probar proxy, conectar, estadísticas, registro | Split tunneling, firewall por app, actividad por app |
-| Solo escritorio | Modo "Otro País" con OpenVPN (Windows y macOS) | Actividad por proceso |
+| Tráfico | TCP sobre IPv4, DNS por el proxy | UDP por SOCKS5, HTTP en claro para Squid que rechaza `CONNECT` al 80 |
+| Funciones | Perfiles, probar proxy, conectar, registro, Otro País, reglas de salida por sitio y por app (Android) | Reglas por app en escritorio, actividad por app, contadores de tráfico |
 
 IPv6 queda fuera del túnel, igual que en Super Proxy. Las cuatro plataformas entran en la versión 1.
 
@@ -321,7 +303,7 @@ Es opcional por perfil: sin archivo `.ovpn`, el perfil conecta directo. Con él,
 no lanza ningún programa externo.
 
 ```
-Apps → interfaz TUN de ProxyUCI → [cifrado OpenVPN] → conexión TCP al servidor VPN (abierta con CONNECT por el proxy)
+Apps → interfaz TUN de Proxy → [cifrado OpenVPN] → conexión TCP al servidor VPN (abierta con CONNECT por el proxy)
 ```
 
 1. `OvpnConfig` (común) lee el `.ovpn`: servidores TCP, la autoridad `<ca>` y la clave `<tls-crypt>`. Lo que el cliente
@@ -331,86 +313,44 @@ Apps → interfaz TUN de ProxyUCI → [cifrado OpenVPN] → conexión TCP al ser
    con el PRF de TLS 1.0 y canal de datos con AES-GCM. Las primitivas de criptografía y el TLS los aporta cada
    plataforma (`OpenVpnCrypto`, `TlsSessionFactory`); escritorio y Android comparten la implementación Java con el
    alias `jvmAndAndroid`, e iOS enlaza versiones «no disponible».
-3. `OpenVpnExit` abre la sesión probando los servidores del archivo, cada uno con un `CONNECT` al proxy.
-4. `TunnelRunner` crea la interfaz **después** del handshake, con la dirección, la máscara, el DNS y el MTU que empuja el
-   servidor, y pasa los paquetes IPv4 tal cual entre la interfaz y la VPN. No usa la pila TCP ni el DNS falso.
+3. `OpenVpnExit` abre la sesión probando los servidores del archivo, cada uno con un `CONNECT` al proxy (por nombre
+   `sslip.io` si el `.ovpn` da una IP).
+4. Sin reglas de salida, `TunnelRunner` crea la interfaz **después** del handshake, con la dirección, la máscara, el DNS
+   y el MTU que empuja el servidor, y pasa los paquetes IPv4 tal cual entre la interfaz y la VPN. Con reglas, la
+   interfaz es la del modo directo y la VPN se abre a la vez, supervisada y con reintentos.
 
 El archivo y la contraseña de la VPN viajan de la ventana al motor en la orden de arranque (`EngineStart.vpn`), porque el
 motor de escritorio corre en otro proceso. iOS no tiene este modo y la interfaz oculta la sección.
 
 ---
 
-## 6. Fases
+## 6. Fases (histórico)
 
-> El orden de entrega vigente está en [`ROADMAP.md`](./ROADMAP.md), organizado por capas verticales. Las fases
-> de abajo describen el trabajo técnico por bloques y sus validaciones; si el orden difiere, manda el roadmap.
+> Este fue el plan técnico inicial, antes de pasar a capas verticales. Se conserva como referencia de las validaciones;
+> el orden y el estado vigentes están en [`ROADMAP.md`](./ROADMAP.md). La fase 6 se resolvió de otra forma: cliente
+> OpenVPN propio en vez de `openvpn` externo, y también en Android.
 
-Cada fase termina con algo verificable. Las fases 1 y 2 no necesitan ninguna VPN: se prueban en JVM con una TUN
-falsa en memoria y un proxy falso local.
+### Fase 0: validaciones previas
 
-### Fase 0: validaciones previas (antes de escribir el núcleo)
+| Qué validar | Resultado |
+|---|---|
+| `ktor-network` compila y conecta en `iosArm64` | **TCP resuelto en la capa 2:** funciona en la app de iOS (simulador), tras el puerto `TcpConnector`. Falta dentro de la extensión |
+| Amper 0.13 puede enlazar `core` desde un target de extensión de iOS | Pendiente (capa 7). Alternativa: añadir el target a mano en `iosApp/module.xcodeproj` |
+| Perfil de aprovisionamiento con Network Extensions, App Groups y Keychain compartido | Pendiente (capa 7) |
+| JNA abre un `utun` como root en macOS | Resuelto en la capa 5 |
+| Un `openvpn` externo a través del proxy | Descartado: se escribió el cliente propio (capa 9) |
 
-| Qué validar | Por qué | Si falla |
-|---|---|---|
-| `ktor-network` (TCP y UDP) compila y conecta en `iosArm64` | Decide si los sockets son comunes | Añadir un puerto `SocketFactory` con implementación POSIX en iOS y NIO en JVM/Android. **Resuelto para TCP en la capa 2:** funciona en la app de iOS (simulador), tras el puerto `TcpConnector`; queda por probar dentro de la extensión y con UDP |
-| Amper 0.13 puede generar el framework de `core` y enlazarlo desde un target de extensión | Sin esto no hay iOS | Añadir el target a mano en `iosApp/module.xcodeproj` (el `.pbxproj` sí está versionado) |
-| El perfil de aprovisionamiento admite Network Extensions (packet tunnel), App Groups y Keychain compartido para la app y la extensión | Hay cuenta de pago; falta crear los identificadores | Ajustar identificadores y capacidades en el portal |
-| JNA funciona en `jvm/app` y abre un `utun` con `sudo` en este Mac | Base del adaptador de escritorio | Probar la API FFM del JDK |
-| Un `openvpn` de Homebrew conecta en este Mac a un `.ovpn` TCP 443 a través de un proxy HTTP local | Base del modo "Otro País" en macOS | Probar con el binario de Tunnelblick |
+### Fases 1 a 8
 
-Listo cuando: las cinco respuestas están anotadas en este archivo.
-
-### Fase 1: núcleo sin red
-
-- Crear el módulo `core` y sustituir `Platform.kt`/`getPlatform()` de `shared` por el puerto `PlatformInfo`.
-- `port`, `di` (`coreModule`, `platformModule` con dobles mínimos por plataforma) y arranque de Koin en cada app.
-- `model`, `packet`, `auth`, `dns`.
-- Listo cuando: pasan en común las pruebas de checksums, sniffing, DNS falso y los vectores de prueba de NTLMv2
-  de la especificación MS-NLMP, y `verify()` valida los módulos de Koin en los tres targets.
-
-### Fase 2: motor completo
-
-- `tcp`, `proxy`, `engine`, más `FakeTunDevice` para pruebas.
-- Listo cuando: una prueba JVM inyecta un SYN en la TUN falsa, el motor negocia con un proxy falso que exige
-  NTLM, y los datos van y vuelven íntegros; también cierre, retransmisión y reset.
-
-### Fase 3: Android (primer extremo a extremo)
-
-- `actual` de Android, `ProxyVpnService` en primer plano, permisos y notificación.
-- Interfaz mínima en `shared`: formulario de perfil, Probar Proxy, Conectar, estado.
-- Listo cuando: en un teléfono, con el proxy real, navegan apps que no soportan proxy.
-
-### Fase 4: macOS
-
-- `UtunTunnel` por JNA, rutas, DNS del sistema con restauración al parar y al arrancar tras un cierre anómalo.
-- Proceso `--engine` elevado más IPC local con token; la ventana Compose corre sin privilegios.
-- Listo cuando: `./kotlin run -m desktopApp` conecta en este Mac y al desconectar la red queda como estaba.
-
-### Fase 5: Windows
-
-- `WintunTunnel` por JNA reutilizando el mismo IPC; elevación por UAC; empaquetar `wintun.dll`.
-- Listo cuando: iguala al `SuperProxyWin.exe` actual en modo Directo.
-
-### Fase 6: modo "Otro País" en escritorio
-
-- `LocalConnectProxy` y `OvpnConfigRewriter` en común, con pruebas de reescritura sobre perfiles `.ovpn` reales.
-- `OpenVpnRunner` en `src@jvm` para Windows y macOS; selector de modo de salida y credenciales OpenVPN en la
-  interfaz.
-- Listo cuando: en ambos sistemas, con un `.ovpn` de ProtonVPN, la IP pública vista desde fuera es la del país
-  elegido, y al desconectar no queda ningún proceso `openvpn` ni DNS cambiado.
-
-### Fase 7: iOS
-
-- Target `PacketTunnel` con una subclase Swift mínima de `NEPacketTunnelProvider` que delega en `core`.
-- `actual` de iOS; perfil por `providerConfiguration`, contraseña por Keychain compartido, estadísticas por
-  `sendProviderMessage`.
-- Medición de memoria de la extensión bajo carga.
-- Listo cuando: conecta en un iPhone real y aguanta navegación sostenida sin que el sistema mate la extensión.
-
-### Fase 8: endurecimiento y versión 2
-
-- Reconexión al cambiar de red, apagado limpio, límites de conexiones, empaquetado e instaladores.
-- Funciones de la versión 2 por prioridad.
+1. **Núcleo sin red:** `core`, `PlatformInfo`, puertos, Koin, `model`, `packet`, `auth`, `dns`. Hecho (capas 0 a 2).
+2. **Motor completo:** `tcp`, `proxy`, `engine` con TUN y proxy falsos. Hecho (capa 4).
+3. **Android extremo a extremo.** Hecho (capas 3 y 4); falta el proxy real de la UCI y un teléfono físico.
+4. **macOS:** `utun`, rutas, DNS con `scutil`, motor elevado con IPC y token. Hecho (capa 5).
+5. **Windows:** Wintun, UAC, `wintun.dll` empaquetada. Hecho en CI (capa 6).
+6. **Otro País:** hecho con cliente propio en Android, macOS y Windows (capa 9).
+7. **iOS:** extensión `PacketTunnel`, Keychain compartido, memoria bajo carga. Pendiente (capa 7).
+8. **Endurecimiento:** reconexión, apagado limpio, límites, instaladores. Parcial: hay APK, `.exe` y `.dmg` (ver
+   [`PUBLICAR.md`](./PUBLICAR.md)); la capa 10 sigue pendiente.
 
 ---
 
@@ -418,113 +358,70 @@ Listo cuando: las cinco respuestas están anotadas en este archivo.
 
 | Riesgo | Impacto | Mitigación |
 |---|---|---|
-| Límite de memoria de la extensión de iOS. No está documentado; se reportan unos 50 MB desde iOS 15, con informes contradictorios de 15 MB | El sistema mata el túnel | `core` sin Compose, búferes acotados, tope de conexiones, medir en fase 7 |
-| iOS exige dispositivo real; el simulador no ejecuta túneles | Pruebas más lentas | El `actual` de `iosSimulatorArm64` es un stub que solo permite probar la interfaz |
-| "Otro País" depende de un `openvpn` instalado por el usuario y de que el `.ovpn` tenga remotos TCP 443 | El modo no arranca | Detectar el binario y validar el perfil antes de conectar, con mensaje claro |
-| Diferencias de OpenVPN entre Windows y macOS (DNS, limpieza del proceso) | Fugas de DNS o procesos huérfanos | Tabla de diferencias en la sección 5; criterio de salida de la fase 6 |
-| Soporte de Amper para targets de extensión, sin confirmar | Trabajo manual en Xcode | Validar en fase 0 |
-| `ktor-network` en nativo: hay artefactos para iOS, pero la documentación oficial no publica una matriz de plataformas y la API es experimental | Sockets no comunes | Validar en fase 0; alternativa con un puerto `SocketFactory` |
-| Koin resuelve el grafo en ejecución, no en compilación | Fallo al arrancar por una dependencia sin enlazar | Prueba `verify()` de los módulos en cada plataforma |
-| Privilegios en escritorio (root en macOS, Administrador en Windows) | Fricción y superficie de seguridad | Solo el proceso `--engine` se eleva; IPC en loopback con token |
-| Cierre anómalo deja rutas o DNS cambiados en escritorio | El equipo se queda sin red | Guardar el estado previo y restaurarlo al arrancar |
-| La pila TCP propia es la pieza más delicada | Cuelgues, datos corruptos | Portar la versión C# ya probada y cubrirla con pruebas en fase 2 |
+| Límite de memoria de la extensión de iOS. No está documentado; se reportan unos 50 MB desde iOS 15, con informes contradictorios de 15 MB | El sistema mata el túnel | `core` sin Compose ni Room, búferes acotados, tope de conexiones, medir en la capa 7 |
+| iOS exige dispositivo real; el simulador no ejecuta túneles | Pruebas más lentas | En el simulador el túnel es `UnavailableTunnel` y solo se prueba la interfaz |
+| El cliente OpenVPN propio solo cubre TCP, `tls-crypt`, usuario y contraseña y AES-GCM | `.ovpn` que no conectan | Se rechazan al cargar con mensaje claro; pruebas contra el `openvpn` oficial en CI |
+| Soporte de Amper para targets de extensión, sin confirmar | Trabajo manual en Xcode | Validar en la capa 7 |
+| `ktor-network` en nativo: API experimental, sin matriz oficial de plataformas | Sockets no comunes | Funciona en la app de iOS; alternativa con implementación propia de `TcpConnector` |
+| Koin resuelve el grafo en ejecución, no en compilación | Fallo al arrancar por una dependencia sin enlazar | Prueba `verify()` de los módulos |
+| Privilegios en escritorio (root en macOS, Administrador en Windows) | Fricción y superficie de seguridad | Solo el proceso `--engine` se eleva; IPC en loopback con token en archivo privado |
+| Cierre anómalo deja rutas o DNS cambiados en escritorio | El equipo se queda sin red | El motor retira al arrancar el resolvedor de `scutil` que quedara; restauración completa en la capa 10 |
+| La pila TCP propia es la pieza más delicada | Cuelgues, datos corruptos | Port de la versión C# ya probada, con pruebas de tiempo virtual |
 
 ---
 
 ## 8. Decisiones
 
-Tomadas (2026-11-16):
+Tomadas:
 
-- Hay cuenta Apple Developer de pago: iOS entra en la versión 1 (fase 7).
-- El modo "Otro País" con OpenVPN entra en la versión 1 de escritorio, en Windows y macOS (fase 6).
-
-- Inyección de dependencias con Koin, siempre por constructor, y diseño según SOLID (sección 3). Los
-  adaptadores pasan de `expect class` a interfaces; el único `expect` es `platformModule`.
-
-- Firma de iOS (2026-11-16): se trabaja sin firmar, en simulador, hasta que haga falta. La firma con cuenta de
-  pago, sesión iniciada en Xcode e iPhone real se retoma al llegar a la capa 7, que es la única que la exige.
-
-Abierta:
-
-- Nombre de paquete: el proyecto usa `org.uci.proxy`; el núcleo iría en `org.uci.proxy.core`.
+- (2026-11-16) Hay cuenta Apple Developer de pago: iOS entra en la versión 1 (capa 7). Se trabaja sin firmar, en
+  simulador, hasta llegar a esa capa.
+- (2026-11-16) Inyección de dependencias con Koin, siempre por constructor, y diseño según SOLID (sección 3). Los
+  adaptadores son interfaces; el único `expect` es `platformModule`.
+- (2026-11-16) Paquete `org.uci.proxy`; el núcleo en `org.uci.proxy.core` y la base de datos en `org.uci.proxy.database`.
+- Otro País con un cliente OpenVPN propio dentro de la app, en Android, macOS y Windows, en vez de lanzar un
+  `openvpn` instalado aparte (capa 9).
+- Registro guardado con Room en un módulo aparte de `core`, para que la extensión de iOS no cargue SQLite. Los secretos
+  siguen en `SecretStore`.
 
 ---
 
 ## 9. Manifiesto de dependencias
 
-Las versiones viven en `libs.versions.toml`. Son las últimas estables publicadas a 2026-11-16, consultadas en
-Maven Central y Google Maven. El criterio es depender de lo mínimo: criptografía de NTLM, pila TCP, DNS y
-parseo de paquetes son código propio en común.
+Las versiones viven en `libs.versions.toml`. El criterio es depender de lo mínimo: criptografía de NTLM, pila TCP, DNS,
+parseo de paquetes y el cliente OpenVPN son código propio en común.
 
 ### Librerías
 
 | Dependencia | Versión | Módulo y ámbito | Para qué |
 |---|---|---|---|
 | `org.jetbrains.kotlinx:kotlinx-coroutines-core` | 1.11.0 | `core`, común | Bucle del motor, relés, `StateFlow` de estado |
-| `io.ktor:ktor-network` | 3.6.1 | `core`, común | Sockets TCP/UDP hacia el proxy y proxy local en loopback |
-| `kotlinx-serialization-json` (`$kotlin.serialization.json`) | la del toolchain | `core`, común | Perfiles, mensajes IPC, configuración de la extensión de iOS |
-| `io.insert-koin:koin-core` | 4.2.2 | `core`, común | Módulos de DI (`coreModule`, `platformModule`) |
-| `io.insert-koin:koin-compose` | 4.2.2 | `shared`, común | Koin en el árbol de Compose |
-| `io.insert-koin:koin-compose-viewmodel` | 4.2.2 | `shared`, común | `viewModelOf` y `koinViewModel()` |
-| `org.jetbrains.androidx.navigation3:navigation3-ui` | 1.2.0 | `shared`, común | Navegación entre pantallas (Navigation 3, la librería que recomienda Google, en la versión de JetBrains). Cada pantalla es una ruta serializable (`Route`) y la pila se guarda al recrear la actividad. En iOS las rutas hay que registrarlas (`routesConfiguration`) |
-| `org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-navigation3` | 2.11.0 | `shared`, común | Un `ViewModel` por pantalla, que se descarta al salir de ella |
+| `io.ktor:ktor-network` | 3.6.1 | `core`, común | Sockets TCP hacia el proxy |
+| `kotlinx-serialization-json` (`$kotlin.serialization.json`) | la del toolchain | `core` y `shared`, común | Perfiles, mensajes IPC, rutas de navegación |
+| `io.insert-koin:koin-core` | 4.2.2 | `core`, común | Módulos de DI |
+| `io.insert-koin:koin-compose`, `koin-compose-viewmodel` | 4.2.2 | `shared`, común | Koin en Compose, `koinViewModel()` |
 | `io.insert-koin:koin-android` | 4.2.2 | `androidApp` | `androidContext()` para los adaptadores de Android |
 | `io.insert-koin:koin-test` | 4.2.2 | `core` y `shared`, pruebas | `verify()` de los módulos |
-| `org.slf4j:slf4j-api` | 2.0.18 | `core`, solo `jvm` | API de registro; es la versión que usa Logback 1.6.2 |
-| `net.java.dev.jna:jna` | 5.19.1 | `core`, solo `jvm` | Llamar a `wintun.dll` y abrir `utun` |
-| `net.java.dev.jna:jna-platform` | 5.19.1 | `core`, solo `jvm` | DPAPI y API de Windows ya mapeadas |
+| `org.jetbrains.androidx.navigation3:navigation3-ui` | 1.2.0 | `shared`, común | Navegación entre pantallas; cada pantalla es una ruta serializable y la pila se guarda al recrear la actividad. En iOS las rutas hay que registrarlas |
+| `org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-navigation3` | 2.11.0 | `shared`, común | Un `ViewModel` por pantalla, que se descarta al salir de ella |
+| `org.jetbrains.kotlinx:kotlinx-datetime` | 0.7.1 | `shared`, común | Horas del registro |
+| `androidx.room:room-runtime` y `room-compiler` (KSP) | 2.8.5 | `database` | Registro guardado |
+| `androidx.sqlite:sqlite-bundled` | 2.6.2 | `database` | SQLite incluido, igual en todas las plataformas |
+| `org.slf4j:slf4j-api` | 2.0.19 | `core`, solo `jvm` | API de registro; es la que trae `ktor-network` |
+| `net.java.dev.jna:jna`, `jna-platform` | 5.19.1 | `core`, solo `jvm` | `wintun.dll`, `utun` y DPAPI |
 | `androidx.core:core-ktx` | 1.19.1 | `androidApp` | Notificación del servicio en primer plano |
-| `org.jetbrains.kotlinx:kotlinx-coroutines-test` | 1.11.0 | `core`, pruebas | Pruebas del motor con tiempo virtual |
-| `io.ktor:ktor-network-tls` | 3.6.1 | `core`, versión 2 | Proxies HTTPS y SOCKS5 sobre TLS |
-| Compose, lifecycle, activity-compose, logback | las actuales | `shared`, apps | Ya estaban en la plantilla; no cambian |
+| `org.jetbrains.kotlinx:kotlinx-coroutines-test` | 1.11.0 | pruebas | Pruebas del motor con tiempo virtual |
+| `io.ktor:ktor-network-tls` | 3.6.1 | declarada, sin usar | Proxies HTTPS y SOCKS5 sobre TLS, más adelante |
+| Compose, lifecycle, activity-compose, logback | ver `libs.versions.toml` | `shared`, apps | Interfaz y registro en escritorio |
 
-`ktor-network` publica artefactos para `jvm`, `iosArm64` e `iosSimulatorArm64`, que son los targets del
-proyecto. Que el artefacto exista no prueba que funcione dentro de la extensión; eso sigue en la fase 0.
-
-Sin dependencia, con API del sistema: Android Keystore y `VpnService`, Keychain y NetworkExtension en iOS,
-`kotlin.time` para relojes.
-
-### `core/module.yaml`
-
-```yaml
-product:
-  type: kmp/lib
-  platforms: [ jvm, android, iosArm64, iosSimulatorArm64 ]
-
-dependencies:
-  - $libs.kotlinx.coroutines.core: exported
-  - $libs.ktor.network
-  - $kotlin.serialization.json
-  - $libs.koin.core: exported
-
-dependencies@jvm:
-  - $libs.slf4j.api
-  - $libs.jna
-  - $libs.jna.platform
-
-test-dependencies:
-  - $libs.kotlinx.coroutines.test
-  - $libs.koin.test
-
-settings:
-  kotlin:
-    serialization: enabled
-```
-
-Cambios en los módulos existentes:
-
-- `shared/module.yaml`: añadir `- //core: exported`, `- $libs.koin.compose` y
-  `- $libs.koin.compose.viewmodel`; en pruebas, `- $libs.koin.test`.
-- `androidApp/module.yaml`: añadir `- $libs.androidx.core.ktx` y `- $libs.koin.android`.
-- `desktopApp` e `iosApp`: sin cambios; reciben `core` a través de `shared`. La extensión de iOS enlaza solo
-  `core`.
+Sin dependencia, con API del sistema: Android Keystore y `VpnService`, Keychain en iOS, JCA y `SSLEngine` para
+OpenVPN en JVM y Android, `kotlin.time` para relojes.
 
 ### Componentes que no vienen de Maven
 
 | Componente | Versión | Plataforma | Cómo se obtiene |
 |---|---|---|---|
 | `wintun.dll` (amd64 y arm64) | 0.14.1, del ZIP oficial de wintun.net, sin modificar y con su licencia | Windows | Recurso de `core` (`resources@jvm/native`); el motor la extrae y verifica su SHA-256 antes de cargarla |
-| `openvpn` | 2.6 o superior | Windows y macOS, modo "Otro País" | Lo instala el usuario (ProtonVPN, OpenVPN GUI, Homebrew o Tunnelblick) |
 | Xcode y perfil con Network Extensions | — | iOS | Cuenta Apple Developer |
 
 ---
@@ -532,10 +429,8 @@ Cambios en los módulos existentes:
 ## Fuentes de las validaciones pendientes
 
 - Versiones: <https://repo1.maven.org/maven2/> y <https://dl.google.com/dl/android/maven2/>
-- Sintaxis de `module.yaml` (`serialization: enabled`, `exported`): <https://kotlin-toolchain.org/dev/>
-
+- Sintaxis de `module.yaml` (`serialization: enabled`, `exported`, `aliases`): <https://kotlin-toolchain.org/dev/>
 - Sockets de Ktor (API experimental, sin matriz de plataformas): <https://ktor.io/docs/server-sockets.html>
-- Artefactos nativos de `ktor-network-tls`: <https://klibs.io/package/io.ktor/ktor-network-tls>
 - Límite de memoria de `NEPacketTunnelProvider`: <https://developer.apple.com/forums/thread/73148>,
   <https://openradar.appspot.com/27660401>
 - Configuración de Network Extensions en Xcode:
