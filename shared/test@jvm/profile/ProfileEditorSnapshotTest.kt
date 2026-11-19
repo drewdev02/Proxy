@@ -44,6 +44,15 @@ class ProfileEditorSnapshotTest {
                     ),
                 ),
                 newRule = "hulu.com",
+                newRuleExit = RouteExit.VPN,
+            ),
+        ),
+        "rules-without-country" to ProfileEditorUiState(
+            isNew = false,
+            draft = draft,
+            engines = engines,
+            routing = RoutingDraft(
+                rules = RoutingRules(enabled = true, rules = listOf(RouteRule(RuleKind.DOMAIN, "ads.example", RouteExit.BLOCK))),
             ),
         ),
         "tailscale-nodes" to ProfileEditorUiState(

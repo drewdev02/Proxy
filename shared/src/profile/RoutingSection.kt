@@ -104,16 +104,33 @@ internal fun RoutingSection(
             )
         }
 
-        Text("Lo que no coincida con ninguna regla sale por", style = MaterialTheme.typography.labelMedium, color = ProxyUciTheme.colors.onSurfaceMuted)
         // «Otro País» como salida por defecto solo si está activado (o si ya estaba elegido, para poder quitarlo).
         val defaults = RoutingRules.DEFAULT_EXITS.filter { it != RouteExit.VPN || vpnEnabled || rules.defaultExit == it }
-        UciSegmentedControl(
-            options = defaults,
-            selected = rules.defaultExit,
-            onSelect = actions::onDefaultExitChange,
-            label = { it.label },
-            enabled = enabled,
-        )
+        if (defaults.size > 1) {
+            Text("Lo que no coincida con ninguna regla sale por", style = MaterialTheme.typography.labelMedium, color = ProxyUciTheme.colors.onSurfaceMuted)
+            UciSegmentedControl(
+                options = defaults,
+                selected = rules.defaultExit,
+                onSelect = actions::onDefaultExitChange,
+                label = { it.label },
+                enabled = enabled,
+            )
+        } else {
+            // Con una sola salida posible no hay nada que elegir: se dice cuál es y cómo tener más.
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    "Lo que no coincida con ninguna regla sale por",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                UciStatusPill(rules.defaultExit.label, tone = rules.defaultExit.tone)
+            }
+            Text(
+                "Activa «Otro País» para poder elegirlo también como salida.",
+                style = MaterialTheme.typography.bodySmall,
+                color = ProxyUciTheme.colors.onSurfaceFaint,
+            )
+        }
 
         UciSectionHeader(if (rules.rules.isEmpty()) "Sin reglas" else "Reglas · gana la primera que coincide")
         rules.rules.forEachIndexed { index, rule ->

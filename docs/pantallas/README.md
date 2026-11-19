@@ -32,9 +32,9 @@ Escritorio y tableta (dos columnas, barra lateral):
 
 ## Editar perfil
 
-| Perfil nuevo con errores | OpenVPN y reglas de salida | Tailscale con nodos encontrados |
-|---|---|---|
-| ![](../../shared/test@jvm/snapshots/macos/profile-editor/phone-new-with-errors.png) | ![](../../shared/test@jvm/snapshots/macos/profile-editor/phone-openvpn-rules.png) | ![](../../shared/test@jvm/snapshots/macos/profile-editor/phone-tailscale-nodes.png) |
+| Perfil nuevo con errores | OpenVPN y reglas de salida | Reglas sin Otro País | Tailscale con nodos encontrados |
+|---|---|---|---|
+| ![](../../shared/test@jvm/snapshots/macos/profile-editor/phone-new-with-errors.png) | ![](../../shared/test@jvm/snapshots/macos/profile-editor/phone-openvpn-rules.png) | ![](../../shared/test@jvm/snapshots/macos/profile-editor/phone-rules-without-country.png) | ![](../../shared/test@jvm/snapshots/macos/profile-editor/phone-tailscale-nodes.png) |
 
 ## Registro
 

@@ -89,10 +89,21 @@ sealed interface ExitNodeSearch {
 data class RoutingDraft(
     val rules: RoutingRules = RoutingRules(),
     val newRule: String = "",
-    val newRuleExit: RouteExit = RouteExit.VPN,
+    /** Proxy por defecto: un perfil nuevo no tiene Otro País (ver [withNewRuleExitFor]). */
+    val newRuleExit: RouteExit = RouteExit.PROXY,
     /** Lo escrito no es ni un dominio ni una IP. */
     val newRuleInvalid: Boolean = false,
-)
+) {
+    /**
+     * La salida de la regla nueva sigue a Otro País: al apagarlo deja de ser «Otro País» (no se puede elegir) y al
+     * encenderlo pasa a serlo, que es para lo que se suelen añadir reglas. Otras salidas elegidas a mano se respetan.
+     */
+    fun withNewRuleExitFor(countryExitEnabled: Boolean): RoutingDraft = when {
+        !countryExitEnabled && newRuleExit == RouteExit.VPN -> copy(newRuleExit = RouteExit.PROXY)
+        countryExitEnabled && newRuleExit == RouteExit.PROXY -> copy(newRuleExit = RouteExit.VPN)
+        else -> this
+    }
+}
 
 data class ProfileEditorUiState(
     val isNew: Boolean = true,
@@ -150,7 +161,11 @@ class ProfileEditorViewModel(
             isNew = existing == null,
             draft = existing?.toDraft() ?: ProfileDraft(),
             vpn = existing?.countryExit?.toDraft() ?: VpnDraft(engine = engines.first()),
-            routing = RoutingDraft(rules = existing?.routing ?: RoutingRules()),
+            routing = RoutingDraft(
+                rules = existing?.routing ?: RoutingRules(),
+                // Una regla nueva va por Otro País solo si el perfil lo tiene; si no, esa salida no se puede elegir.
+                newRuleExit = if (existing?.countryExit != null) RouteExit.VPN else RouteExit.PROXY,
+            ),
             engines = engines,
         )
         if (existing != null) {
@@ -196,7 +211,14 @@ class ProfileEditorViewModel(
     }
 
     fun setCountryExitEnabled(enabled: Boolean) {
-        state.update { it.copy(vpn = it.vpn.copy(enabled = enabled), errors = it.errors - VPN_FIELDS, saveFailed = false) }
+        state.update {
+            it.copy(
+                vpn = it.vpn.copy(enabled = enabled),
+                routing = it.routing.withNewRuleExitFor(enabled),
+                errors = it.errors - VPN_FIELDS,
+                saveFailed = false,
+            )
+        }
     }
 
     fun selectEngine(engine: CountryEngineKind) {
@@ -290,7 +312,9 @@ class ProfileEditorViewModel(
         } catch (e: OvpnConfigException) {
             state.value.vpn.copy(fileName = fileName, ovpn = "", fileError = e.message)
         }
-        state.update { it.copy(vpn = vpn, errors = it.errors - ProfileField.VPN_FILE, saveFailed = false) }
+        state.update {
+            it.copy(vpn = vpn, routing = it.routing.withNewRuleExitFor(vpn.enabled), errors = it.errors - ProfileField.VPN_FILE, saveFailed = false)
+        }
     }
 
     fun updateVpnUsername(username: String) {

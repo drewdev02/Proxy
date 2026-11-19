@@ -1,5 +1,6 @@
 package org.uci.proxy.profile
 
+import org.uci.proxy.core.model.CountryExit
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.ProxyProtocol
 import org.uci.proxy.core.model.RouteExit
@@ -149,5 +150,46 @@ class ProfileEditorRoutingTest : MainDispatcherTest() {
         ).also { it.start("p1") }
 
         assertEquals(routing, viewModel.rules)
+    }
+
+    private val ProfileEditorViewModel.newRuleExit get() = uiState.value.routing.newRuleExit
+
+    @Test
+    fun `without Otro País a new rule goes through the proxy`() {
+        assertEquals(RouteExit.PROXY, newViewModel().newRuleExit)
+    }
+
+    @Test
+    fun `the new rule exit follows Otro País on and off`() {
+        val viewModel = newViewModel()
+
+        viewModel.setCountryExitEnabled(true)
+        assertEquals(RouteExit.VPN, viewModel.newRuleExit)
+
+        viewModel.setCountryExitEnabled(false)
+        assertEquals(RouteExit.PROXY, viewModel.newRuleExit)
+    }
+
+    @Test
+    fun `an exit chosen by hand is kept when Otro País changes`() {
+        val viewModel = newViewModel()
+        viewModel.setNewRuleExit(RouteExit.BLOCK)
+
+        viewModel.setCountryExitEnabled(true)
+        viewModel.setCountryExitEnabled(false)
+
+        assertEquals(RouteExit.BLOCK, viewModel.newRuleExit)
+    }
+
+    @Test
+    fun `a profile with Otro País starts new rules on it`() {
+        val seeded = FakeProfileRepository(
+            listOf(ProxyProfile("p1", "UCI", "proxy.uci.cu", 3128, ProxyProtocol.HTTP, "", countryExit = CountryExit.OpenVpn("ca.ovpn", "u"))),
+        )
+        val viewModel = ProfileEditorViewModel(
+            seeded, ProfileValidator(), idGenerator = { "nuevo" }, FakeProxyTester(), FakeLocalNetworkPermission(), RecordingLogger(),
+        ).also { it.start("p1") }
+
+        assertEquals(RouteExit.VPN, viewModel.newRuleExit)
     }
 }

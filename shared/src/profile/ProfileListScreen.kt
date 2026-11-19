@@ -116,7 +116,7 @@ fun ProfileListScreen(
                 else -> "${profiles.size} perfiles guardados"
             },
             actions = {
-                if (onOpenCatalog != null) UciIconButton(UciIcons.Tune, "Catálogo de componentes", onOpenCatalog, bordered = false)
+                if (onOpenCatalog != null) UciIconButton(UciIcons.Widgets, "Catálogo de componentes", onOpenCatalog, bordered = false)
                 UciButton("Nuevo", onAdd, icon = UciIcons.Add)
             },
         )
