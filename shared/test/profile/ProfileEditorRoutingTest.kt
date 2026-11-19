@@ -110,7 +110,7 @@ class ProfileEditorRoutingTest : MainDispatcherTest() {
     }
 
     @Test
-    fun `rules can be reordered, changed and removed`() {
+    fun `rules can be reordered and changed and removed`() {
         val viewModel = newViewModel()
         viewModel.add("a.com", RouteExit.VPN)
         viewModel.add("b.com", RouteExit.VPN)

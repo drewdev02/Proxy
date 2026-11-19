@@ -302,7 +302,7 @@ class SplitRoutingTest {
     }
 
     @Test
-    fun `when the VPN drops it warns, falls back to the proxy and comes back on retry`() = runTest(UnconfinedTestDispatcher()) {
+    fun `when the VPN drops it warns and falls back to the proxy and comes back on retry`() = runTest(UnconfinedTestDispatcher()) {
         connect()
         assertEquals(TunnelState.Connected("p1"), stateStore.state.value)
         val first = session

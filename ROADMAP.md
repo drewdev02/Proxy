@@ -24,6 +24,7 @@ orden de entrega**.
 | 8 | Actividad | Ver tráfico, estado y registro de eventos | ✔ | ✔ | ✔ | ✔ |
 | 9 | Otro País | Salir por un `.ovpn` encadenado al proxy, opcional por perfil | ✔ | | ✔ | ✔ |
 | 10 | Resistencia | Cambiar de red o cerrar mal sin quedarse sin Internet | ✔ | ✔ | ✔ | ✔ |
+| 11 | Reglas de salida | Elegir por sitio o por app si sale por el proxy, por Otro País, directo o se bloquea | ✔ | | ✔ | ✔ |
 
 Las capas 0 a 2 no necesitan ninguna VPN y corren en las cuatro plataformas. Sirven para dejar probados
 Koin, el almacenamiento, los sockets y NTLMv2 antes de tocar una interfaz TUN.
@@ -34,7 +35,7 @@ flowchart LR
     C4 --> C5["5 macOS"] --> C6["6 Windows"]
     C4 --> C7["7 iOS"]
     C4 --> C8["8 Actividad"]
-    C6 --> C9["9 Otro País"]
+    C6 --> C9["9 Otro País"] --> C11["11 Reglas de salida"]
     C5 & C6 & C7 --> C10["10 Resistencia"]
 ```
 
@@ -490,6 +491,51 @@ escritorio, el motor cuenta el resultado a la ventana con el mensaje `NAMESTAT`.
 **Demo:** cambiar de red con el túnel activo; matar el proceso del motor en escritorio y comprobar que la red
 se recupera al reabrir la app.
 
+## Capa 11: reglas de salida (split tunneling)
+
+**Resultado:** cada perfil puede tener reglas que deciden por dónde sale cada conexión: por el proxy, por Otro País (la VPN
+del perfil), directa por la red real, o bloqueada. Una regla es un dominio (con sus subdominios, o con `*`), una IP o rango
+CIDR, o una app de Android. Gana la primera que coincide; lo demás toma la salida por defecto (proxy u Otro País). Sin
+reglas, el perfil se comporta como antes: todo por el proxy, o todo por la VPN si tiene una.
+
+| Salida | Dominio | IP o rango | App (Android) |
+|---|---|---|---|
+| Proxy | ✔ | ✔ | ✔ |
+| Otro País | ✔ | ✔ | ✔ |
+| Directo | — (sale por el proxy) | ✔ el rango no entra en la interfaz | ✔ la app queda fuera de la VPN |
+| Bloquear | ✔ | ✔ | ✔ |
+
+**Cómo funciona:** con reglas, la interfaz es la del modo directo (DNS falso y pila TCP propia) y, si alguna regla usa
+Otro País, la VPN se abre a la vez. Las consultas DNS de nombres que van por Otro País se preguntan al DNS de la VPN, así
+que la app recibe la IP real; las conexiones a esas IP salen por la VPN cambiando la dirección de origen (la de la interfaz
+por la que asignó la VPN) y se deshace a la vuelta. Por la VPN va también UDP. Una app con regla de Otro País que recibió
+una dirección inventada (el DNS no sabe qué app pregunta) se resuelve en ese momento por el DNS de la VPN y su conexión se
+traduce en ambos sentidos; su primera conexión a cada sitio tarda un segundo más. Qué app abrió cada conexión lo dice
+Android (`getConnectionOwnerUid`, Android 10 o más) al abrirse.
+
+**Si Otro País se cae:** lo suyo sale por el proxy, se avisa (notificación en Android, aviso en la tarjeta del perfil en
+todas; en escritorio el motor lo cuenta con `STATE connected vpn-down`) y se reintenta de 5 s a 60 s. No se reintenta con
+credenciales o archivo malos.
+
+| Parte | Trabajo | Hecho |
+|---|---|---|
+| Interfaz | Sección «Reglas de salida» en el editor del perfil; «Elegir app» con iconos y buscador en Android; aviso de Otro País caído | ✔ |
+| Núcleo | `RoutingRules`, `RuleSet`, `SplitRouting` (`VpnLink`, `SplitDnsHandler`, `ExitRouterHandler`), VPN supervisada en `TunnelRunner` | ✔ |
+| Adaptadores | `AndroidConnectionOwner`, apps directas con `addDisallowedApplication`, `PackageManagerAppCatalog`, rangos directos fuera de las rutas | ✔ |
+| Protocolo | `STATE connected vpn-down` entre el motor de escritorio y la ventana | ✔ |
+
+**Pruebas:** unitarias de las reglas, del reparto (DNS por la VPN, traducción de ida y vuelta, bloqueo, rangos directos,
+caída y vuelta de la VPN, reglas por app) y del editor. `SplitRoutingLiveTest` contra ProtonVPN real a través del proxy
+(se activa con variables de entorno). A mano: Android en emulador (Chrome por Otro País vio la IP de Canadá mientras el
+resto salía por el proxy) y macOS con la app de escritorio (`ifconfig.me` por Canadá, lo demás por el proxy, limpieza
+correcta al desconectar). En CI, `WindowsSplitTunnelE2ETest` con Wintun real y una VPN de bucle local en el proceso.
+
+**Limitaciones:** con DNS seguro en el navegador (DoH) solo valen las reglas de app o IP; una app que guardó en caché una
+dirección inventada sale por el proxy hasta volver a resolver (60 s como mucho).
+
+> Pendiente: reglas por app en Windows y macOS, crear reglas desde el registro, plantillas («Streaming → Otro País»),
+> y salida directa para dominios.
+
 ---
 
 ## Después de la versión 1
@@ -502,7 +548,6 @@ Cada una es una capa vertical independiente, por prioridad a decidir:
 | Rendimiento TCP | Escalado de ventana y menos contención, si las medidas en dispositivo real lo piden |
 | Proxies con TLS | Perfiles HTTPS y SOCKS5 sobre TLS, con fijación de certificado |
 | UDP por SOCKS5 | Llamadas y juegos con un proxy `socks5udp` |
-| Split tunneling | Elegir qué apps pasan por el túnel |
-| Firewall por app | Bloquear apps concretas |
-| Actividad por app | Ver qué app genera cada conexión |
+| Reglas por app en escritorio | Elegir programas en Windows (`GetExtendedTcpTable`) y macOS (`libproc`), como ya se hace en Android |
+| Actividad por app | Ver qué app genera cada conexión, y crear una regla desde ahí |
 | Empaquetado | Instaladores firmados para escritorio y publicación en tiendas |

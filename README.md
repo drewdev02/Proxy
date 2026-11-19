@@ -25,6 +25,11 @@ mismo las consultas DNS con una dirección falsa por cada nombre, y termina las 
 relé sabe a qué nombre iba cada conexión por esa dirección falsa (o, si la app usó una IP directa, por el SNI o el
 `Host`) y abre el túnel hacia ese destino a través del proxy, autenticándose.
 
+Un perfil puede salir además por **Otro País**: un `.ovpn` cuyo servidor se alcanza a través del mismo proxy, con un
+cliente OpenVPN propio, sin nada que instalar. Con **reglas de salida** cada sitio (dominio, IP o rango) o app de Android
+elige por dónde sale: el proxy, Otro País, directo o bloqueado. Si Otro País se cae, lo suyo sale por el proxy y se
+avisa. Los detalles están en las capas 9 y 11 del [ROADMAP](ROADMAP.md).
+
 En el escritorio la ventana no tiene privilegios: lanza el motor, que sí puede crear la interfaz, con el diálogo de
 administrador de macOS o el aviso de UAC de Windows, y habla con él por un socket local.
 
