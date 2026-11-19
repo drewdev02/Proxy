@@ -1,7 +1,12 @@
 package org.uci.proxy.logs
 
 import kotlinx.datetime.TimeZone
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import org.uci.proxy.core.log.InMemoryLogHistory
 import org.uci.proxy.core.log.LogBuffer
+import org.uci.proxy.core.log.LogRecorder
+import org.uci.proxy.core.profile.AppDispatchers
+import kotlin.time.Clock
 import org.uci.proxy.core.log.LogEntry
 import org.uci.proxy.core.port.LogLevel
 import org.uci.proxy.fakes.MainDispatcherTest
@@ -12,11 +17,11 @@ import kotlin.test.assertTrue
 
 class LogsViewModelTest : MainDispatcherTest() {
     private val buffer = LogBuffer()
-
+    private val recorder = LogRecorder(buffer, InMemoryLogHistory(), Clock.System, AppDispatchers(UnconfinedTestDispatcher()))
 
     // Se crea en el primer uso, ya dentro de la prueba: viewModelScope necesita el despachador principal que instala la
     // clase base, y el orden entre sus @BeforeTest y los de esta clase cambia según la plataforma (en iOS va al revés).
-    private val viewModel by lazy { LogsViewModel(buffer) }
+    private val viewModel by lazy { LogsViewModel(buffer, recorder) }
 
     private fun log(level: LogLevel, message: String) = buffer.append(0, level, "Relay", message)
 

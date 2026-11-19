@@ -5,10 +5,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import org.uci.proxy.core.port.LogLevel
+import kotlin.concurrent.Volatile
 
 /**
  * Una línea del registro. [id] crece de uno en uno dentro de un [LogBuffer] y sirve para saber qué es nuevo y como clave
- * de la lista en pantalla; no tiene sentido fuera del búfer que lo asignó.
+ * de la lista en pantalla; no tiene sentido fuera del búfer que lo asignó. Las líneas recuperadas de una sesión anterior
+ * ([LogBuffer.restore]) llevan ids negativos.
  */
 data class LogEntry(
     val id: Long,
@@ -26,12 +28,16 @@ data class LogEntry(
  *
  * @param capacity cuántos mensajes se conservan.
  */
-class LogBuffer(private val capacity: Int = DEFAULT_CAPACITY) {
+class LogBuffer(val capacity: Int = DEFAULT_CAPACITY) {
     init {
         require(capacity > 0) { "La capacidad debe ser positiva" }
     }
 
     private val mutableEntries = MutableStateFlow<List<LogEntry>>(emptyList())
+
+    /** El último id que tuvo el búfer antes de vaciarlo: los ids siguen creciendo después de [clear]. */
+    @Volatile
+    private var lastClearedId = -1L
 
     /** Los mensajes conservados, del más antiguo al más reciente. */
     val entries: StateFlow<List<LogEntry>> = mutableEntries.asStateFlow()
@@ -40,14 +46,30 @@ class LogBuffer(private val capacity: Int = DEFAULT_CAPACITY) {
         val text = if (message.length > MAX_MESSAGE_LENGTH) message.take(MAX_MESSAGE_LENGTH) + "…" else message
         mutableEntries.update { current ->
             // El id sale de la lista misma, así que reintentar la actualización no deja huecos ni repite ids.
-            val entry = LogEntry(id = (current.lastOrNull()?.id ?: -1L) + 1, epochMillis = epochMillis, level = level, tag = tag, message = text)
+            val lastId = current.lastOrNull()?.id?.coerceAtLeast(lastClearedId) ?: lastClearedId
+            val entry = LogEntry(id = lastId + 1, epochMillis = epochMillis, level = level, tag = tag, message = text)
             if (current.size < capacity) current + entry else current.drop(current.size - capacity + 1) + entry
         }
     }
 
-    /** Vacía el búfer. Los ids vuelven a empezar: nada de lo que se muestre después comparte id con lo anterior. */
+    /**
+     * Pone delante [older], los mensajes de una sesión anterior (del más antiguo al más reciente), sin pasar de la
+     * capacidad. Llevan ids negativos, así que no se confunden con los de esta sesión ni cuentan como nuevos.
+     */
+    fun restore(older: List<LogEntry>) {
+        mutableEntries.update { current ->
+            val kept = older.takeLast((capacity - current.size).coerceAtLeast(0))
+            kept.mapIndexed { index, entry -> entry.copy(id = (index - kept.size).toLong()) } + current
+        }
+    }
+
+    /** Vacía el búfer. Los ids no vuelven a empezar: quien guarda lo nuevo por id ([LogRecorder]) sigue funcionando. */
     fun clear() {
-        mutableEntries.value = emptyList()
+        mutableEntries.update { current ->
+            // Antes de publicar la lista vacía, para que un append que la vea ya sepa por dónde iban los ids.
+            lastClearedId = maxOf(lastClearedId, current.lastOrNull()?.id ?: -1L)
+            emptyList()
+        }
     }
 
     companion object {
