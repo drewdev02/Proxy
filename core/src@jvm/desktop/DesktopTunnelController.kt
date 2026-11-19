@@ -19,7 +19,8 @@ import org.uci.proxy.core.profile.AppDispatchers
 import org.uci.proxy.core.profile.ProfileRepository
 import org.uci.proxy.core.settings.NameServiceReporter
 import org.uci.proxy.core.settings.SettingsRepository
-import org.uci.proxy.core.vpn.VpnStart
+import org.uci.proxy.core.port.EngineStateDirectories
+import org.uci.proxy.core.vpn.CountryExitStart
 import java.io.IOException
 import java.io.PrintWriter
 import java.net.InetAddress
@@ -50,6 +51,8 @@ class DesktopTunnelController(
     private val settings: SettingsRepository,
     /** Donde la ventana anota cómo le fue a cada servicio de nombres, según cuenta el motor. */
     private val nameStatus: NameServiceReporter,
+    /** Dónde guarda cada perfil el estado de su motor de Otro País; el motor, que corre aparte, recibe la ruta. */
+    private val stateDirectories: EngineStateDirectories = EngineStateDirectories.None,
     private val launchTimeout: Duration = 3.minutes,
 ) : TunnelControl, TunnelMonitor {
     override val isAvailable = true
@@ -77,14 +80,14 @@ class DesktopTunnelController(
             mutableState.value = TunnelState.Failed(TunnelFailure.PROFILE_NOT_FOUND)
             return
         }
-        val vpn = profile.vpn?.let { vpnProfile ->
-            val secrets = profiles.vpnSecrets(profileId)
+        val vpn = profile.countryExit?.let { exit ->
+            val secrets = profiles.exitSecrets(profileId)
             if (secrets == null) {
-                logger.log(LogLevel.ERROR, TAG, "El perfil tiene una VPN pero no se pudo leer su archivo")
+                logger.log(LogLevel.ERROR, TAG, "El perfil sale por Otro País pero no se pudieron leer sus secretos")
                 mutableState.value = TunnelState.Failed(TunnelFailure.VPN_PROFILE_INVALID)
                 return
             }
-            VpnStart(secrets.ovpn, vpnProfile.username, secrets.password)
+            CountryExitStart(exit, secrets, stateDirectories.forProfile(profileId))
         }
         val start = EngineStart(profile, profiles.password(profileId), settings.settings.value, vpn)
         mutableState.value = TunnelState.Connecting(profileId)

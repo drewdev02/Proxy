@@ -16,7 +16,7 @@ import org.uci.proxy.core.port.PacketWriter
 import org.uci.proxy.core.port.RandomBytes
 import org.uci.proxy.core.tcp.TunTcpConnection
 import org.uci.proxy.core.tcp.TunTcpStack
-import org.uci.proxy.core.vpn.OpenVpnPush
+import org.uci.proxy.core.vpn.VpnNetwork
 import org.uci.proxy.core.vpn.VpnSession
 import java.net.InetSocketAddress
 import java.net.Socket
@@ -35,10 +35,7 @@ internal class LoopbackVpnSession(
     private val originPort: Int,
     randomBytes: RandomBytes,
 ) : VpnSession {
-    override val push = OpenVpnPush(
-        address = "10.99.0.2", netmask = "255.255.255.0", dnsServers = listOf("10.99.0.1"), peerId = 0, cipher = "AES-256-GCM",
-        tunMtu = 1500, pingSeconds = 10, pingRestartSeconds = 60, redirectGateway = true,
-    )
+    override val network = VpnNetwork(address = "10.99.0.2", prefixLength = 24, dnsServers = listOf("10.99.0.1"), mtu = 1500)
     val accepted = AtomicInteger()
     val dnsQueries = AtomicInteger()
 

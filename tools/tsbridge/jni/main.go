@@ -117,6 +117,11 @@ func Java_org_uci_proxy_core_vpn_tailscale_TsBridgeNative_start(env *C.JNIEnv, c
 	return jString(env, jsonOf(map[string]any{"handle": h, "network": s.Network()}))
 }
 
+//export Java_org_uci_proxy_core_vpn_tailscale_TsBridgeNative_cancelStart
+func Java_org_uci_proxy_core_vpn_tailscale_TsBridgeNative_cancelStart(env *C.JNIEnv, cls C.jclass) {
+	bridge.CancelStart()
+}
+
 //export Java_org_uci_proxy_core_vpn_tailscale_TsBridgeNative_write
 func Java_org_uci_proxy_core_vpn_tailscale_TsBridgeNative_write(env *C.JNIEnv, cls C.jclass, h C.jlong, packet C.jbyteArray, length C.jint) C.jint {
 	s := session(int64(h))

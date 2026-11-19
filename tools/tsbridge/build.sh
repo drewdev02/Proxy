@@ -2,7 +2,7 @@
 # Compila libtsbridge (el puente de Tailscale) y la deja donde la app la busca:
 #
 #   core/resources@jvm/native/tsbridge/<so>-<arch>/libtsbridge.{dylib,so,dll}       (escritorio y pruebas de la JVM)
-#   core/resources@android/native/tsbridge/android-<arch>/libtsbridge.so            (Android)
+#   androidApp/jniLibs/<abi>/libtsbridge.so                                          (Android)
 #
 #   tools/tsbridge/build.sh                    # la del equipo actual
 #   tools/tsbridge/build.sh android-arm64      # o android-x86_64; necesita el NDK (ANDROID_NDK_HOME o el del SDK)
@@ -64,13 +64,13 @@ case "$TARGET" in
   android-arm64|android-x86_64)
     arch="${TARGET#android-}"
     case "$arch" in
-      arm64) goarch=arm64; triple=aarch64-linux-android ;;
-      x86_64) goarch=amd64; triple=x86_64-linux-android ;;
+      arm64) goarch=arm64; triple=aarch64-linux-android; abi=arm64-v8a ;;
+      x86_64) goarch=amd64; triple=x86_64-linux-android; abi=x86_64 ;;
     esac
     n="$(ndk)"
     host="$(ls "$n/toolchains/llvm/prebuilt" | head -1)"
     cc="$n/toolchains/llvm/prebuilt/$host/bin/${triple}26-clang"
-    out="$ROOT/core/resources@android/native/tsbridge/android-$arch/libtsbridge.so"
+    out="$ROOT/androidApp/jniLibs/$abi/libtsbridge.so"
     mkdir -p "$(dirname "$out")"
     # jni.h viene en el NDK (sysroot), no hace falta un JDK.
     CGO_ENABLED=1 GOOS=android GOARCH="$goarch" CC="$cc" go build -trimpath -tags "$TAGS" -ldflags "$LDFLAGS" -buildmode=c-shared -o "$out" ./jni

@@ -13,9 +13,16 @@ import org.uci.proxy.core.proxy.HttpConnectConnector
 import org.uci.proxy.core.proxy.Socks5Connector
 import org.uci.proxy.core.settings.NameServiceReporter
 import org.uci.proxy.core.settings.NameServiceStatusRepository
+import org.uci.proxy.core.port.EngineStateDirectories
+import org.uci.proxy.core.profile.AppDispatchers
+import org.uci.proxy.core.vpn.tailscale.TailscaleBridge
+import org.uci.proxy.core.vpn.tailscale.TailscaleEngine
+import org.uci.proxy.core.vpn.CountryEngines
 import org.uci.proxy.core.vpn.OpenVpnClient
-import org.uci.proxy.core.vpn.OpenVpnExit
-import org.uci.proxy.core.vpn.VpnExit
+import org.uci.proxy.core.vpn.OpenVpnCrypto
+import org.uci.proxy.core.vpn.OpenVpnEngine
+import org.uci.proxy.core.vpn.ProxyDialer
+import org.uci.proxy.core.vpn.UnavailableOpenVpnCrypto
 import kotlin.time.Clock
 import kotlin.time.TimeSource
 
@@ -43,8 +50,16 @@ val tunnelModule = module {
             owner = getOrNull<ConnectionOwner>() ?: ConnectionOwner.Unknown,
         )
     }
-    single<VpnExit> {
-        OpenVpnExit(
+    // Cómo llegan los motores de Otro País a sus servidores: por el proxy del perfil, todos igual.
+    single {
+        ProxyDialer(
+            connectors = listOf(get<HttpConnectConnector>(), get<Socks5Connector>()),
+            logger = get(),
+            reporter = get(),
+        )
+    }
+    single {
+        OpenVpnEngine(
             client = OpenVpnClient(
                 crypto = get(),
                 tls = get(),
@@ -52,10 +67,27 @@ val tunnelModule = module {
                 logger = get(),
                 nowSeconds = { get<Clock>().now().epochSeconds },
             ),
-            connectors = listOf(get<HttpConnectConnector>(), get<Socks5Connector>()),
+            dialer = get(),
             random = get(),
             logger = get(),
-            reporter = get(),
+            // iOS no tiene cliente OpenVPN propio.
+            isAvailable = get<OpenVpnCrypto>() !is UnavailableOpenVpnCrypto,
+        )
+    }
+    // Los motores de esta plataforma; cada uno dice si puede usarse aquí (Tailscale, si su librería está).
+    single {
+        CountryEngines(
+            listOf(
+                get<OpenVpnEngine>(),
+                TailscaleEngine(
+                    bridge = getOrNull<TailscaleBridge>() ?: TailscaleBridge.Unavailable,
+                    dialer = get(),
+                    selector = get(),
+                    random = get(),
+                    logger = get(),
+                    io = get<AppDispatchers>().background,
+                ),
+            ),
         )
     }
     // Con get() explícitos: las rutas públicas usan el valor por defecto del constructor.
@@ -68,7 +100,8 @@ val tunnelModule = module {
             stateStore = get(),
             dispatchers = get(),
             logger = get(),
-            vpnExit = get(),
+            engines = get(),
+            stateDirectories = getOrNull<EngineStateDirectories>() ?: EngineStateDirectories.None,
         )
     }
 }

@@ -12,7 +12,7 @@ import org.uci.proxy.core.port.SecretStore
 import org.uci.proxy.core.port.TunnelControl
 import org.uci.proxy.core.port.TunnelMonitor
 import org.uci.proxy.core.port.TunnelState
-import org.uci.proxy.core.model.VpnSecrets
+import org.uci.proxy.core.model.CountryExitSecrets
 import org.uci.proxy.core.profile.ProfileRepository
 import org.uci.proxy.core.proxy.ProxyTestResult
 import org.uci.proxy.core.proxy.ProxyTester
@@ -24,13 +24,13 @@ class FakeProfileRepository(initial: List<ProxyProfile> = emptyList()) : Profile
 
     override val profiles: StateFlow<List<ProxyProfile>> = state
 
-    val vpnSecrets = mutableMapOf<String, VpnSecrets>()
+    val vpnSecrets = mutableMapOf<String, CountryExitSecrets>()
 
-    override suspend fun save(profile: ProxyProfile, password: String, vpn: VpnSecrets?) {
+    override suspend fun save(profile: ProxyProfile, password: String, exitSecrets: CountryExitSecrets?) {
         check(!failWrites) { "almacén no disponible" }
         state.value = state.value.filterNot { it.id == profile.id } + profile
         passwords[profile.id] = password
-        if (profile.vpn != null && vpn != null) vpnSecrets[profile.id] = vpn else vpnSecrets.remove(profile.id)
+        if (profile.countryExit != null && exitSecrets != null) vpnSecrets[profile.id] = exitSecrets else vpnSecrets.remove(profile.id)
     }
 
     override suspend fun delete(id: String) {
@@ -42,7 +42,7 @@ class FakeProfileRepository(initial: List<ProxyProfile> = emptyList()) : Profile
 
     override suspend fun password(id: String): String = passwords[id].orEmpty()
 
-    override suspend fun vpnSecrets(id: String): VpnSecrets? = vpnSecrets[id]
+    override suspend fun exitSecrets(id: String): CountryExitSecrets? = vpnSecrets[id]
 }
 
 /** Devuelve [result] y recuerda con qué se le llamó. Con [gate] la prueba queda en curso hasta completarlo. */

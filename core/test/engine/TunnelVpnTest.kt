@@ -14,19 +14,20 @@ import org.uci.proxy.core.fakes.InMemorySecretStore
 import org.uci.proxy.core.fakes.RecordingLogger
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.ProxyProtocol
-import org.uci.proxy.core.model.VpnProfile
-import org.uci.proxy.core.model.VpnSecrets
+import org.uci.proxy.core.model.CountryExit
+import org.uci.proxy.core.model.CountryExitSecrets
 import org.uci.proxy.core.packet.parseIpv4
 import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.profile.AppDispatchers
 import org.uci.proxy.core.settings.AppSettings
 import org.uci.proxy.core.profile.StoredProfileRepository
-import org.uci.proxy.core.vpn.OpenVpnPush
+import org.uci.proxy.core.fakes.fakeEngines
+import org.uci.proxy.core.vpn.CountryEngines
+import org.uci.proxy.core.vpn.CountryExitStart
 import org.uci.proxy.core.vpn.VpnConnectResult
-import org.uci.proxy.core.vpn.VpnExit
+import org.uci.proxy.core.vpn.VpnNetwork
 import org.uci.proxy.core.vpn.VpnSession
-import org.uci.proxy.core.vpn.VpnStart
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -35,13 +36,10 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-private fun push(dns: List<String> = listOf("10.98.0.1")) = OpenVpnPush(
-    address = "10.98.0.9", netmask = "255.255.0.0", dnsServers = dns, peerId = 3, cipher = "AES-256-GCM",
-    tunMtu = 1500, pingSeconds = 10, pingRestartSeconds = 60, redirectGateway = true,
-)
+private fun push(dns: List<String> = listOf("10.98.0.1")) = VpnNetwork(address = "10.98.0.9", prefixLength = 16, dnsServers = dns, mtu = 1500)
 
 /** Una sesión VPN en memoria: lo que la prueba meta en [fromServer] llega a la interfaz, y lo que la interfaz envíe queda en [sent]. */
-private class FakeVpnSession(override val push: OpenVpnPush = push()) : VpnSession {
+private class FakeVpnSession(override val network: VpnNetwork = push()) : VpnSession {
     val sent = mutableListOf<ByteArray>()
     val fromServer = Channel<ByteArray>(Channel.UNLIMITED)
     var closed = false
@@ -67,15 +65,15 @@ class TunnelVpnTest {
     private val stateStore = TunnelStateStore()
     private val platformTunnel = FakePlatformTunnel()
     private val resolvedHosts = mutableMapOf("proxy.uci.cu" to "10.8.0.20")
-    private val profile = ProxyProfile("p1", "UCI", "proxy.uci.cu", 3128, ProxyProtocol.HTTP, "andrey", VpnProfile("pais.ovpn", "vpnuser"))
-    private val start = VpnStart("client\n", "vpnuser", "vpnpass")
+    private val profile = ProxyProfile("p1", "UCI", "proxy.uci.cu", 3128, ProxyProtocol.HTTP, "andrey", CountryExit.OpenVpn("pais.ovpn", "vpnuser"))
+    private val start = CountryExitStart(CountryExit.OpenVpn("pais.ovpn", "vpnuser"), CountryExitSecrets.OpenVpn("client\n", "vpnpass"))
 
     private var result: VpnConnectResult = VpnConnectResult.Connected(FakeVpnSession())
-    private val exitCalls = mutableListOf<Triple<ProxyProfile, String, VpnStart>>()
+    private val exitCalls = mutableListOf<Triple<ProxyProfile, String, CountryExitStart>>()
     private var exitSettings: AppSettings? = null
-    private val exit = VpnExit { proxy, password, vpn, settings ->
-        exitCalls += Triple(proxy, password, vpn)
-        exitSettings = settings
+    private val exit = fakeEngines { context, start ->
+        exitCalls += Triple(context.proxy, context.proxyPassword, start)
+        exitSettings = context.settings
         result
     }
 
@@ -90,7 +88,7 @@ class TunnelVpnTest {
             stateStore = stateStore,
             dispatchers = dispatchers,
             logger = logger,
-            vpnExit = if (withExit) exit else null,
+            engines = if (withExit) exit else CountryEngines.None,
         )
         return runner to repository
     }
@@ -233,7 +231,7 @@ class TunnelVpnTest {
 
         runner.run(platformTunnel, profile, "x", vpn = start)
 
-        assertEquals(TunnelState.Failed(TunnelFailure.VPN_PROFILE_INVALID), stateStore.state.value)
+        assertEquals(TunnelState.Failed(TunnelFailure.ENGINE_UNAVAILABLE), stateStore.state.value)
     }
 
     @Test
@@ -250,19 +248,19 @@ class TunnelVpnTest {
     @Test
     fun `a stored profile with a VPN reads its file and credentials from the secure store`() = runTest(UnconfinedTestDispatcher()) {
         val (runner, repository) = newRunner()
-        repository.save(profile, "proxypass", VpnSecrets("client\nremote x 443\n", "vpnpass"))
+        repository.save(profile, "proxypass", CountryExitSecrets.OpenVpn("client\nremote x 443\n", "vpnpass"))
         val job = launch { runner.run(platformTunnel, profile.id) }
 
         val (_, password, vpn) = exitCalls.single()
         assertEquals("proxypass", password)
-        assertEquals(VpnStart("client\nremote x 443\n", "vpnuser", "vpnpass"), vpn)
+        assertEquals(CountryExitStart(profile.countryExit!!, CountryExitSecrets.OpenVpn("client\nremote x 443\n", "vpnpass")), vpn)
         job.cancel()
     }
 
     @Test
     fun `a stored profile whose VPN file is missing fails instead of connecting directly`() = runTest {
         val (runner, repository) = newRunner()
-        repository.save(profile, "proxypass", vpn = null)
+        repository.save(profile, "proxypass", exitSecrets = null)
 
         runner.run(platformTunnel, profile.id)
 

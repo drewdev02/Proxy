@@ -8,8 +8,8 @@ import org.uci.proxy.core.fakes.InMemorySecretStore
 import org.uci.proxy.core.fakes.RecordingLogger
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.ProxyProtocol
-import org.uci.proxy.core.model.VpnProfile
-import org.uci.proxy.core.model.VpnSecrets
+import org.uci.proxy.core.model.CountryExit
+import org.uci.proxy.core.model.CountryExitSecrets
 import org.uci.proxy.core.port.LogLevel
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -116,8 +116,8 @@ class StoredProfileRepositoryTest {
         assertEquals(listOf(LogLevel.ERROR), logger.entries.map { it.first })
     }
 
-    private val withVpn = uci.copy(vpn = VpnProfile("pais.ovpn", "vpnuser"))
-    private val secrets = VpnSecrets("client\n<tls-crypt>clave</tls-crypt>\n", "vpnpass")
+    private val withVpn = uci.copy(countryExit = CountryExit.OpenVpn("pais.ovpn", "vpnuser"))
+    private val secrets = CountryExitSecrets.OpenVpn("client\n<tls-crypt>clave</tls-crypt>\n", "vpnpass")
 
     @Test
     fun `the VPN file and its password are kept in the secure store and survive a restart`() = runTest {
@@ -126,7 +126,7 @@ class StoredProfileRepositoryTest {
         val reopened = newRepository()
 
         assertEquals(withVpn, reopened.profiles.value.single())
-        assertEquals(secrets, reopened.vpnSecrets(withVpn.id))
+        assertEquals(secrets, reopened.exitSecrets(withVpn.id))
         assertFalse(keyValueStore.values.values.any { "tls-crypt" in it || "vpnpass" in it }, "nada de la VPN en el almacén sin cifrar")
     }
 
@@ -135,7 +135,7 @@ class StoredProfileRepositoryTest {
         val repository = newRepository()
         repository.save(uci, "secreta", secrets)
 
-        assertEquals(null, repository.vpnSecrets(uci.id), "sin VPN en el perfil no se guarda nada aunque se pasen secretos")
+        assertEquals(null, repository.exitSecrets(uci.id), "sin VPN en el perfil no se guarda nada aunque se pasen secretos")
         assertTrue(secretStore.secrets.keys.none { "vpn" in it })
     }
 
@@ -146,7 +146,7 @@ class StoredProfileRepositoryTest {
 
         repository.save(uci, "secreta", null)
 
-        assertEquals(null, repository.vpnSecrets(uci.id))
+        assertEquals(null, repository.exitSecrets(uci.id))
         assertTrue(secretStore.secrets.keys.none { "vpn" in it })
     }
 
@@ -157,7 +157,7 @@ class StoredProfileRepositoryTest {
 
         repository.save(withVpn, "secreta", secrets.copy(password = ""))
 
-        assertEquals(secrets.copy(password = ""), repository.vpnSecrets(withVpn.id))
+        assertEquals(secrets.copy(password = ""), repository.exitSecrets(withVpn.id))
     }
 
     @Test
@@ -167,7 +167,7 @@ class StoredProfileRepositoryTest {
 
         repository.delete(withVpn.id)
 
-        assertEquals(null, repository.vpnSecrets(withVpn.id))
+        assertEquals(null, repository.exitSecrets(withVpn.id))
         assertTrue(secretStore.secrets.isEmpty())
     }
 
@@ -176,5 +176,49 @@ class StoredProfileRepositoryTest {
         keyValueStore.putString("profiles", """[{"id":"a1","name":"UCI","host":"proxy.uci.cu","port":3128,"protocol":"HTTP","username":"andrey"}]""")
 
         assertEquals(listOf(uci), newRepository().profiles.value)
+    }
+
+    @Test
+    fun `profiles saved with an OpenVPN exit before the engines existed are read as OpenVPN`() = runTest {
+        keyValueStore.putString(
+            "profiles",
+            """[{"id":"a1","name":"UCI","host":"proxy.uci.cu","port":3128,"protocol":"HTTP","username":"andrey",""" +
+                """"vpn":{"fileName":"pais.ovpn","username":"vpnuser"}}]""",
+        )
+
+        assertEquals(listOf(withVpn), newRepository().profiles.value)
+    }
+
+    private val withTailscale = uci.copy(countryExit = CountryExit.Tailscale(exitNode = "nodo-ca", hostname = "portatil"))
+
+    @Test
+    fun `a Tailscale exit and its auth key survive a restart with the key only in the secure store`() = runTest {
+        newRepository().save(withTailscale, "secreta", CountryExitSecrets.Tailscale("tskey-auth-abc"))
+
+        val reopened = newRepository()
+
+        assertEquals(withTailscale, reopened.profiles.value.single())
+        assertEquals(CountryExitSecrets.Tailscale("tskey-auth-abc"), reopened.exitSecrets(withTailscale.id))
+        assertFalse(keyValueStore.values.values.any { "tskey" in it }, "la clave no va al almacén sin cifrar")
+        assertTrue(keyValueStore.values.values.any { "\"type\":\"tailscale\"" in it }, "el motor queda guardado")
+    }
+
+    @Test
+    fun `changing the engine deletes the secrets of the previous one`() = runTest {
+        val repository = newRepository()
+        repository.save(withVpn, "secreta", secrets)
+
+        repository.save(withTailscale, "secreta", CountryExitSecrets.Tailscale("tskey-auth-abc"))
+
+        assertEquals(CountryExitSecrets.Tailscale("tskey-auth-abc"), repository.exitSecrets(withTailscale.id))
+        assertTrue(secretStore.secrets.keys.none { "vpn" in it }, "ni el .ovpn ni su contraseña quedan guardados")
+    }
+
+    @Test
+    fun `a Tailscale exit without a stored key still reconnects with the node identity`() = runTest {
+        val repository = newRepository()
+        repository.save(withTailscale, "secreta", CountryExitSecrets.Tailscale(""))
+
+        assertEquals(CountryExitSecrets.Tailscale(""), repository.exitSecrets(withTailscale.id))
     }
 }

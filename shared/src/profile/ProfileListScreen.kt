@@ -209,18 +209,23 @@ private fun TunnelFailure.message(): String = when (this) {
     TunnelFailure.PROXY_HOST_UNRESOLVED -> "No se pudo conectar: no se encuentra el servidor del perfil."
     TunnelFailure.PROXY_AUTH_FAILED -> "No se pudo conectar: el proxy rechazó el usuario o la contraseña."
     TunnelFailure.VPN_PROFILE_INVALID ->
-        "No se pudo conectar: el archivo .ovpn del perfil no sirve. Debe ser OpenVPN sobre TCP; vuelve a elegirlo."
-    TunnelFailure.VPN_SERVER_UNREACHABLE -> "No se pudo conectar: el proxy no dejó llegar al servidor VPN."
+        "No se pudo conectar: la configuración de Otro País no sirve (el archivo .ovpn debe ser OpenVPN sobre TCP; " +
+            "la dirección del servidor de Tailscale debe ser válida). Revísala en el perfil."
+    TunnelFailure.VPN_SERVER_UNREACHABLE -> "No se pudo conectar: el proxy no dejó llegar al servidor de Otro País."
     TunnelFailure.VPN_SERVER_BLOCKED ->
-        "No se pudo conectar: la política del proxy bloqueó el acceso a los servidores VPN del archivo. " +
-            "Prueba con otro servidor, uno con puerto 443."
-    TunnelFailure.VPN_AUTH_FAILED -> "No se pudo conectar: el servidor VPN rechazó el usuario o la contraseña."
-    TunnelFailure.VPN_HANDSHAKE_FAILED -> "No se pudo conectar: el servidor VPN no completó el acuerdo de claves."
+        "No se pudo conectar: la política del proxy bloqueó el acceso a los servidores de Otro País. " +
+            "Con OpenVPN, prueba con otro servidor, uno con puerto 443."
+    TunnelFailure.VPN_AUTH_FAILED ->
+        "No se pudo conectar: Otro País rechazó las credenciales (usuario y contraseña de la VPN, o clave de Tailscale)."
+    TunnelFailure.VPN_HANDSHAKE_FAILED -> "No se pudo conectar: el servidor de Otro País no completó la conexión."
+    TunnelFailure.EXIT_NODE_NOT_FOUND ->
+        "No se pudo conectar: el nodo de salida de Tailscale no existe en la red, o hay varios y no se eligió ninguno."
+    TunnelFailure.ENGINE_UNAVAILABLE -> "No se pudo conectar: el motor de Otro País del perfil no está disponible en este equipo."
 }
 
 private fun ProxyProfile.summary(): String {
     val user = if (username.isEmpty()) "" else " · $username"
-    val exit = vpn?.let { " · VPN ${it.fileName}" }.orEmpty()
+    val exit = countryExit?.let { " · ${it.kind.label} ${it.summary}" }.orEmpty()
     return "${protocol.label} · $host:$port$user$exit"
 }
 

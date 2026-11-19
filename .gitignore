@@ -23,4 +23,4 @@ Pasted *.png
 
 # Librerías nativas del puente de Tailscale: las construye tools/tsbridge/build.sh (y el CI).
 core/resources@jvm/native/tsbridge/
-core/resources@android/native/tsbridge/
+androidApp/jniLibs/

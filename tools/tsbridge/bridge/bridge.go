@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/netip"
 	"net/url"
 	"os"
@@ -24,6 +25,7 @@ import (
 	"tailscale.com/envknob"
 	"tailscale.com/ipn"
 	"tailscale.com/ipn/ipnstate"
+	"tailscale.com/ipn/store/mem"
 	"tailscale.com/logtail"
 	"tailscale.com/net/tshttpproxy"
 	"tailscale.com/tailcfg"
@@ -49,7 +51,10 @@ type Config struct {
 	// ProxyURL es el proxy HTTP por el que sale todo, por ejemplo http://token:x@127.0.0.1:41234.
 	ProxyURL string `json:"proxyUrl"`
 	// ListOnly abre la sesión solo para listar los nodos de salida, sin elegir ninguno.
-	ListOnly  bool `json:"listOnly"`
+	ListOnly bool `json:"listOnly"`
+	// Ephemeral registra un nodo efímero, sin guardar nada en disco: la red lo olvida al desconectarse. Para listar
+	// nodos sin dejar uno permanente por cada búsqueda.
+	Ephemeral bool `json:"ephemeral"`
 	TimeoutMs int  `json:"timeoutMs"`
 	Verbose   bool `json:"verbose"`
 }
@@ -93,7 +98,9 @@ type Error struct {
 
 func (e *Error) Error() string { return e.Code + ": " + e.Message }
 
-func fail(code, format string, a ...any) error { return &Error{Code: code, Message: fmt.Sprintf(format, a...)} }
+func fail(code, format string, a ...any) error {
+	return &Error{Code: code, Message: fmt.Sprintf(format, a...)}
+}
 
 // El proxy de cada proceso: Tailscale fija su función de proxy una vez, así que esta lee el valor actual.
 var (
@@ -102,7 +109,18 @@ var (
 	setupErr     error
 	sessionMu    sync.Mutex
 	sessionAlive bool
+	// cancelStart corta el Start en curso (la app lo pide si el proxy rechaza sus credenciales o al desconectar).
+	cancelStart context.CancelFunc
 )
+
+// CancelStart corta el arranque en curso, si lo hay: Start devuelve enseguida con CONTROL_UNREACHABLE.
+func CancelStart() {
+	sessionMu.Lock()
+	defer sessionMu.Unlock()
+	if cancelStart != nil {
+		cancelStart()
+	}
+}
 
 // Setup prepara Tailscale para este proceso. Tiene que correr antes de que nada de Tailscale lea la configuración de
 // proxy (por eso también se llama al cargar la librería); después, la función de proxy ya no se puede cambiar.
@@ -111,6 +129,8 @@ func Setup() error {
 		// Sin subir registros a log.tailscale.com: la app no los manda a ningún sitio.
 		envknob.SetNoLogsNoSupport()
 		logtail.Disable()
+		// El log estándar de Go escribe en stderr (en Android, en logcat) cosas como la URL del proxy local con su token.
+		log.SetOutput(io.Discard)
 		// Solo DERP: el UDP directo no atraviesa el proxy, y además así ningún paquete sale por fuera de él.
 		envknob.Setenv("TS_DEBUG_ALWAYS_USE_DERP", "true")
 		// Sin abrir puertos en el router (UPnP, NAT-PMP, PCP): no tiene sentido detrás de un proxy.
@@ -135,11 +155,12 @@ type Session struct {
 	tun     *chanTun
 	network Network
 	logf    func(string, ...any)
+	tempDir string
 }
 
 // Start abre la sesión y espera a que el nodo de salida esté listo (salvo con ListOnly).
 func Start(parent context.Context, cfg Config, logf func(string, ...any)) (*Session, error) {
-	if cfg.ControlURL == "" || cfg.StateDir == "" || cfg.ProxyURL == "" {
+	if cfg.ControlURL == "" || cfg.ProxyURL == "" || cfg.StateDir == "" && !cfg.Ephemeral {
 		return nil, fail(CodeConfig, "faltan controlUrl, stateDir o proxyUrl")
 	}
 	pu, err := url.Parse(cfg.ProxyURL)
@@ -175,7 +196,29 @@ func Start(parent context.Context, cfg Config, logf func(string, ...any)) (*Sess
 	}
 	ctx, cancel := context.WithTimeout(parent, timeout)
 	defer cancel()
+	sessionMu.Lock()
+	cancelStart = cancel
+	sessionMu.Unlock()
+	defer func() {
+		sessionMu.Lock()
+		cancelStart = nil
+		sessionMu.Unlock()
+	}()
 
+	tempDir := ""
+	if cfg.Ephemeral {
+		// tsnet necesita un directorio aunque no guarde el estado en él.
+		dir, err := os.MkdirTemp("", "tsbridge-efimero")
+		if err != nil {
+			return nil, fail(CodeInternal, "no se pudo crear un directorio temporal: %v", err)
+		}
+		cfg.StateDir, tempDir = dir, dir
+		defer func() {
+			if !ok {
+				os.RemoveAll(tempDir)
+			}
+		}()
+	}
 	if err := os.MkdirAll(cfg.StateDir, 0o700); err != nil {
 		return nil, fail(CodeConfig, "no se pudo crear el directorio de estado: %v", err)
 	}
@@ -198,7 +241,11 @@ func Start(parent context.Context, cfg Config, logf func(string, ...any)) (*Sess
 		Logf:       tsLogf,
 		UserLogf:   tsLogf,
 	}
-	s := &Session{srv: srv, tun: t, logf: logf}
+	if cfg.Ephemeral {
+		srv.Ephemeral = true
+		srv.Store = new(mem.Store)
+	}
+	s := &Session{srv: srv, tun: t, logf: logf, tempDir: tempDir}
 
 	logf("Conectando con el servidor de control %s", cfg.ControlURL)
 	status, err := srv.Up(ctx)
@@ -375,6 +422,9 @@ func (s *Session) Close() {
 		s.logf("Tailscale no terminó de cerrarse a tiempo; se da por cerrada la sesión")
 	}
 	s.tun.Close()
+	if s.tempDir != "" {
+		os.RemoveAll(s.tempDir)
+	}
 	UseProxy(nowhere)
 	sessionMu.Lock()
 	sessionAlive = false

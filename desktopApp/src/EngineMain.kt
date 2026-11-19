@@ -68,7 +68,7 @@ fun runEngine(args: List<String>) {
     val runner = if (testRoutes == null) {
         koin.get<TunnelRunner>()
     } else {
-        TunnelRunner(koin.get(), koin.get(), koin.get(), koin.get(), koin.get(), dispatchers, logger, publicRoutes = testRoutes, vpnExit = koin.get())
+        TunnelRunner(koin.get(), koin.get(), koin.get(), koin.get(), koin.get(), dispatchers, logger, publicRoutes = testRoutes, engines = koin.get())
     }
     val tunnel = when (val kind = koin.get<PlatformInfo>().kind) {
         PlatformKind.MACOS -> MacPlatformTunnel(

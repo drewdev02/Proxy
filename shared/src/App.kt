@@ -128,10 +128,8 @@ private fun ProfileEditorRoute(profileId: String?, onClose: () -> Unit) {
     ProfileEditorScreen(
         state = state,
         vpnAvailable = picker != null,
-        onVpnEnabledChange = viewModel::onVpnEnabledChange,
         onVpnPickFile = { scope.launch { picker?.pickText()?.let { viewModel.onVpnFileChosen(it.name, it.text) } } },
-        onVpnUsernameChange = viewModel::onVpnUsernameChange,
-        onVpnPasswordChange = viewModel::onVpnPasswordChange,
+        exitActions = viewModel,
         routingActions = viewModel,
         appCatalog = LocalAppCatalog.current,
         onDraftChange = viewModel::onDraftChange,

@@ -30,7 +30,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.horizontalScroll
 import org.uci.proxy.apps.AppCatalog
+import org.uci.proxy.core.model.CountryEngineKind
 import org.uci.proxy.core.model.ProxyProtocol
 import org.uci.proxy.core.profile.ProfileDraft
 import org.uci.proxy.core.profile.ProfileField
@@ -46,12 +48,10 @@ fun ProfileEditorScreen(
     onTest: () -> Unit,
     onSave: () -> Unit,
     onCancel: () -> Unit,
-    /** False donde no hay selector de archivos (iOS): la sección de la VPN no se muestra. */
+    /** False donde no hay selector de archivos (iOS): la sección de Otro País no se muestra. */
     vpnAvailable: Boolean = false,
-    onVpnEnabledChange: (Boolean) -> Unit = {},
     onVpnPickFile: () -> Unit = {},
-    onVpnUsernameChange: (String) -> Unit = {},
-    onVpnPasswordChange: (String) -> Unit = {},
+    exitActions: CountryExitActions = CountryExitActions.None,
     routingActions: RoutingActions = RoutingActions.None,
     /** Las apps instaladas, para las reglas por app; null donde no se aplican. */
     appCatalog: AppCatalog? = null,
@@ -132,13 +132,7 @@ fun ProfileEditorScreen(
             }
 
             if (vpnAvailable) {
-                VpnSection(
-                    state = state,
-                    onEnabledChange = onVpnEnabledChange,
-                    onPickFile = onVpnPickFile,
-                    onUsernameChange = onVpnUsernameChange,
-                    onPasswordChange = onVpnPasswordChange,
-                )
+                VpnSection(state = state, actions = exitActions, onPickFile = onVpnPickFile)
                 RoutingSection(
                     routing = state.routing,
                     vpnEnabled = state.vpn.enabled,
@@ -164,29 +158,27 @@ fun ProfileEditorScreen(
     }
 }
 
-/** «Salir por otro país»: encadena una VPN OpenVPN tras el proxy. Opcional: apagada, el perfil sale directo. */
+/** «Salir por otro país»: encadena tras el proxy un motor (OpenVPN o Tailscale). Opcional: apagado, el perfil sale directo. */
 @Composable
 private fun VpnSection(
     state: ProfileEditorUiState,
-    onEnabledChange: (Boolean) -> Unit,
+    actions: CountryExitActions,
     onPickFile: () -> Unit,
-    onUsernameChange: (String) -> Unit,
-    onPasswordChange: (String) -> Unit,
 ) {
     val vpn = state.vpn
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .toggleable(value = vpn.enabled, role = Role.Switch, onValueChange = onEnabledChange),
+                .toggleable(value = vpn.enabled, role = Role.Switch, onValueChange = actions::onVpnEnabledChange),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
-                Text("Salir por otro país (VPN)", style = MaterialTheme.typography.titleMedium)
+                Text("Salir por otro país", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "Carga un archivo .ovpn y el tráfico saldrá por ese servidor, pasando por el proxy " +
-                        "(con reglas de salida, solo lo que elijas). Solo perfiles OpenVPN sobre TCP.",
+                    "El tráfico sale por un servidor en otro país, pasando por el proxy (con reglas de salida, solo lo " +
+                        "que elijas). Elige cómo: un archivo OpenVPN o un nodo de salida de Tailscale.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -195,33 +187,131 @@ private fun VpnSection(
         }
 
         if (vpn.enabled) {
-            OutlinedButton(onClick = onPickFile, enabled = !state.isBusy, modifier = Modifier.fillMaxWidth()) {
-                Text(if (vpn.fileName.isEmpty()) "Elegir archivo .ovpn" else "Archivo: ${vpn.fileName} (cambiar)")
+            if (state.engines.size > 1) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    state.engines.forEach { engine ->
+                        FilterChip(
+                            selected = vpn.engine == engine,
+                            onClick = { actions.onEngineChange(engine) },
+                            label = { Text(engine.label) },
+                            enabled = !state.isBusy,
+                        )
+                    }
+                }
             }
-            val fileError = vpn.fileError
-                ?: "Elige un archivo .ovpn.".takeIf { ProfileField.VPN_FILE in state.errors }
-            fileError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
-
-            if (vpn.needsCredentials) {
-                ProfileTextField(
-                    label = "Usuario de la VPN",
-                    value = vpn.username,
-                    onValueChange = onUsernameChange,
-                    error = "Escribe el usuario de la VPN.".takeIf { ProfileField.VPN_USERNAME in state.errors },
-                )
-                OutlinedTextField(
-                    value = vpn.password,
-                    onValueChange = onPasswordChange,
-                    label = { Text("Contraseña de la VPN") },
-                    singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    modifier = Modifier.fillMaxWidth(),
-                )
+            when (vpn.engine) {
+                CountryEngineKind.OPENVPN -> OpenVpnFields(state, actions, onPickFile)
+                CountryEngineKind.TAILSCALE -> TailscaleFields(state, actions)
             }
         }
     }
 }
+
+@Composable
+private fun OpenVpnFields(state: ProfileEditorUiState, actions: CountryExitActions, onPickFile: () -> Unit) {
+    val vpn = state.vpn
+    Text(
+        "Solo perfiles OpenVPN sobre TCP.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    OutlinedButton(onClick = onPickFile, enabled = !state.isBusy, modifier = Modifier.fillMaxWidth()) {
+        Text(if (vpn.fileName.isEmpty()) "Elegir archivo .ovpn" else "Archivo: ${vpn.fileName} (cambiar)")
+    }
+    val fileError = vpn.fileError
+        ?: "Elige un archivo .ovpn.".takeIf { ProfileField.VPN_FILE in state.errors }
+    fileError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
+
+    if (vpn.needsCredentials) {
+        ProfileTextField(
+            label = "Usuario de la VPN",
+            value = vpn.username,
+            onValueChange = actions::onVpnUsernameChange,
+            error = "Escribe el usuario de la VPN.".takeIf { ProfileField.VPN_USERNAME in state.errors },
+        )
+        OutlinedTextField(
+            value = vpn.password,
+            onValueChange = actions::onVpnPasswordChange,
+            label = { Text("Contraseña de la VPN") },
+            singleLine = true,
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+@Composable
+private fun TailscaleFields(state: ProfileEditorUiState, actions: CountryExitActions) {
+    val tailscale = state.vpn.tailscale
+    Text(
+        "Sale por un nodo de salida de tu red de Tailscale (o de un servidor Headscale). Detrás del proxy todo va por " +
+            "los relés de Tailscale: funciona, con algo más de latencia.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    ProfileTextField(
+        label = "Servidor de control",
+        value = tailscale.controlUrl,
+        onValueChange = actions::onTailscaleControlUrlChange,
+        error = "Escribe una dirección http:// o https://.".takeIf { ProfileField.TAILSCALE_CONTROL_URL in state.errors },
+        keyboardType = KeyboardType.Uri,
+    )
+    OutlinedTextField(
+        value = tailscale.authKey,
+        onValueChange = actions::onTailscaleAuthKeyChange,
+        label = { Text("Clave de autenticación (tskey-auth-…)") },
+        singleLine = true,
+        isError = ProfileField.TAILSCALE_AUTH_KEY in state.errors,
+        supportingText = {
+            Text(
+                if (ProfileField.TAILSCALE_AUTH_KEY in state.errors) "Escribe la clave de autenticación."
+                else "Créala en la consola de Tailscale (Configuración → Claves). Mejor reutilizable.",
+            )
+        },
+        visualTransformation = PasswordVisualTransformation(),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+        modifier = Modifier.fillMaxWidth(),
+    )
+    ProfileTextField(
+        label = "Nodo de salida (vacío: el único de la red)",
+        value = tailscale.exitNode,
+        onValueChange = actions::onTailscaleExitNodeChange,
+    )
+    OutlinedButton(
+        onClick = actions::searchExitNodes,
+        enabled = !state.isBusy && tailscale.search != ExitNodeSearch.Running,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text(if (tailscale.search == ExitNodeSearch.Running) "Buscando nodos…" else "Buscar nodos de salida")
+    }
+    when (val search = tailscale.search) {
+        is ExitNodeSearch.Found -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
+            search.nodes.forEach { node ->
+                FilterChip(
+                    selected = tailscale.exitNode.equals(node.selector, ignoreCase = true),
+                    onClick = { actions.onTailscaleExitNodeChange(node.selector) },
+                    label = {
+                        Text(listOfNotNull(node.name, node.place.ifEmpty { null }, "sin conexión".takeIf { !node.online }).joinToString(" · "))
+                    },
+                )
+            }
+        }
+        is ExitNodeSearch.Failed -> Text(search.message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+        else -> Unit
+    }
+    ProfileTextField(
+        label = "Nombre de este equipo en la red",
+        value = tailscale.hostname,
+        onValueChange = actions::onTailscaleHostnameChange,
+    )
+}
+
+internal val CountryEngineKind.label: String
+    get() = when (this) {
+        CountryEngineKind.OPENVPN -> "OpenVPN"
+        CountryEngineKind.TAILSCALE -> "Tailscale"
+    }
 
 @Composable
 private fun ProfileTextField(

@@ -30,11 +30,11 @@ import org.uci.proxy.core.port.LogLevel
 import kotlin.time.Clock
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.ProxyProtocol
-import org.uci.proxy.core.vpn.VpnStart
-import org.uci.proxy.core.vpn.VpnExit
+import org.uci.proxy.core.fakes.fakeEngines
+import org.uci.proxy.core.vpn.CountryExitStart
 import org.uci.proxy.core.vpn.VpnConnectResult
-import org.uci.proxy.core.model.VpnSecrets
-import org.uci.proxy.core.model.VpnProfile
+import org.uci.proxy.core.model.CountryExit
+import org.uci.proxy.core.model.CountryExitSecrets
 import org.uci.proxy.core.packet.buildUdpPacket
 import org.uci.proxy.core.packet.parseIpv4
 import org.uci.proxy.core.port.TunnelFailure
@@ -83,7 +83,13 @@ class EngineProtocolTest {
 
     @Test
     fun `a start order carries the VPN along`() {
-        val start = EngineStart(profile, "x", vpn = VpnStart("client\nremote 192.0.2.1 443\n<ca>\n...\n</ca>\n", "usuario", "con \"comillas\" y ñ"))
+        val start = EngineStart(
+            profile, "x",
+            countryExit = CountryExitStart(
+                CountryExit.OpenVpn("pais.ovpn", "usuario"),
+                CountryExitSecrets.OpenVpn("client\nremote 192.0.2.1 443\n<ca>\n...\n</ca>\n", "con \"comillas\" y ñ"),
+            ),
+        )
 
         val line = EngineProtocol.encodeStart(start)
 
@@ -210,8 +216,8 @@ class DesktopTunnelIntegrationTest {
             stateStore = stateStore,
             dispatchers = dispatchers,
             logger = engineLogger,
-            vpnExit = VpnExit { proxy, password, vpn, _ ->
-                receivedVpn = Triple(proxy, password, vpn)
+            engines = fakeEngines { context, start ->
+                receivedVpn = Triple(context.proxy, context.proxyPassword, start)
                 vpnResult
             },
         )
@@ -220,7 +226,7 @@ class DesktopTunnelIntegrationTest {
 
     private val nameForwarder = EngineNameForwarder()
     private val windowNameStatus = java.util.concurrent.CopyOnWriteArrayList<Pair<String, NameOutcome>>()
-    private var receivedVpn: Triple<ProxyProfile, String, VpnStart>? = null
+    private var receivedVpn: Triple<ProxyProfile, String, CountryExitStart>? = null
     private var vpnResult: VpnConnectResult = VpnConnectResult.Failed(TunnelFailure.VPN_AUTH_FAILED)
     private var receivedHost: String? = null
     private var engineMaxDuration: Duration? = null
@@ -285,23 +291,23 @@ class DesktopTunnelIntegrationTest {
 
     @Test
     fun `a profile with a VPN sends its file and credentials to the engine and a failure comes back by name`() = runBlocking {
-        val withVpn = profile.copy(vpn = VpnProfile("pais.ovpn", "vpnuser"))
-        repository.save(withVpn, "proxypass", VpnSecrets("client\n", "vpnpass"))
+        val withVpn = profile.copy(countryExit = CountryExit.OpenVpn("pais.ovpn", "vpnuser"))
+        repository.save(withVpn, "proxypass", CountryExitSecrets.OpenVpn("client\n", "vpnpass"))
 
         controller.connect(withVpn.id)
         val state = awaitState { it is TunnelState.Failed }
 
         val (proxy, proxyPassword, vpn) = assertNotNull(receivedVpn)
         assertEquals("proxypass", proxyPassword)
-        assertEquals(VpnStart("client\n", "vpnuser", "vpnpass"), vpn)
+        assertEquals(CountryExitStart(withVpn.countryExit!!, CountryExitSecrets.OpenVpn("client\n", "vpnpass")), vpn)
         assertEquals("10.8.0.20", proxy.host, "el motor resolvió el proxy antes de abrir la VPN")
         assertEquals(TunnelState.Failed(TunnelFailure.VPN_AUTH_FAILED), state)
     }
 
     @Test
     fun `a profile whose VPN file is missing fails in the window without launching the engine`() = runBlocking {
-        val withVpn = profile.copy(vpn = VpnProfile("pais.ovpn", "vpnuser"))
-        repository.save(withVpn, "proxypass", vpn = null)
+        val withVpn = profile.copy(countryExit = CountryExit.OpenVpn("pais.ovpn", "vpnuser"))
+        repository.save(withVpn, "proxypass", exitSecrets = null)
 
         controller.connect(withVpn.id)
 

@@ -29,3 +29,13 @@ interface DataProtector {
 }
 
 class DataProtectionException(message: String, cause: Throwable? = null) : Exception(message, cause)
+
+/** Dónde guarda cada perfil el estado de su motor de «Otro País» (por ejemplo, la identidad de un nodo de Tailscale). */
+fun interface EngineStateDirectories {
+    /** Un directorio propio del perfil, o null si esta plataforma no guarda estado. */
+    fun forProfile(profileId: String): String?
+
+    companion object {
+        val None = EngineStateDirectories { null }
+    }
+}
