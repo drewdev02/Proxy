@@ -466,9 +466,13 @@ el `.ovpn` lo da por IP literal. SuperProxy lo evita pidiendo siempre el destino
 también (en el modo directo y en el de VPN), prueba antes el puerto 443 y distingue «bloqueado por política» de
 «inalcanzable». Mi proxy de pruebas no rechazaba IP literales, por eso no se vio antes.
 
-**Servicios de nombres configurables (rc6):** en Ajustes hay una lista de servicios que dan nombre a una IP (sslip.io y nip.io
-de fábrica), cada uno con su interruptor y su orden. Se prueban por orden, empezando por el que funcionó la última vez, y la
-IP tal cual queda como último recurso. Pendiente: añadir servicios propios, botón «Probar» y apartar temporalmente los que fallan.
+**Servicios de nombres configurables (rc6 y rc7):** en Ajustes hay una lista de servicios que dan nombre a una IP pública
+(sslip.io y nip.io de fábrica). Cada uno tiene su interruptor y su orden, y se pueden añadir servicios propios (con
+validación de la plantilla y un aviso de confianza) y eliminarlos. Se prueban por orden, empezando por el que funcionó la
+última vez; la IP tal cual queda como último recurso. Un servicio que el proxy rechaza tres veces seguidas se aparta cinco
+minutos. Cada servicio muestra su último resultado («funcionó hace 2 min», «el proxy lo rechazó») y tiene un botón
+«Probar» que le pide al proxy del perfil (el del túnel activo o el primero) una IP pública conocida por ese nombre. En
+escritorio, el motor cuenta el resultado a la ventana con el mensaje `NAMESTAT`.
 
 > Pendiente: comprobarlo en macOS y Windows reales con la red de la UCI.
 

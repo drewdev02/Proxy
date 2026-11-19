@@ -2,6 +2,9 @@ package org.uci.proxy
 
 import kotlinx.coroutines.runBlocking
 import org.koin.core.context.startKoin
+import org.uci.proxy.core.settings.NameServiceReporter
+import org.uci.proxy.core.desktop.EngineNameForwarder
+import org.koin.dsl.module
 import org.uci.proxy.core.desktop.EngineArguments
 import org.uci.proxy.core.desktop.EngineSession
 import org.uci.proxy.core.desktop.MacElevatedEngineLauncher
@@ -52,7 +55,11 @@ fun runEngine(args: List<String>) {
     val tokenFile = requireNotNull(EngineArguments.value(args, EngineArguments.TOKEN_FILE)) { "Falta ${EngineArguments.TOKEN_FILE}" }
     val token = Files.readString(Path(tokenFile)).trim()
 
-    val koin = startKoin { modules(platformModule, coreModule, tunnelModule) }.koin
+    // El motor corre aparte de la ventana: lo que cuente de los servicios de nombres se reenvía por el socket.
+    val nameForwarder = EngineNameForwarder()
+    val koin = startKoin {
+        modules(platformModule, coreModule, tunnelModule, module { single<NameServiceReporter> { nameForwarder } })
+    }.koin
     val dispatchers = koin.get<AppDispatchers>()
     val logger = koin.get<Logger>()
 
@@ -91,6 +98,7 @@ fun runEngine(args: List<String>) {
         logger = logger,
         logBuffer = koin.get(),
         maxDuration = EngineArguments.value(args, EngineArguments.MAX_SECONDS)?.toIntOrNull()?.seconds,
+        nameForwarder = nameForwarder,
     )
 
     runBlocking {

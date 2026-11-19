@@ -71,7 +71,13 @@ interface SettingsRepository {
     /** Sube ([delta] negativo) o baja ([delta] positivo) un servicio en la lista. No hace nada si ya está en el extremo. */
     fun moveNameService(id: String, delta: Int)
 
-    /** Deja los servicios como vienen de fábrica y activos. */
+    /** Añade un servicio propio al final de la lista. Quien llama lo ha validado (ver [IpNameServiceValidator]). */
+    fun addNameService(service: IpNameService)
+
+    /** Quita un servicio propio. Los de fábrica no se pueden quitar, solo desactivar. */
+    fun removeNameService(id: String)
+
+    /** Deja los servicios como vienen de fábrica y activos, y borra los propios. */
     fun resetNameServices()
 }
 
@@ -109,6 +115,11 @@ class StoredSettingsRepository(private val keyValueStore: KeyValueStore) : Setti
             list.toMutableList().also { it.add(to, it.removeAt(from)) }
         }
     }
+
+    override fun addNameService(service: IpNameService) =
+        updateServices { list -> if (list.any { it.id == service.id }) list else list + service.copy(builtIn = false) }
+
+    override fun removeNameService(id: String) = updateServices { list -> list.filterNot { it.id == id && !it.builtIn } }
 
     override fun resetNameServices() = updateServices { IpNameService.BUILT_IN }
 

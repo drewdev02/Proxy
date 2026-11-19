@@ -17,6 +17,7 @@ import org.uci.proxy.core.port.TunnelMonitor
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.profile.AppDispatchers
 import org.uci.proxy.core.profile.ProfileRepository
+import org.uci.proxy.core.settings.NameServiceReporter
 import org.uci.proxy.core.settings.SettingsRepository
 import org.uci.proxy.core.vpn.VpnStart
 import java.io.IOException
@@ -47,6 +48,8 @@ class DesktopTunnelController(
     private val logBuffer: LogBuffer,
     /** Los ajustes que se llevan al motor al conectar: él corre en otro proceso y no puede leerlos. */
     private val settings: SettingsRepository,
+    /** Donde la ventana anota cómo le fue a cada servicio de nombres, según cuenta el motor. */
+    private val nameStatus: NameServiceReporter,
     private val launchTimeout: Duration = 3.minutes,
 ) : TunnelControl, TunnelMonitor {
     override val isAvailable = true
@@ -173,6 +176,10 @@ class DesktopTunnelController(
             EngineProtocol.decodeLog(line)?.let { log ->
                 val level = LogLevel.entries.firstOrNull { it.name == log.level } ?: LogLevel.INFO
                 logBuffer.append(log.epochMillis, level, log.tag, log.message)
+                continue
+            }
+            EngineProtocol.decodeNameStat(line)?.let { (serviceId, outcome) ->
+                nameStatus.report(serviceId, outcome)
                 continue
             }
             when (val state = EngineProtocol.decodeState(line, profileId)) {

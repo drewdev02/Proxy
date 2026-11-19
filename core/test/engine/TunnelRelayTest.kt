@@ -18,6 +18,7 @@ import org.uci.proxy.core.proxy.ProxyFailure
 import org.uci.proxy.core.proxy.ProxyTarget
 import org.uci.proxy.core.settings.AppSettings
 import org.uci.proxy.core.settings.IpNameService
+import org.uci.proxy.core.settings.NameOutcome
 import org.uci.proxy.core.tcp.TcpTestClient
 import org.uci.proxy.core.tcp.text
 import kotlin.test.Test
@@ -203,6 +204,21 @@ class TunnelRelayTest {
         app.sendData("SSH-2.0-OpenSSH_9.6\r\n")
 
         assertEquals(1, connector.targets.size, "solo un rechazo del proxy justifica otro nombre")
+    }
+
+    @Test
+    fun `the relay reports which name services were refused and which worked`() = runTest {
+        val reports = mutableListOf<Pair<String, NameOutcome>>()
+        val namer = IpNamer(AppSettings(), { id, outcome -> reports += id to outcome }, testScheduler.timeSource)
+        val connector = FakeProxyConnector { target ->
+            if (target.host.endsWith(".nip.io")) ProxyConnectResult.Connected(tunnel) else ProxyConnectResult.Failed(ProxyFailure.Refused("403"))
+        }
+        val app = appThrough(connector, namer = namer)
+        app.handshake()
+
+        app.sendData("SSH-2.0-OpenSSH_9.6\r\n")
+
+        assertEquals(listOf("sslip" to NameOutcome.REFUSED, "nip" to NameOutcome.WORKED), reports)
     }
 
     @Test

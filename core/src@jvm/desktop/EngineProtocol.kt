@@ -7,6 +7,7 @@ import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.settings.AppSettings
+import org.uci.proxy.core.settings.NameOutcome
 import org.uci.proxy.core.vpn.VpnStart
 
 /*
@@ -17,6 +18,7 @@ import org.uci.proxy.core.vpn.VpnStart
  *   ventana -> motor   : START <json de EngineStart>
  *   motor   -> ventana : STATE connected | STATE disconnected | STATE failed <TunnelFailure>
  *   motor   -> ventana : LOG <json de EngineLog>    un mensaje de registro, para la pantalla «Registro» de la ventana
+ *   motor   -> ventana : NAMESTAT <id del servicio> WORKED | REFUSED   cómo le fue a un servicio de nombres para IP
  *   ventana -> motor   : STOP
  *
  * Si cualquiera de los dos cierra el socket, el otro da el túnel por terminado. Así el motor nunca
@@ -43,6 +45,19 @@ object EngineProtocol {
     private const val START_PREFIX = "START "
     private const val STATE_PREFIX = "STATE "
     private const val LOG_PREFIX = "LOG "
+
+    private const val NAMESTAT_PREFIX = "NAMESTAT "
+
+    fun encodeNameStat(serviceId: String, outcome: NameOutcome): String = "$NAMESTAT_PREFIX$serviceId ${outcome.name}"
+
+    /** @return el servicio y el resultado, o null si [line] no es un NAMESTAT válido. */
+    fun decodeNameStat(line: String): Pair<String, NameOutcome>? {
+        if (!line.startsWith(NAMESTAT_PREFIX)) return null
+        val parts = line.removePrefix(NAMESTAT_PREFIX).split(' ')
+        if (parts.size != 2 || parts[0].isEmpty()) return null
+        val outcome = NameOutcome.entries.firstOrNull { it.name == parts[1] } ?: return null
+        return parts[0] to outcome
+    }
 
     /** El JSON escapa los saltos de línea, así que un mensaje de varias líneas sigue siendo un solo mensaje del protocolo. */
     fun encodeLog(entry: LogEntry): String = LOG_PREFIX + json.encodeToString(
