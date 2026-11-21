@@ -159,6 +159,8 @@ fun interface TcpConnector { suspend fun connect(host: String, port: Int): TcpCo
 fun interface RandomBytes { fun next(size: Int): ByteArray }
 fun interface LocalAddresses { /* redes 10.x locales, para no chocar con la subred virtual */ }
 fun interface HostResolver { /* resuelve el proxy con el DNS real antes de levantar el túnel */ }
+fun interface LocalDnsSource { suspend fun read(): LocalDnsConfig }   // servidores y dominios de búsqueda de la red real
+fun interface DnsTransport { suspend fun exchange(server: String, query: ByteArray, timeoutMs: Long): ByteArray? }
 fun interface ConnectionOwner { fun appsFor(protocol: Int, source: Int, sourcePort: Int, destination: Int, destinationPort: Int): List<String> }
 interface LogHistory { /* registro guardado: append, latest, deleteBefore, trimTo */ }
 interface Logger
@@ -195,6 +197,7 @@ En `jvm` el `platformModule` enlaza un túnel «no disponible»; la ventana de e
 | `Logger` | Logcat | `NSLog` | SLF4J, con Logback en `desktopApp` | SLF4J, con Logback en `desktopApp` |
 | `LocalNetworkPermission` | Pide `ACCESS_LOCAL_NETWORK` en Android 17 o superior, mediante la Activity | Concedido: iOS muestra su propio aviso | Concedido | Concedido |
 | `ConnectionOwner` | `getConnectionOwnerUid` (Android 10+) | No se sabe | No se sabe | No se sabe |
+| `LocalDnsSource` | `AndroidLocalDnsSource` (`LinkProperties` de la red sin VPN) | — | `WinLocalDnsSource` (PowerShell) | `MacLocalDnsSource` (`scutil`, servicio principal) |
 | `OpenVpnCrypto`, `TlsSessionFactory` | JCA y `SSLEngine` (`src@jvmAndAndroid`) | «No disponible» | JCA y `SSLEngine` | JCA y `SSLEngine` |
 | `RandomBytes` | `SecureRandom` | `SecRandomCopyBytes` | `SecureRandom` | `SecureRandom` |
 

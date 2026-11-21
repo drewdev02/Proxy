@@ -38,6 +38,18 @@ class StoredSettingsRepositoryTest {
     private fun reopened() = StoredSettingsRepository(store)
 
     @Test
+    fun `opening the local network without the proxy is on by default and survives a restart`() {
+        assertTrue(AppSettings().intranetDirect)
+        assertTrue(reopened().settings.value.intranetDirect, "también para quien ya tenía ajustes guardados")
+
+        val repository = reopened()
+        repository.setIntranetDirect(false)
+
+        assertFalse(repository.settings.value.intranetDirect)
+        assertFalse(reopened().settings.value.intranetDirect)
+    }
+
+    @Test
     fun `names for public IPs are on by default with sslip and nip in that order`() {
         val settings = reopened().settings.value
 

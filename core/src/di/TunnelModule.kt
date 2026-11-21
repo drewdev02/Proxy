@@ -7,7 +7,10 @@ import org.uci.proxy.core.engine.TunAddressPlanner
 import org.uci.proxy.core.engine.TunnelEngineFactory
 import org.uci.proxy.core.engine.TunnelRunner
 import org.uci.proxy.core.engine.TunnelStateStore
+import org.uci.proxy.core.net.KtorDnsTransport
 import org.uci.proxy.core.port.ConnectionOwner
+import org.uci.proxy.core.port.DnsTransport
+import org.uci.proxy.core.port.LocalDnsSource
 import org.uci.proxy.core.port.TunnelMonitor
 import org.uci.proxy.core.proxy.HttpConnectConnector
 import org.uci.proxy.core.proxy.Socks5Connector
@@ -29,7 +32,7 @@ import kotlin.time.TimeSource
 /**
  * Lo que necesita un proceso que ejecuta el túnel. Solo lo cargan esos procesos: hoy la app de
  * Android; más adelante la extensión de iOS y el proceso elevado de escritorio.
- * Requiere [coreModule] y que la plataforma enlace `LocalAddresses` y `HostResolver`.
+ * Requiere [coreModule] y que la plataforma enlace `LocalAddresses` y `HostResolver` (y, si sabe leerlo, `LocalDnsSource`).
  */
 val tunnelModule = module {
     singleOf(::TunnelStateStore) { bind<TunnelMonitor>() }
@@ -39,6 +42,8 @@ val tunnelModule = module {
     // Quien se entera de qué servicio de nombres funcionó: por defecto, el repositorio de este mismo proceso. El motor de
     // escritorio, que corre aparte, lo sustituye por uno que avisa a la ventana.
     single<NameServiceReporter> { get<NameServiceStatusRepository>() }
+    // Las consultas al DNS de la red local, para abrir sin proxy lo interno.
+    single<DnsTransport> { KtorDnsTransport(get(), get()) }
     single {
         TunnelEngineFactory(
             connectors = listOf(get<HttpConnectConnector>(), get<Socks5Connector>()),
@@ -102,6 +107,8 @@ val tunnelModule = module {
             logger = get(),
             engines = get(),
             stateDirectories = getOrNull<EngineStateDirectories>() ?: EngineStateDirectories.None,
+            localDnsSource = getOrNull<LocalDnsSource>() ?: LocalDnsSource.None,
+            dnsTransport = get(),
         )
     }
 }

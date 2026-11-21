@@ -72,6 +72,16 @@ class SettingsViewModelTest : MainDispatcherTest() {
     }
 
     @Test
+    fun `the local network switch starts on and is stored`() {
+        assertTrue(viewModel.uiState.value.settings.intranetDirect)
+
+        viewModel.setIntranetDirect(false)
+
+        assertFalse(viewModel.uiState.value.settings.intranetDirect)
+        assertFalse(StoredSettingsRepository(store).settings.value.intranetDirect)
+    }
+
+    @Test
     fun `names for public IPs start on with the two factory services`() {
         val settings = viewModel.uiState.value.settings
 

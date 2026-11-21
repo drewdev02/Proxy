@@ -66,6 +66,7 @@ class SettingsActions(
     /** Null cuando Ajustes es una pestaña de la navegación principal: no hay a dónde volver. */
     val onBack: (() -> Unit)? = null,
     val onAnswerConnectivityChecksChange: (Boolean) -> Unit = {},
+    val onIntranetDirectChange: (Boolean) -> Unit = {},
     val onNameByIpChange: (Boolean) -> Unit = {},
     val onTryRawIpChange: (Boolean) -> Unit = {},
     val onServiceEnabledChange: (String, Boolean) -> Unit = { _, _ -> },
@@ -88,6 +89,7 @@ internal fun SettingsScreen(onBack: (() -> Unit)? = null, viewModel: SettingsVie
         actions = SettingsActions(
             onBack = onBack,
             onAnswerConnectivityChecksChange = viewModel::setAnswerConnectivityChecks,
+            onIntranetDirectChange = viewModel::setIntranetDirect,
             onNameByIpChange = viewModel::setNameByIp,
             onTryRawIpChange = viewModel::setTryRawIp,
             onServiceEnabledChange = viewModel::setServiceEnabled,
@@ -137,6 +139,15 @@ fun SettingsScreen(
                             "proxy funcione; si deja de responder, el aviso aparece.",
                         checked = settings.answerConnectivityChecks,
                         onCheckedChange = actions.onAnswerConnectivityChecksChange,
+                    )
+                    UciDivider()
+                    UciSwitchRow(
+                        title = "Abrir la red local sin proxy",
+                        subtitle = "Los sitios de la red donde estás (como los de uci.cu) se buscan en el DNS de esa red y, si " +
+                            "son internos, se abren directamente, sin pasar por el proxy ni por Otro País: el proxy no suele " +
+                            "abrirlos. Para otros sitios internos, añade una regla de dominio con salida «Directo».",
+                        checked = settings.intranetDirect,
+                        onCheckedChange = actions.onIntranetDirectChange,
                     )
                 }
                 NameServicesCard(settings, statuses, tests, actions, onAdd = { adding = true })

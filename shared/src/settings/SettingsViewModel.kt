@@ -74,6 +74,8 @@ class SettingsViewModel(
 
     fun setAnswerConnectivityChecks(enabled: Boolean) = repository.setAnswerConnectivityChecks(enabled)
 
+    fun setIntranetDirect(enabled: Boolean) = repository.setIntranetDirect(enabled)
+
     fun setNameByIp(enabled: Boolean) = repository.setNameByIp(enabled)
 
     fun setTryRawIp(enabled: Boolean) = repository.setTryRawIp(enabled)

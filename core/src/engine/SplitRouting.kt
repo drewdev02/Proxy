@@ -323,8 +323,13 @@ class ExitRouterHandler(
                 if (opening) logger.log(LogLevel.DEBUG, TAG, "Bloqueado: $target")
                 listOfNotNull(if (segment != null) reset(packet, segment) else buildIcmpPortUnreachable(packet))
             }
-            // Directo solo existe para rangos de IP y apps, que ni entran en la interfaz; un dominio con esa salida va por el proxy.
-            RouteExit.PROXY, RouteExit.DIRECT -> null
+            RouteExit.PROXY -> null
+            // Lo directo de verdad (rangos, apps, y dominios con dirección interna) ni entra en la interfaz. Llega aquí un
+            // dominio «Directo» que el DNS de la red no dio como interno: no hay otro camino que el proxy.
+            RouteExit.DIRECT -> {
+                if (opening) logger.log(LogLevel.DEBUG, TAG, "Directo sin dirección interna, por el proxy: $target")
+                null
+            }
         }
     }
 

@@ -151,3 +151,40 @@ class DnsResponderTest {
         assertNull(responder.respond(dnsQuery("uci.cu").also { it[12] = 0xC0.toByte() }), "puntero en la pregunta")
     }
 }
+
+class DnsReplyTest {
+    @Test
+    fun `a reply carries the given address`() {
+        val reply = assertNotNull(DnsResponder.reply(dnsQuery("drst.uci.cu", id = 0x2222), address = 0x0A00000D, ttlSeconds = 30))
+
+        assertEquals(0x2222, reply.readU16(0))
+        assertEquals(0x8180, reply.readU16(2), "respuesta sin error, con recursión")
+        assertEquals(1, reply.readU16(6))
+        assertEquals("10.0.0.13", formatIpv4(reply.readInt(reply.size - 4)))
+        assertEquals(30, reply.readInt(reply.size - 10))
+        assertEquals(listOf(0x0A00000D), dnsAnswerAddresses(reply))
+    }
+
+    @Test
+    fun `without an address the reply is empty and without error`() {
+        val reply = assertNotNull(DnsResponder.reply(dnsQuery("drst.uci.cu"), address = null))
+
+        assertEquals(0, reply.readU16(2) and 0x000F)
+        assertEquals(0, reply.readU16(6))
+    }
+
+    @Test
+    fun `a name error says the name does not exist`() {
+        val reply = assertNotNull(DnsResponder.nameError(dnsQuery("wpad.uci.cu")))
+
+        assertEquals(3, reply.readU16(2) and 0x000F, "NXDOMAIN")
+        assertEquals(0, reply.readU16(6))
+        assertEquals("wpad.uci.cu", DnsResponder.questionName(reply))
+    }
+
+    @Test
+    fun `invalid queries get no reply`() {
+        assertNull(DnsResponder.reply(ByteArray(5), address = 1))
+        assertNull(DnsResponder.nameError(ByteArray(5)))
+    }
+}

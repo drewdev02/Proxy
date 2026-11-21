@@ -67,12 +67,12 @@ class ProfileEditorRoutingTest : MainDispatcherTest() {
     }
 
     @Test
-    fun `a domain cannot go direct yet so it goes through the proxy`() {
+    fun `a domain can go direct`() {
         val viewModel = newViewModel()
 
-        viewModel.add("etecsa.cu", RouteExit.DIRECT)
+        viewModel.add("*.uci.cu", RouteExit.DIRECT)
 
-        assertEquals(RouteExit.PROXY, viewModel.rules.rules.single().exit)
+        assertEquals(RouteRule(RuleKind.DOMAIN, "*.uci.cu", RouteExit.DIRECT), viewModel.rules.rules.single())
     }
 
     @Test
