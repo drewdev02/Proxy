@@ -16,6 +16,7 @@ import org.jetbrains.skia.Image
 import org.uci.proxy.theme.ProxyUciTheme
 import java.io.File
 import kotlin.math.abs
+import kotlinx.coroutines.Dispatchers
 import kotlin.test.fail
 
 /**
@@ -63,7 +64,10 @@ class Snapshots(private val group: String) {
     private fun render(widthDp: Int, heightDp: Int?, content: @Composable () -> Unit): ByteArray {
         val widthPx = (widthDp * density).toInt()
         val heightPx = ((heightDp ?: MAX_HEIGHT_DP) * density).toInt()
-        val image = ImageComposeScene(width = widthPx, height = heightPx, density = Density(density)) {
+        // Los efectos (LaunchedEffect, produceState) corren en el hilo de la prueba durante cada fotograma y se cancelan al
+        // cerrar la escena. En el hilo de Swing, alguno llegaba a ejecutarse con la escena ya cerrada y su excepción la
+        // recogía la prueba siguiente, que fallaba sin tener nada que ver.
+        val image = ImageComposeScene(width = widthPx, height = heightPx, density = Density(density), coroutineContext = Dispatchers.Unconfined) {
             ProxyUciTheme {
                 // Fondo en toda la imagen: así el recorte encuentra dónde acaba el contenido.
                 Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) { content() }
