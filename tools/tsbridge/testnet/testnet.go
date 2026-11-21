@@ -1,6 +1,7 @@
 // Package testnet levanta una red de Tailscale completa en este equipo, para las pruebas: servidor de control
 // (testcontrol, el de las pruebas de Tailscale), un relé DERP y un nodo de salida que reenvía las conexiones TCP a su
-// destino real. No hace falta cuenta ni conexión a Internet.
+// destino real y hace de DNS de la red, como un nodo de salida de verdad. No hace falta cuenta ni conexión a Internet
+// (sin Internet, el DNS contesta que el nombre no existe).
 package testnet
 
 import (
@@ -18,6 +19,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"golang.org/x/net/dns/dnsmessage"
 	"tailscale.com/derp/derpserver"
 	"tailscale.com/ipn"
 	"tailscale.com/ipn/store/mem"
@@ -26,6 +28,7 @@ import (
 	"tailscale.com/tailcfg"
 	"tailscale.com/tsnet"
 	"tailscale.com/tstest/integration/testcontrol"
+	"tailscale.com/types/dnstype"
 	"tailscale.com/types/key"
 	"tailscale.com/types/logger"
 )
@@ -38,6 +41,8 @@ type Net struct {
 	ExitIP     string `json:"exitNodeIp"`
 	// Forwarded cuenta las conexiones que el nodo de salida llevó a su destino.
 	Forwarded atomic.Int64 `json:"-"`
+	// Resolved cuenta las consultas DNS que contestó el nodo de salida.
+	Resolved atomic.Int64 `json:"-"`
 
 	control *http.Server
 	derp    *httptest.Server
@@ -163,8 +168,85 @@ func Start(ctx context.Context, ip, redirect string, logf logger.Logf) (*Net, er
 		return nil, err
 	}
 	control.SetSubnetRoutes(st.Self.PublicKey, tsaddr.ExitRoutes())
+
+	// El DNS de la red: el nodo de salida, como hace Tailscale con un nodo de salida real. Sin esto, MagicDNS
+	// (100.100.100.100) no sabe resolver nombres públicos y las apps que salen por la red no consiguen la IP real.
+	dns, err := n.exit.ListenPacket("udp", net.JoinHostPort(n.ExitIP, "53"))
+	if err != nil {
+		return nil, fmt.Errorf("el DNS del nodo de salida no arrancó: %w", err)
+	}
+	go n.serveDNS(dns, logf)
+	control.DNSConfig = &tailcfg.DNSConfig{Resolvers: []*dnstype.Resolver{{Addr: n.ExitIP}}}
+
 	ok = true
 	return n, nil
+}
+
+// serveDNS contesta las consultas A resolviendo el nombre desde este equipo; lo demás (u otro tipo, o un nombre que
+// no existe) se contesta sin respuestas, para que el cliente no espere.
+func (n *Net) serveDNS(pc net.PacketConn, logf logger.Logf) {
+	defer pc.Close()
+	buf := make([]byte, 1500)
+	for {
+		size, from, err := pc.ReadFrom(buf)
+		if err != nil {
+			return
+		}
+		query := append([]byte(nil), buf[:size]...)
+		go func() {
+			reply, err := n.answer(query)
+			if err != nil {
+				logf("testnet: consulta DNS ilegible: %v", err)
+				return
+			}
+			n.Resolved.Add(1)
+			pc.WriteTo(reply, from)
+		}()
+	}
+}
+
+func (n *Net) answer(query []byte) ([]byte, error) {
+	var p dnsmessage.Parser
+	header, err := p.Start(query)
+	if err != nil {
+		return nil, err
+	}
+	question, err := p.Question()
+	if err != nil {
+		return nil, err
+	}
+	var addresses []net.IP
+	rcode := dnsmessage.RCodeSuccess
+	if question.Type == dnsmessage.TypeA && question.Class == dnsmessage.ClassINET {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ips, err := net.DefaultResolver.LookupIP(ctx, "ip4", question.Name.String())
+		cancel()
+		if err != nil {
+			rcode = dnsmessage.RCodeNameError
+		}
+		addresses = ips
+	}
+	reply := dnsmessage.NewBuilder(nil, dnsmessage.Header{ID: header.ID, Response: true, RecursionDesired: header.RecursionDesired, RecursionAvailable: true, RCode: rcode})
+	reply.EnableCompression()
+	if err := reply.StartQuestions(); err != nil {
+		return nil, err
+	}
+	if err := reply.Question(question); err != nil {
+		return nil, err
+	}
+	if err := reply.StartAnswers(); err != nil {
+		return nil, err
+	}
+	for _, ip := range addresses {
+		if v4 := ip.To4(); v4 != nil {
+			rr := dnsmessage.AResource{}
+			copy(rr.A[:], v4)
+			if err := reply.AResource(dnsmessage.ResourceHeader{Name: question.Name, Class: dnsmessage.ClassINET, TTL: 60}, rr); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return reply.Finish()
 }
 
 // Close lo apaga todo.

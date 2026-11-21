@@ -320,6 +320,14 @@ private fun StatusLine(state: ConnectionUiState) {
     )
 }
 
+/** «El DNS de Otro País no resolvió a.com, b.com y 3 más: …», con los primeros nombres y cuántos quedan. */
+internal fun viaProxyMessage(hosts: List<String>, shown: Int = 3): String {
+    val names = hosts.takeLast(shown).asReversed().joinToString(", ")
+    val rest = hosts.size - minOf(hosts.size, shown)
+    val more = if (rest > 0) " y $rest más" else ""
+    return "El DNS de Otro País no resolvió $names$more: sus conexiones salen por el proxy, no por Otro País."
+}
+
 /** `usuario@host:puerto`, o `host:puerto` si el perfil no tiene usuario. */
 internal fun ProxyProfile.address(): String =
     if (username.isEmpty()) "$host:$port" else "$username@$host:$port"
@@ -346,10 +354,16 @@ private fun StatusAlerts(state: ConnectionUiState, actions: ConnectionActions, o
                 }
             },
         )
-        is TunnelState.Connected -> if (tunnel.vpnDown) {
-            UciInlineAlert(
+        is TunnelState.Connected -> when {
+            tunnel.vpnDown -> UciInlineAlert(
                 "Lo que debía salir por Otro País sale por el proxy mientras se reintenta la VPN.",
                 title = "Otro País no responde",
+                tone = UciTone.Warning,
+            )
+            // Otro País está, pero su DNS no resolvió algunos nombres: esos salen por el proxy y hay que decirlo.
+            tunnel.viaProxy.isNotEmpty() -> UciInlineAlert(
+                viaProxyMessage(tunnel.viaProxy),
+                title = "Algunos sitios salen por el proxy",
                 tone = UciTone.Warning,
             )
         }

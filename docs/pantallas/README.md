@@ -16,9 +16,9 @@ Están dibujadas en macOS a 412 dp de ancho (móvil) y, cuando aplica, a 1100 dp
 |---|---|---|
 | ![](../../shared/test@jvm/snapshots/macos/connection/phone-disconnected.png) | ![](../../shared/test@jvm/snapshots/macos/connection/phone-connecting.png) | ![](../../shared/test@jvm/snapshots/macos/connection/phone-connected.png) |
 
-| Otro País caído | Falló | Sin perfiles | Sin túnel (iOS) |
-|---|---|---|---|
-| ![](../../shared/test@jvm/snapshots/macos/connection/phone-vpn-down.png) | ![](../../shared/test@jvm/snapshots/macos/connection/phone-failed.png) | ![](../../shared/test@jvm/snapshots/macos/connection/phone-no-profiles.png) | ![](../../shared/test@jvm/snapshots/macos/connection/phone-no-tunnel.png) |
+| Otro País caído | Sitios que salen por el proxy | Falló | Sin perfiles | Sin túnel (iOS) |
+|---|---|---|---|---|
+| ![](../../shared/test@jvm/snapshots/macos/connection/phone-vpn-down.png) | ![](../../shared/test@jvm/snapshots/macos/connection/phone-via-proxy.png) | ![](../../shared/test@jvm/snapshots/macos/connection/phone-failed.png) | ![](../../shared/test@jvm/snapshots/macos/connection/phone-no-profiles.png) | ![](../../shared/test@jvm/snapshots/macos/connection/phone-no-tunnel.png) |
 
 Escritorio y tableta (dos columnas, barra lateral):
 

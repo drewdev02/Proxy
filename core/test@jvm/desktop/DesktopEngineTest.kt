@@ -138,6 +138,8 @@ class EngineProtocolTest {
 
         assertEquals(TunnelState.Connected("p1"), roundTrip(TunnelState.Connected("otro-id-del-motor")))
         assertEquals(TunnelState.Connected("p1", vpnDown = true), roundTrip(TunnelState.Connected("p1", vpnDown = true)))
+        val viaProxy = TunnelState.Connected("p1", viaProxy = listOf("example.com", "www.google.com"))
+        assertEquals(viaProxy, roundTrip(viaProxy))
         assertEquals(TunnelState.Disconnected, roundTrip(TunnelState.Disconnected))
         TunnelFailure.entries.forEach { assertEquals(TunnelState.Failed(it), roundTrip(TunnelState.Failed(it))) }
     }

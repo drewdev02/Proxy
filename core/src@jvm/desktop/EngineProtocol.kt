@@ -48,6 +48,7 @@ object EngineProtocol {
 
     /** Tras «connected»: Otro País no está y su tráfico sale por el proxy. */
     private const val VPN_DOWN = "vpn-down"
+    private const val VIA_PROXY = "via-proxy="
 
     private const val NAMESTAT_PREFIX = "NAMESTAT "
 
@@ -92,7 +93,10 @@ object EngineProtocol {
 
     /** Solo se transmiten los estados que produce el motor; "conectando" lo pone la propia ventana. */
     fun encodeState(state: TunnelState): String? = when (state) {
-        is TunnelState.Connected -> STATE_PREFIX + "connected" + if (state.vpnDown) " $VPN_DOWN" else ""
+        is TunnelState.Connected -> STATE_PREFIX + "connected" +
+            (if (state.vpnDown) " $VPN_DOWN" else "") +
+            // Los nombres no llevan espacios ni comas: van en una sola palabra.
+            (if (state.viaProxy.isNotEmpty()) " $VIA_PROXY" + state.viaProxy.joinToString(",") else "")
         TunnelState.Disconnected -> STATE_PREFIX + "disconnected"
         is TunnelState.Failed -> STATE_PREFIX + "failed " + state.failure.name
         is TunnelState.Connecting -> null
@@ -103,7 +107,11 @@ object EngineProtocol {
         if (!line.startsWith(STATE_PREFIX)) return null
         val parts = line.removePrefix(STATE_PREFIX).split(' ')
         return when (parts[0]) {
-            "connected" -> TunnelState.Connected(profileId, vpnDown = parts.getOrNull(1) == VPN_DOWN)
+            "connected" -> TunnelState.Connected(
+                profileId,
+                vpnDown = VPN_DOWN in parts,
+                viaProxy = parts.firstOrNull { it.startsWith(VIA_PROXY) }?.removePrefix(VIA_PROXY)?.split(',')?.filter { it.isNotEmpty() }.orEmpty(),
+            )
             "disconnected" -> TunnelState.Disconnected
             "failed" -> TunnelFailure.entries.firstOrNull { it.name == parts.getOrNull(1) }?.let(TunnelState::Failed)
             else -> null

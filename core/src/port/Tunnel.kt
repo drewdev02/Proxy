@@ -98,8 +98,14 @@ sealed interface TunnelState {
     /**
      * @param vpnDown con reglas de salida que usan «Otro País»: la VPN no está (no conectó o se cayó), así que lo que iba
      *   por ella sale por el proxy mientras se reintenta.
+     * @param viaProxy con la VPN en pie, los nombres que debían salir por ella pero salen por el proxy porque su DNS no
+     *   los resolvió (los últimos, sin repetir). Se vacía cuando la VPN vuelve a conectar.
      */
-    data class Connected(val profileId: String, val vpnDown: Boolean = false) : TunnelState
+    data class Connected(
+        val profileId: String,
+        val vpnDown: Boolean = false,
+        val viaProxy: List<String> = emptyList(),
+    ) : TunnelState
 
     data class Failed(val failure: TunnelFailure) : TunnelState
 }

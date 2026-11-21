@@ -7,6 +7,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.selects.select
 import org.uci.proxy.core.model.ProxyProfile
@@ -42,6 +43,11 @@ class TunnelStateStore : TunnelMonitor {
 
     fun set(newState: TunnelState) {
         mutableState.value = newState
+    }
+
+    /** Cambia el estado a partir del actual sin perder un cambio que llegue a la vez desde otra corrutina. */
+    fun update(change: (TunnelState) -> TunnelState) {
+        mutableState.update(change)
     }
 }
 
@@ -142,7 +148,7 @@ class TunnelRunner(
             return
         }
 
-        val link = VpnLink(plan.tunAddress, logger)
+        val link = VpnLink(plan.tunAddress, logger, onViaProxy = { host -> noteViaProxy(host) })
         val split = rules?.let { SplitRouting(it, link) }
         logger.log(LogLevel.INFO, TAG, "Túnel activo en ${plan.tunAddressText}, proxy $proxyAddress" + if (rules != null) ", con reglas de salida" else "")
         val vpnDown = retry != null && firstSession == null
@@ -177,6 +183,12 @@ class TunnelRunner(
     }
 
     /** Lo necesario para volver a abrir la VPN. */
+    /** Apunta que [host] sale por el proxy en vez de por Otro País, para que la interfaz lo diga. */
+    private fun noteViaProxy(host: String) = stateStore.update { state ->
+        if (state !is TunnelState.Connected || state.vpnDown) return@update state
+        state.copy(viaProxy = (state.viaProxy - host + host).takeLast(MAX_VIA_PROXY))
+    }
+
     private class VpnRetry(val context: ExitContext, val start: CountryExitStart)
 
     /** Un intento de abrir la VPN: la sesión, o si merece la pena reintentar. */
@@ -316,6 +328,9 @@ class TunnelRunner(
     private companion object {
         const val TAG = "Tunnel"
         const val MTU = 1500
+
+        // Cuántos nombres que salen por el proxy en vez de por Otro País se recuerdan para mostrarlos.
+        const val MAX_VIA_PROXY = 20
 
         // Si el servidor VPN no empuja un DNS: una dirección pública, que de todos modos va por la VPN.
         const val FALLBACK_DNS = "1.1.1.1"

@@ -80,6 +80,7 @@ class ConnectionSnapshotTest {
                 check = ProxyCheck.Finished(ProxyTestResult.Success, 184),
             ),
             "vpn-down" to base.copy(tunnel = TunnelState.Connected("p1", vpnDown = true)),
+            "via-proxy" to base.copy(tunnel = TunnelState.Connected("p1", viaProxy = listOf("netflix.com", "hulu.com"))),
             "failed" to base.copy(tunnel = TunnelState.Failed(TunnelFailure.PROXY_AUTH_FAILED)),
             "no-profiles" to ConnectionUiState(),
             "no-tunnel" to base.copy(tunnelAvailable = false, profiles = listOf(home), activeProfile = home, recentActivity = emptyList()),

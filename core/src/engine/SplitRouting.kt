@@ -47,8 +47,14 @@ class SplitRouting(val rules: RuleSet, val link: VpnLink)
  * La usan a la vez el bucle del motor (lo que sale) y el de la VPN (lo que entra), así que su estado va bajo un cerrojo.
  *
  * @param appAddress la dirección de la interfaz, desde la que salen las apps.
+ * @param onViaProxy se llama con cada nombre que el DNS de la VPN no resolvió: sus conexiones salen por el proxy, y la
+ *   interfaz debe poder decirlo en vez de mostrar que todo va por Otro País.
  */
-class VpnLink(private val appAddress: Int, private val logger: Logger) {
+class VpnLink(
+    private val appAddress: Int,
+    private val logger: Logger,
+    private val onViaProxy: (String) -> Unit = {},
+) {
     private val lock = Mutex()
     private var session: VpnSession? = null
     private var vpnAddress = 0
@@ -172,6 +178,7 @@ class VpnLink(private val appAddress: Int, private val logger: Logger) {
         if (failed) {
             val why = if (answered) "no tiene dirección para" else "no contestó por"
             logger.log(LogLevel.WARN, TAG, "El DNS de Otro País $why $name: sus conexiones salen por el proxy")
+            onViaProxy(name)
         }
     }
 

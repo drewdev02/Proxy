@@ -441,8 +441,31 @@ class SplitRoutingTest {
 
         assertEquals(1, session.sent.size, "solo la consulta")
         assertAnsweredByProxyStack(fake)
-        // Que salga por el proxy en vez de por Otro País tiene que verse en el registro, no pasar en silencio.
+        // Que salga por el proxy en vez de por Otro País tiene que verse en el registro y en la interfaz, no pasar en silencio.
         assertTrue(logger.entries.any { (level, message) -> level == LogLevel.WARN && "nada.invalid" in message && "proxy" in message })
+        assertEquals(listOf("nada.invalid"), (stateStore.state.value as TunnelState.Connected).viaProxy)
+    }
+
+    @Test
+    fun `the names that go through the proxy are listed once and cleared when the VPN comes back`() = runTest(UnconfinedTestDispatcher()) {
+        connect(profile.copy(routing = appRules))
+        appsByPort[50003] = listOf("com.netflix.mediaclient")
+        appsByPort[50004] = listOf("com.netflix.mediaclient")
+
+        // El mismo nombre dos veces: tras la primera queda como no resoluble y no se vuelve a preguntar ni a apuntar.
+        val fake = fakeAddressOf("nada.invalid")
+        send(syn(fake, sourcePort = 50003))
+        val query = UdpDatagram.parse(assertNotNull(Ipv4Packet.parse(session.sent.single())))!!
+        fromVpn(vpnDnsAnswer("nada.invalid", null, port = query.sourcePort, id = query.payload.readU16(0)))
+        send(syn(fake, sourcePort = 50004))
+        assertEquals(listOf("nada.invalid"), (stateStore.state.value as TunnelState.Connected).viaProxy)
+
+        // La VPN se cae y vuelve: se reintenta todo, así que la lista empieza de cero.
+        session.fromServer.close()
+        runCurrent()
+        advanceTimeBy(6.seconds)
+        runCurrent()
+        assertEquals(TunnelState.Connected("p1"), stateStore.state.value)
     }
 
     @Test
