@@ -88,6 +88,15 @@ class RuleSet(private val routing: RoutingRules) {
     val hasAppRules: Boolean = matchers.any { it is AppMatcher && it.exit != RouteExit.DIRECT }
 
     /**
+     * La salida de la primera regla de dominio que coincide con [host], o null si ninguna. Al resolver un nombre solo se
+     * conoce el nombre: las reglas de IP y de app se aplican después, al conectar.
+     */
+    fun domainExitFor(host: String): RouteExit? {
+        val name = host.lowercase().trimEnd('.')
+        return matchers.firstOrNull { it is DomainMatcher && it.matches(name) }?.exit
+    }
+
+    /**
      * La salida de una conexión.
      *
      * @param host el nombre del destino si se conoce (por el DNS del túnel).

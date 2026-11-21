@@ -49,6 +49,11 @@ data class AppSettings(
      * bloquear y hacen que el sistema muestre «sin internet» aunque lo haya. Solo contesta si el proxy funciona.
      */
     val answerConnectivityChecks: Boolean = true,
+    /**
+     * Los nombres de la red local (los de sus dominios de búsqueda, como `uci.cu`) se resuelven con el DNS de la red y,
+     * si su dirección es interna, van directos, sin proxy ni Otro País: el proxy institucional no suele abrirlos.
+     */
+    val intranetDirect: Boolean = true,
     /** Pedir al proxy las IP públicas por un nombre de [nameServices], en vez de por la IP tal cual. */
     val nameByIp: Boolean = true,
     /** Si ningún nombre sirve, probar por último la IP tal cual. */
@@ -61,6 +66,8 @@ interface SettingsRepository {
     val settings: StateFlow<AppSettings>
 
     fun setAnswerConnectivityChecks(enabled: Boolean)
+
+    fun setIntranetDirect(enabled: Boolean)
 
     fun setNameByIp(enabled: Boolean)
 
@@ -91,6 +98,11 @@ class StoredSettingsRepository(private val keyValueStore: KeyValueStore) : Setti
     override fun setAnswerConnectivityChecks(enabled: Boolean) {
         keyValueStore.putString(ANSWER_CONNECTIVITY_CHECKS_KEY, enabled.toString())
         state.value = state.value.copy(answerConnectivityChecks = enabled)
+    }
+
+    override fun setIntranetDirect(enabled: Boolean) {
+        keyValueStore.putString(INTRANET_DIRECT_KEY, enabled.toString())
+        state.value = state.value.copy(intranetDirect = enabled)
     }
 
     override fun setNameByIp(enabled: Boolean) {
@@ -134,6 +146,7 @@ class StoredSettingsRepository(private val keyValueStore: KeyValueStore) : Setti
         fun flag(key: String, default: Boolean) = keyValueStore.getString(key)?.toBooleanStrictOrNull() ?: default
         return AppSettings(
             answerConnectivityChecks = flag(ANSWER_CONNECTIVITY_CHECKS_KEY, defaults.answerConnectivityChecks),
+            intranetDirect = flag(INTRANET_DIRECT_KEY, defaults.intranetDirect),
             nameByIp = flag(NAME_BY_IP_KEY, defaults.nameByIp),
             tryRawIp = flag(TRY_RAW_IP_KEY, defaults.tryRawIp),
             nameServices = loadServices() ?: defaults.nameServices,
@@ -154,6 +167,7 @@ class StoredSettingsRepository(private val keyValueStore: KeyValueStore) : Setti
 
     internal companion object {
         const val ANSWER_CONNECTIVITY_CHECKS_KEY = "settings.answer_connectivity_checks"
+        const val INTRANET_DIRECT_KEY = "settings.intranet_direct"
         const val NAME_BY_IP_KEY = "settings.name_by_ip"
         const val TRY_RAW_IP_KEY = "settings.try_raw_ip"
         const val NAME_SERVICES_KEY = "settings.name_services"

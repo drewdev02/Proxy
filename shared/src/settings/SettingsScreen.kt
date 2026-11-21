@@ -46,6 +46,7 @@ import kotlin.time.Clock
 class SettingsActions(
     val onBack: () -> Unit = {},
     val onAnswerConnectivityChecksChange: (Boolean) -> Unit = {},
+    val onIntranetDirectChange: (Boolean) -> Unit = {},
     val onNameByIpChange: (Boolean) -> Unit = {},
     val onTryRawIpChange: (Boolean) -> Unit = {},
     val onServiceEnabledChange: (String, Boolean) -> Unit = { _, _ -> },
@@ -70,6 +71,7 @@ internal fun SettingsRoute(onBack: () -> Unit) {
         actions = SettingsActions(
             onBack = onBack,
             onAnswerConnectivityChecksChange = viewModel::onAnswerConnectivityChecksChange,
+            onIntranetDirectChange = viewModel::onIntranetDirectChange,
             onNameByIpChange = viewModel::onNameByIpChange,
             onTryRawIpChange = viewModel::onTryRawIpChange,
             onServiceEnabledChange = viewModel::onServiceEnabledChange,
@@ -110,6 +112,16 @@ fun SettingsScreen(
                     "Se aplica al conectar la próxima vez.",
                 checked = settings.answerConnectivityChecks,
                 onCheckedChange = actions.onAnswerConnectivityChecksChange,
+            )
+            HorizontalDivider()
+            SettingSwitch(
+                title = "Abrir la red local sin proxy",
+                description = "Los sitios de la red donde estás (como los de uci.cu) se buscan en el DNS de esa red y, si " +
+                    "son internos, se abren directamente, sin pasar por el proxy ni por Otro País: el proxy no suele " +
+                    "abrirlos. Para otros sitios internos, añade una regla de dominio con salida «Directo». " +
+                    "Se aplica al conectar la próxima vez.",
+                checked = settings.intranetDirect,
+                onCheckedChange = actions.onIntranetDirectChange,
             )
             HorizontalDivider()
             NameServicesSection(settings, statuses, tests, actions, onAdd = { adding = true })

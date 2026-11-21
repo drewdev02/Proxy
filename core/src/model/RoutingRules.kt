@@ -12,8 +12,9 @@ enum class RouteExit {
     VPN,
 
     /**
-     * La red real, sin proxy ni túnel. Solo en reglas de IP o rango (esos destinos no entran en el túnel) y de app (en
-     * Android la app queda fuera de la VPN).
+     * La red real, sin proxy ni túnel. En reglas de IP o rango esos destinos no entran en el túnel; en las de app (Android)
+     * la app queda fuera de la VPN; en las de dominio, el nombre se resuelve con el DNS de la red y, si su dirección es
+     * interna, la conexión va directa (si es pública, sale por el proxy).
      */
     DIRECT,
 
@@ -51,10 +52,8 @@ data class RoutingRules(
 
     companion object {
         /** Las salidas que admite cada tipo de regla. */
-        fun exitsFor(kind: RuleKind): List<RouteExit> = when (kind) {
-            RuleKind.IP, RuleKind.APP -> RouteExit.entries
-            RuleKind.DOMAIN -> listOf(RouteExit.PROXY, RouteExit.VPN, RouteExit.BLOCK)
-        }
+        @Suppress("UNUSED_PARAMETER")
+        fun exitsFor(kind: RuleKind): List<RouteExit> = RouteExit.entries
 
         /** Las que puede tener [defaultExit]. */
         val DEFAULT_EXITS = listOf(RouteExit.PROXY, RouteExit.VPN)

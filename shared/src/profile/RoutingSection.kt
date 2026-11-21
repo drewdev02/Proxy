@@ -175,7 +175,8 @@ internal fun RoutingSection(
             }
         }
         Text(
-            "Un dominio incluye sus subdominios. «Directo» (sin proxy) vale para apps, IP y rangos, no para dominios. " +
+            "Un dominio incluye sus subdominios. «Directo» sale sin proxy: en un dominio, solo si su dirección es de la " +
+                "red local (si es pública, sale por el proxy). " +
                 "Una app que sale por Otro País puede tardar un segundo más en su primera conexión. " +
                 "Si Otro País se cae, su tráfico sale por el proxy hasta que vuelva.",
             style = MaterialTheme.typography.bodySmall,

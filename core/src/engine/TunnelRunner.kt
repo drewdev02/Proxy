@@ -2,6 +2,8 @@ package org.uci.proxy.core.engine
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -9,11 +11,17 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.selects.select
+import org.uci.proxy.core.dns.LocalDnsPolicy
+import org.uci.proxy.core.dns.LocalDnsResolver
 import org.uci.proxy.core.model.ProxyProfile
+import org.uci.proxy.core.packet.Ipv4Packet
 import org.uci.proxy.core.packet.Ipv4Route
 import org.uci.proxy.core.packet.NON_PUBLIC_RANGES
 import org.uci.proxy.core.packet.routesExcluding
+import org.uci.proxy.core.port.DnsTransport
 import org.uci.proxy.core.port.HostResolver
+import org.uci.proxy.core.port.LocalDnsConfig
+import org.uci.proxy.core.port.LocalDnsSource
 import org.uci.proxy.core.port.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.PlatformTunnel
@@ -65,6 +73,9 @@ class TunnelRunner(
     private val engines: CountryEngines = CountryEngines.None,
     /** Dónde guarda cada perfil el estado de su motor (la identidad de un nodo de Tailscale). */
     private val stateDirectories: EngineStateDirectories = EngineStateDirectories.None,
+    /** El DNS de la red real, para abrir sin proxy lo interno. Sin él (o sin [dnsTransport]), todo va como siempre. */
+    private val localDnsSource: LocalDnsSource = LocalDnsSource.None,
+    private val dnsTransport: DnsTransport? = null,
 ) {
     /** Carga el perfil y su contraseña del almacén y ejecuta el túnel. */
     suspend fun run(platformTunnel: PlatformTunnel, profileId: String, settings: AppSettings = AppSettings()) {
@@ -104,8 +115,10 @@ class TunnelRunner(
         }
         val resolvedProfile = profile.copy(host = proxyAddress)
         val routing = profile.routing
+        // También antes de tocar la red: el DNS de la red real deja de verse en cuanto el túnel captura el DNS.
+        val localDnsConfig = readLocalDns()
         if (vpn != null && !routing.enabled) {
-            runThroughVpn(platformTunnel, profile, resolvedProfile, password, vpn, settings)
+            runThroughVpn(platformTunnel, profile, resolvedProfile, password, vpn, settings, localDnsConfig)
             return
         }
 
@@ -144,6 +157,7 @@ class TunnelRunner(
 
         val link = VpnLink(plan.tunAddress, logger)
         val split = rules?.let { SplitRouting(it, link) }
+        val localDns = localDnsFor(localDnsConfig, settings, rules, reserved = listOf(plan.subnet))
         logger.log(LogLevel.INFO, TAG, "Túnel activo en ${plan.tunAddressText}, proxy $proxyAddress" + if (rules != null) ", con reglas de salida" else "")
         val vpnDown = retry != null && firstSession == null
         if (vpnDown) logger.log(LogLevel.WARN, TAG, "Otro País no conectó: lo que iba por él sale por el proxy")
@@ -151,7 +165,7 @@ class TunnelRunner(
         try {
             coroutineScope {
                 // En este ámbito viven también el temporizador TCP y los relés de cada conexión.
-                val engine = engineFactory.create(plan, output = tun, scope = this, profile = resolvedProfile, password = password, settings = settings, split = split)
+                val engine = engineFactory.create(plan, output = tun, scope = this, profile = resolvedProfile, password = password, settings = settings, split = split, localDns = localDns)
                 val loop = launch(dispatchers.background) { engine.run(tun) }
                 if (retry != null && firstAttempt != null) {
                     launch { superviseVpn(firstAttempt, link, tun, profile.id, retry) }
@@ -249,6 +263,7 @@ class TunnelRunner(
         password: String,
         vpn: CountryExitStart,
         settings: AppSettings,
+        localDnsConfig: LocalDnsConfig = LocalDnsConfig.NONE,
     ) {
         val session = when (val result = engines.connect(ExitContext(resolvedProfile, password, settings), vpn)) {
             is VpnConnectResult.Connected -> result.session
@@ -282,11 +297,22 @@ class TunnelRunner(
         stateStore.set(TunnelState.Connected(profile.id))
         try {
             coroutineScope {
+                // Aquí no hay motor que reparta: el DNS de la red local se atiende al vuelo, y lo que no le toca sigue a
+                // la VPN tal cual. Lo que apartó un momento vuelve por esta misma cola, antes del siguiente paquete.
+                val localDns = localDnsFor(localDnsConfig, settings, rules = null, reserved = listOfNotNull(network.subnet))
+                val requeued = Channel<Ipv4Packet>(REQUEUE_CAPACITY, BufferOverflow.DROP_OLDEST)
+                val local = LocalDnsHandler(localDns, tun, this, logger) { requeued.trySend(it) }
                 val outbound = launch(dispatchers.background) {
                     while (true) {
                         val packet = tun.readPacket() ?: break
+                        while (true) {
+                            val waiting = requeued.tryReceive().getOrNull() ?: break
+                            session.writePacket(waiting.bytes)
+                        }
                         // La VPN solo lleva IPv4: el IPv6 que el sistema intente se descarta, como en el modo directo.
-                        if (packet.isNotEmpty() && (packet[0].toInt() ushr 4) == 4) session.writePacket(packet)
+                        if (packet.isEmpty() || (packet[0].toInt() ushr 4) != 4) continue
+                        val replies = Ipv4Packet.parse(packet)?.let { local.handle(it) }
+                        if (replies == null) session.writePacket(packet) else replies.forEach { tun.writePacket(it) }
                     }
                 }
                 val inbound = launch { session.receive { tun.writePacket(it) } }
@@ -313,8 +339,45 @@ class TunnelRunner(
         }
     }
 
+    private suspend fun readLocalDns(): LocalDnsConfig {
+        if (dnsTransport == null) return LocalDnsConfig.NONE
+        val config = try {
+            localDnsSource.read()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            logger.log(LogLevel.WARN, TAG, "No se pudo leer el DNS de la red: ${e.message}")
+            LocalDnsConfig.NONE
+        }
+        if (config.servers.isNotEmpty()) {
+            logger.log(
+                LogLevel.DEBUG,
+                TAG,
+                "DNS de la red: ${config.servers.joinToString()}" +
+                    if (config.searchDomains.isEmpty()) "" else "; dominios ${config.searchDomains.joinToString()}",
+            )
+        }
+        return config
+    }
+
+    /** El DNS de la red local para esta sesión, o null si no hay nada que atender con él. */
+    private fun localDnsFor(config: LocalDnsConfig, settings: AppSettings, rules: RuleSet?, reserved: List<Ipv4Route>): LocalDns? {
+        val transport = dnsTransport ?: return null
+        val resolver = LocalDnsResolver(config.servers, transport, reserved, logger)
+        if (resolver.servers.isEmpty()) {
+            if (config.servers.isNotEmpty()) logger.log(LogLevel.DEBUG, TAG, "El DNS de la red no es interno: la red local va como siempre")
+            return null
+        }
+        val policy = LocalDnsPolicy(config.searchDomains, settings.intranetDirect, rules)
+        if (settings.intranetDirect && config.searchDomains.isNotEmpty()) {
+            logger.log(LogLevel.INFO, TAG, "Red local sin proxy: ${config.searchDomains.joinToString()}")
+        }
+        return LocalDns(policy, resolver)
+    }
+
     private companion object {
         const val TAG = "Tunnel"
+        const val REQUEUE_CAPACITY = 256
         const val MTU = 1500
 
         // Si el servidor VPN no empuja un DNS: una dirección pública, que de todos modos va por la VPN.

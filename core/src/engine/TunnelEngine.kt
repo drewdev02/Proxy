@@ -1,6 +1,9 @@
 package org.uci.proxy.core.engine
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ReceiveChannel
 import org.uci.proxy.core.dns.DnsResponder
 import org.uci.proxy.core.dns.FakeDnsTable
 import org.uci.proxy.core.model.ProxyProfile
@@ -137,6 +140,8 @@ class TunnelEngineFactory(
         settings: AppSettings = AppSettings(),
         /** Con reglas de salida: cómo repartir las conexiones. Sin ellas, todo va por el proxy. */
         split: SplitRouting? = null,
+        /** El DNS de la red local, para abrir sin proxy lo que es interno; null si no se usa. */
+        localDns: LocalDns? = null,
     ): TunnelEngine {
         val fakeDns = FakeDnsTable(plan.subnetBase)
         val connector = connectors.first { it.protocol == profile.protocol }
@@ -155,30 +160,49 @@ class TunnelEngineFactory(
         tcp.start()
 
         val dns = DnsPacketHandler(DnsResponder(fakeDns, checks::dnsAddressFor), logger)
+        val requeued = Channel<Ipv4Packet>(REQUEUE_CAPACITY, BufferOverflow.DROP_OLDEST)
+        val local = LocalDnsHandler(localDns, output, scope, logger) { requeued.trySend(it) }
         // El orden importa: DNS antes que el reparto por reglas, y este antes que el proxy y el rechazo genérico de UDP.
+        // El de la red local va primero: lo interno no debe acabar ni en el DNS falso ni en el de la VPN.
         val handlers = if (split == null) {
-            listOf(dns, TcpPacketHandler(tcp, fakeDns), UdpRejectHandler())
+            listOf(local, dns, TcpPacketHandler(tcp, fakeDns), UdpRejectHandler())
         } else {
             listOf(
+                local,
                 SplitDnsHandler(split, dns) { checks.dnsAddressFor(it) != null },
                 ExitRouterHandler(split, fakeDns, logger, owner, scope),
                 TcpPacketHandler(tcp, fakeDns, split.link::hostFor),
                 UdpRejectHandler(),
             )
         }
-        return TunnelEngine(handlers)
+        return TunnelEngine(handlers, requeued)
+    }
+
+    private companion object {
+        const val REQUEUE_CAPACITY = 256
     }
 }
 
 /**
  * Bucle del túnel: lee cada paquete de la interfaz, se lo ofrece a los manejadores por orden
  * y escribe lo que el primero interesado devuelva. Lo que nadie reclama se descarta.
+ *
+ * @param requeued paquetes que un manejador apartó un momento y devuelve al bucle (ver [LocalDnsHandler]). Se atienden
+ *   antes del siguiente paquete de la interfaz, en este mismo bucle: así los manejadores siguen sin compartir estado
+ *   entre hilos.
  */
-class TunnelEngine(private val handlers: List<PacketHandler>) {
+class TunnelEngine(
+    private val handlers: List<PacketHandler>,
+    private val requeued: ReceiveChannel<Ipv4Packet>? = null,
+) {
     /** Corre hasta que la interfaz se cierra. */
     suspend fun run(tun: TunDevice) {
         while (true) {
             val bytes = tun.readPacket() ?: return
+            while (true) {
+                val waiting = requeued?.tryReceive()?.getOrNull() ?: break
+                firstReply(waiting)?.forEach { tun.writePacket(it) }
+            }
             val packet = Ipv4Packet.parse(bytes) ?: continue
             val replies = firstReply(packet) ?: continue
             replies.forEach { tun.writePacket(it) }
