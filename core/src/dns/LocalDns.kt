@@ -29,9 +29,10 @@ fun isIntranetAddress(address: Int): Boolean = INTRANET_RANGES.any { it.contains
 /**
  * Qué nombres se resuelven con el DNS de la red local en vez de con el del túnel.
  *
- * - Una regla de dominio que coincide manda: con «Directo», sí; con cualquier otra salida, no.
- * - Sin regla que coincida, sí los de los dominios de búsqueda de la red (`uci.cu` y sus subdominios), si el ajuste
- *   [intranetDirect] está activo.
+ * - Con una regla de dominio «Directo», sí; con «Otro País» o «Bloquear», no.
+ * - Con una regla «Proxy» o sin regla, sí los de los dominios de búsqueda de la red (`uci.cu` y sus subdominios), si el
+ *   ajuste [intranetDirect] está activo: el proxy institucional no abre su propia intranet, así que para una dirección
+ *   interna «Proxy» solo puede significar «sin Otro País». Si la dirección es pública, sigue yendo por el proxy.
  */
 class LocalDnsPolicy(
     searchDomains: List<String>,
@@ -42,8 +43,13 @@ class LocalDnsPolicy(
 
     fun claims(name: String): Boolean {
         val host = name.lowercase().trimEnd('.')
-        rules?.domainExitFor(host)?.let { return it == RouteExit.DIRECT }
-        return intranetDirect && domains.any { host == it || host.endsWith(".$it") }
+        return when (rules?.domainExitFor(host)) {
+            RouteExit.DIRECT -> true
+            // Quien manda algo a Otro País o lo bloquea no quiere que salga por la red local.
+            RouteExit.VPN, RouteExit.BLOCK -> false
+            // «Proxy» (o ninguna regla): una dirección interna no la abre el proxy, así que si lo es, va directa.
+            RouteExit.PROXY, null -> intranetDirect && domains.any { host == it || host.endsWith(".$it") }
+        }
     }
 
     companion object {

@@ -48,18 +48,34 @@ class LocalDnsPolicyTest {
     }
 
     @Test
-    fun `an explicit domain rule wins over the setting`() {
+    fun `Otro País and block rules keep a name off the local network, a proxy rule does not`() {
         val policy = LocalDnsPolicy(
             listOf("uci.cu"),
             intranetDirect = true,
             rules(
-                RouteRule(RuleKind.DOMAIN, "correo.uci.cu", RouteExit.DIRECT),
+                RouteRule(RuleKind.DOMAIN, "correo.uci.cu", RouteExit.VPN),
+                RouteRule(RuleKind.DOMAIN, "ads.uci.cu", RouteExit.BLOCK),
                 RouteRule(RuleKind.DOMAIN, "*.uci.cu", RouteExit.PROXY),
             ),
         )
 
-        assertTrue(policy.claims("correo.uci.cu"), "la primera que coincide es «Directo»")
-        assertFalse(policy.claims("drst.uci.cu"), "«*.uci.cu → Proxy» manda sobre el ajuste")
+        assertFalse(policy.claims("correo.uci.cu"), "«Otro País» manda")
+        assertFalse(policy.claims("ads.uci.cu"), "«Bloquear» manda")
+        assertTrue(policy.claims("drst.uci.cu"), "con «Proxy», lo interno va directo: el proxy no lo abre")
+    }
+
+    @Test
+    fun `a proxy rule outside the local domains does not use the local DNS`() {
+        val policy = LocalDnsPolicy(listOf("uci.cu"), intranetDirect = true, rules(RouteRule(RuleKind.DOMAIN, "etecsa.cu", RouteExit.PROXY)))
+
+        assertFalse(policy.claims("www.etecsa.cu"))
+    }
+
+    @Test
+    fun `with the setting off a proxy rule goes through the proxy`() {
+        val policy = LocalDnsPolicy(listOf("uci.cu"), intranetDirect = false, rules(RouteRule(RuleKind.DOMAIN, "*.uci.cu", RouteExit.PROXY)))
+
+        assertFalse(policy.claims("drst.uci.cu"))
     }
 
     @Test

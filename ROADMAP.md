@@ -542,7 +542,8 @@ DNS, se leen los servidores DNS y los dominios de búsqueda de la red real (`scu
 preguntan a ese DNS; si la dirección es interna (10/8, 172.16/12, 192.168/16, 100.64/10), la app la recibe tal cual y su
 conexión va directa, porque esas direcciones nunca entran en la interfaz. Si es pública, o cae en la subred del túnel,
 sigue el camino de siempre. Solo se usan servidores DNS internos, así que la consulta tampoco entra en el túnel. Una regla
-de dominio que coincide manda sobre el ajuste («`*.uci.cu` → Proxy» lo desactiva para esos nombres). Vale con reglas y sin
+de dominio «Otro País» o «Bloquear» manda sobre el ajuste; una «Proxy» no (`*.uci.cu → Proxy` sigue abriendo directo lo
+interno, porque el proxy no lo abre, y por el proxy lo público). Vale con reglas y sin
 ellas, también con todo por Otro País. Lo controla el ajuste «Abrir la red local sin proxy», activo por defecto. Además,
 mientras el túnel está activo WPAD (`wpad`, `wpad.*`) contesta «no existe»: así el navegador no encuentra el proxy de la
 red ni lo usa por su cuenta, y deja de reintentarlo sin parar.

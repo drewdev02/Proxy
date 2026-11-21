@@ -215,7 +215,8 @@ class LocalDnsTunnelTest {
             rules = listOf(
                 RouteRule(RuleKind.DOMAIN, "intranet.example", RouteExit.DIRECT),
                 RouteRule(RuleKind.DOMAIN, "publico.example", RouteExit.DIRECT),
-                RouteRule(RuleKind.DOMAIN, "correo.uci.cu", RouteExit.PROXY),
+                RouteRule(RuleKind.DOMAIN, "correo.uci.cu", RouteExit.VPN),
+                RouteRule(RuleKind.DOMAIN, "*.uci.cu", RouteExit.PROXY),
             ),
         ),
     )
@@ -256,14 +257,27 @@ class LocalDnsTunnelTest {
     }
 
     @Test
-    fun `an explicit rule wins over the setting`() = runTest(UnconfinedTestDispatcher()) {
+    fun `a name sent to Otro País by a rule is not asked to the local DNS`() = runTest(UnconfinedTestDispatcher()) {
         connect(rulesProfile, vpn = start)
 
         askDns("correo.uci.cu")
 
         assertTrue(transport.asked.isEmpty())
-        assertTrue(fakeSubnet.contains(parseIpv4(assertNotNull(lastAnswer().second))!!))
+        assertEquals(1, session.sent.size, "se pregunta al DNS de la VPN")
     }
+
+    @Test
+    fun `with «*_uci_cu → Proxy» an internal site still goes direct and a public one through the proxy`() =
+        runTest(UnconfinedTestDispatcher()) {
+            connect(rulesProfile, vpn = start)
+
+            askDns("drst.uci.cu")
+            assertEquals(0 to "10.0.0.13", lastAnswer(), "el proxy no abre lo interno: va directo")
+
+            askDns("www.uci.cu", port = 41001)
+            assertTrue(fakeSubnet.contains(parseIpv4(assertNotNull(lastAnswer().second))!!), "lo público, por el proxy")
+            assertTrue(session.sent.isEmpty())
+        }
 
     @Test
     fun `a slow answer arrives later without holding the tunnel`() = runTest(UnconfinedTestDispatcher()) {
