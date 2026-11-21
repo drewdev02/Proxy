@@ -60,7 +60,33 @@ data class AppSettings(
     val tryRawIp: Boolean = true,
     /** En el orden en que se prueban; los desactivados se saltan. */
     val nameServices: List<IpNameService> = IpNameService.BUILT_IN,
+    /** La cuota de la UCI: avisos, consulta y pausa. */
+    val quota: QuotaSettings = QuotaSettings(),
 )
+
+/** Cómo se sigue la cuota de navegación de la UCI. */
+@Serializable
+data class QuotaSettings(
+    /** Los porcentajes de la cuota a los que se avisa. Cada uno avisa una vez, hasta que el consumo vuelve a bajar. */
+    val alerts: List<Int> = ALERT_THRESHOLDS,
+    /** Cada cuántos minutos se consulta mientras el túnel está conectado. */
+    val checkMinutes: Int = 5,
+    /** Desconectar el túnel al llegar al [PAUSE_THRESHOLD] % de la cuota, para no agotarla sin querer. */
+    val pauseAtLimit: Boolean = false,
+    /**
+     * Verificar el certificado del servicio. UCIProxy no lo hacía; aquí solo se desactiva a mano, si el servicio usa un
+     * certificado que el sistema no reconoce (de una autoridad interna de la UCI).
+     */
+    val verifyCertificate: Boolean = true,
+    /** Otra dirección para el servicio, solo en modo desarrollo (para el simulador `tools/test_cuotas.py`). */
+    val serviceUrl: String? = null,
+) {
+    companion object {
+        val ALERT_THRESHOLDS = listOf(50, 75, 90)
+        val CHECK_INTERVALS = listOf(5, 15, 30)
+        const val PAUSE_THRESHOLD = 90
+    }
+}
 
 interface SettingsRepository {
     val settings: StateFlow<AppSettings>
@@ -86,6 +112,9 @@ interface SettingsRepository {
 
     /** Deja los servicios como vienen de fábrica y activos, y borra los propios. */
     fun resetNameServices()
+
+    /** Cambia los ajustes de la cuota a partir de los actuales. */
+    fun updateQuota(change: (QuotaSettings) -> QuotaSettings)
 }
 
 /** Guarda cada ajuste como una clave del [KeyValueStore]; lo que falte o no se entienda toma el valor por defecto. */
@@ -135,6 +164,12 @@ class StoredSettingsRepository(private val keyValueStore: KeyValueStore) : Setti
 
     override fun resetNameServices() = updateServices { IpNameService.BUILT_IN }
 
+    override fun updateQuota(change: (QuotaSettings) -> QuotaSettings) {
+        val updated = change(state.value.quota)
+        keyValueStore.putString(QUOTA_KEY, json.encodeToString(updated))
+        state.value = state.value.copy(quota = updated)
+    }
+
     private fun updateServices(transform: (List<IpNameService>) -> List<IpNameService>) {
         val updated = transform(state.value.nameServices)
         keyValueStore.putString(NAME_SERVICES_KEY, json.encodeToString(updated))
@@ -150,7 +185,19 @@ class StoredSettingsRepository(private val keyValueStore: KeyValueStore) : Setti
             nameByIp = flag(NAME_BY_IP_KEY, defaults.nameByIp),
             tryRawIp = flag(TRY_RAW_IP_KEY, defaults.tryRawIp),
             nameServices = loadServices() ?: defaults.nameServices,
+            quota = loadQuota() ?: defaults.quota,
         )
+    }
+
+    private fun loadQuota(): QuotaSettings? {
+        val stored = keyValueStore.getString(QUOTA_KEY) ?: return null
+        return try {
+            json.decodeFromString<QuotaSettings>(stored)
+        } catch (_: SerializationException) {
+            null
+        } catch (_: IllegalArgumentException) {
+            null
+        }
     }
 
     /** Los guardados; si falta alguno de fábrica (porque una versión nueva lo añade) se pone al final, activo. */
@@ -171,5 +218,6 @@ class StoredSettingsRepository(private val keyValueStore: KeyValueStore) : Setti
         const val NAME_BY_IP_KEY = "settings.name_by_ip"
         const val TRY_RAW_IP_KEY = "settings.try_raw_ip"
         const val NAME_SERVICES_KEY = "settings.name_services"
+        const val QUOTA_KEY = "settings.quota"
     }
 }

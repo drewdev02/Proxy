@@ -38,6 +38,23 @@ class StoredSettingsRepositoryTest {
     private fun reopened() = StoredSettingsRepository(store)
 
     @Test
+    fun `the quota settings start with every alert and survive a restart`() {
+        val repository = StoredSettingsRepository(store)
+        assertEquals(QuotaSettings(alerts = listOf(50, 75, 90), checkMinutes = 5, pauseAtLimit = false, verifyCertificate = true), repository.settings.value.quota)
+
+        repository.updateQuota { it.copy(alerts = listOf(90), checkMinutes = 15, pauseAtLimit = true) }
+
+        assertEquals(QuotaSettings(alerts = listOf(90), checkMinutes = 15, pauseAtLimit = true), reopened().settings.value.quota)
+    }
+
+    @Test
+    fun `broken quota settings fall back to the defaults`() {
+        store.putString(StoredSettingsRepository.QUOTA_KEY, "{no es json")
+
+        assertEquals(QuotaSettings(), reopened().settings.value.quota)
+    }
+
+    @Test
     fun `opening the local network without the proxy is on by default and survives a restart`() {
         assertTrue(AppSettings().intranetDirect)
         assertTrue(reopened().settings.value.intranetDirect, "también para quien ya tenía ajustes guardados")
