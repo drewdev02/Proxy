@@ -267,7 +267,8 @@ class LocalDnsTunnelTest {
     }
 
     @Test
-    fun `with «*_uci_cu → Proxy» an internal site still goes direct and a public one through the proxy`() =
+    // Sin «*» en el nombre: en Windows no vale en el nombre del archivo de la clase.
+    fun `with a proxy rule for every uci_cu name an internal site still goes direct and a public one through the proxy`() =
         runTest(UnconfinedTestDispatcher()) {
             connect(rulesProfile, vpn = start)
 
