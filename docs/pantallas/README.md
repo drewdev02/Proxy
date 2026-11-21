@@ -24,6 +24,12 @@ Escritorio y tableta (dos columnas, barra lateral):
 
 ![](../../shared/test@jvm/snapshots/macos/connection/desktop-connected.png)
 
+En la app de macOS, la barra de título es transparente y la app ocupa toda la ventana: los botones de cerrar,
+minimizar y ampliar quedan sobre el fondo de la app (captura real de la ventana, no de las pruebas). En Windows 11 la
+barra se pinta del color del fondo.
+
+![](escritorio/macos-conexion.png)
+
 ## Perfiles
 
 | Con un perfil conectado | Sin perfiles | Con fallos (túnel y borrado) |

@@ -6,6 +6,8 @@ dependencies:
   - $compose.preview
   - $libs.kotlinx.coroutines.swing
   - $libs.logback.classic
+  - $libs.jna
+  - $libs.jna.platform
 
 settings:
   compose: enabled

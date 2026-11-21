@@ -4,6 +4,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
@@ -41,9 +43,16 @@ fun App() = App(filePicker = null)
  * @param appCatalog las apps instaladas, o null donde no hay reglas por app (escritorio, iOS).
  * @param developerMode muestra herramientas de desarrollo, como el catálogo de componentes. Solo en compilaciones de
  * depuración (Android) o con la variable de entorno PROXYUCI_DEV=1 (escritorio).
+ * @param titleBarInset el alto de la barra de título del sistema cuando la ventana dibuja por debajo de ella (macOS),
+ * para no poner nada bajo sus botones.
  */
 @Composable
-fun App(filePicker: FilePicker?, appCatalog: AppCatalog? = null, developerMode: Boolean = false) = CompositionLocalProvider(
+fun App(
+    filePicker: FilePicker?,
+    appCatalog: AppCatalog? = null,
+    developerMode: Boolean = false,
+    titleBarInset: Dp = 0.dp,
+) = CompositionLocalProvider(
     LocalFilePicker provides filePicker,
     LocalAppCatalog provides appCatalog,
 ) {
@@ -63,6 +72,7 @@ fun App(filePicker: FilePicker?, appCatalog: AppCatalog? = null, developerMode: 
                 onSelect = { backStack.selectTab(it) },
                 // Las pantallas de detalle (editor, catálogo) ocupan todo, sin barra.
                 showNavigation = backStack.isOnTab(),
+                topInset = titleBarInset,
             ) { wide ->
                 NavDisplay(
                     backStack = backStack,

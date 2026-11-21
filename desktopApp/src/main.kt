@@ -1,6 +1,7 @@
 package org.uci.proxy
 
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import org.uci.proxy.core.desktop.EngineArguments
@@ -25,12 +26,18 @@ fun main(args: Array<String>) {
     val readyFile = EngineArguments.value(args.toList(), EngineArguments.READY_FILE)
     if (readyFile != null) reportUncaughtErrorsTo("$readyFile.error")
 
+    prepareSystemAppearance()
     initKoin {
         modules(desktopAppModule(JvmPlatformInfo.fromSystemProperties()))
     }
     application {
         Window(onCloseRequest = ::exitApplication, title = "ProxyUCI") {
-            App(filePicker = AwtFilePicker(), developerMode = System.getenv("PROXYUCI_DEV") == "1")
+            val titleBarInset = remember { blendTitleBar(window) }
+            App(
+                filePicker = AwtFilePicker(),
+                developerMode = System.getenv("PROXYUCI_DEV") == "1",
+                titleBarInset = titleBarInset,
+            )
             // Solo para pruebas: avisa de que la ventana ya se compuso y sale. Un ejecutor de CI no tiene un
             // escritorio interactivo del que leer el título de la ventana, así que lo dice la propia app.
             if (readyFile != null) {

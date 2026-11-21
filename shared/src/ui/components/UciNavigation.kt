@@ -27,6 +27,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.NavigationRailDefaults
 import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -42,6 +43,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import org.uci.proxy.theme.ProxyUciTheme
 import org.uci.proxy.ui.icons.UciIcons
@@ -118,9 +120,10 @@ fun <K> UciNavigationRail(
     onSelect: (K) -> Unit,
     modifier: Modifier = Modifier,
     header: (@Composable ColumnScope.() -> Unit)? = null,
+    windowInsets: WindowInsets = NavigationRailDefaults.windowInsets,
 ) {
     val c = ProxyUciTheme.colors
-    NavigationRail(modifier = modifier, containerColor = c.card, header = header) {
+    NavigationRail(modifier = modifier, containerColor = c.card, header = header, windowInsets = windowInsets) {
         Spacer(Modifier.size(8.dp))
         items.forEach { item ->
             NavigationRailItem(
@@ -165,6 +168,9 @@ internal val WideLayoutBreakpoint = 600.dp
  *
  * Con [showNavigation] en false se ocultan las barras (pantallas de detalle como el editor) sin cambiar la estructura,
  * para que el contenido no pierda su estado al entrar y salir de ellas.
+ *
+ * [topInset] es el alto que ocupa encima la barra de título del sistema cuando la ventana dibuja por debajo de ella
+ * (escritorio en macOS): el fondo de la barra lateral sube hasta arriba, pero sus botones y el contenido empiezan debajo.
  */
 @Composable
 fun <K> UciNavigationScaffold(
@@ -173,6 +179,7 @@ fun <K> UciNavigationScaffold(
     onSelect: (K) -> Unit,
     modifier: Modifier = Modifier,
     showNavigation: Boolean = true,
+    topInset: Dp = 0.dp,
     content: @Composable (wide: Boolean) -> Unit,
 ) {
     BoxWithConstraints(modifier.fillMaxSize()) {
@@ -180,14 +187,14 @@ fun <K> UciNavigationScaffold(
         if (wide) {
             Row(Modifier.fillMaxSize()) {
                 if (showNavigation) {
-                    UciNavigationRail(items, selected, onSelect, Modifier.fillMaxHeight())
+                    UciNavigationRail(items, selected, onSelect, Modifier.fillMaxHeight(), windowInsets = WindowInsets(top = topInset))
                     VerticalDivider(color = ProxyUciTheme.colors.cardBorder)
                 }
-                Box(Modifier.weight(1f).fillMaxHeight()) { content(true) }
+                Box(Modifier.weight(1f).fillMaxHeight().padding(top = topInset)) { content(true) }
             }
         } else {
             Column(Modifier.fillMaxSize()) {
-                Box(Modifier.weight(1f).fillMaxWidth()) { content(false) }
+                Box(Modifier.weight(1f).fillMaxWidth().padding(top = topInset)) { content(false) }
                 if (showNavigation) UciBottomNavBar(items, selected, onSelect)
             }
         }
