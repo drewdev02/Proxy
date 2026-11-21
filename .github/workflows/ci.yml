@@ -68,6 +68,10 @@ jobs:
         run: ${{ matrix.kotlin }} test -m core --platform jvm
       - name: Pruebas de la interfaz
         run: ${{ matrix.kotlin }} test -m shared --platform jvm
+      # El servicio de cuotas de la UCI, de mentira, contra el que se prueba la consulta de la cuota.
+      - name: Simulador del servicio de cuotas
+        if: matrix.name == 'Linux'
+        run: python3 tools/test_cuotas_test.py
 
   # El puente de Tailscale por su lado: pruebas de Go (sesión por un proxy con autenticación, nodo de salida, clave mala)
   # y las librerías de Android, que se meten en un APK para comprobar que llegan a él.
