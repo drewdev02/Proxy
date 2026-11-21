@@ -48,6 +48,28 @@ Capturas reales en el emulador de Android:
 |---|---|
 | ![](android/consumo.png) | ![](android/consumo-destinos-apps.png) |
 
+### Cuota de la UCI
+
+Con un perfil de la UCI, Consumo empieza por la cuota de navegación de la cuenta: lo consumido y lo que queda. Se
+consulta al servicio de cuotas de la UCI (el mismo que usaba UCIProxy) con el usuario y la contraseña del perfil. La
+cuota no se renueva en una fecha: lo consumido baja solo con el tiempo y puede pasar del 100 %, así que la app no
+calcula fechas. Avisa al 50, 75 y 90 % (cada aviso, una vez hasta que el consumo baje) y, si se pide en Ajustes,
+desconecta al llegar al 90 %.
+
+| Con cuota | Pasada del 100 %, en pausa y sin poder actualizar | Contraseña rechazada |
+|---|---|---|
+| ![](../../shared/test@jvm/snapshots/macos/usage/phone-quota.png) | ![](../../shared/test@jvm/snapshots/macos/usage/phone-quota-paused.png) | ![](../../shared/test@jvm/snapshots/macos/usage/phone-quota-wrong-password.png) |
+
+Escritorio, y Conexión en pausa por la cuota:
+
+![](../../shared/test@jvm/snapshots/macos/usage/desktop-quota.png)
+
+![](../../shared/test@jvm/snapshots/macos/connection/phone-quota-paused.png)
+
+Captura real en el emulador, contra el simulador del servicio (`tools/test_cuotas.py serve --tls`):
+
+![](android/consumo-cuota.png)
+
 En la app de macOS, la barra de título es transparente y la app ocupa toda la ventana: los botones de cerrar,
 minimizar y ampliar quedan sobre el fondo de la app (captura real de la ventana, no de las pruebas). En Windows 11 la
 barra se pinta del color del fondo.
