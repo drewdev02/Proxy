@@ -15,6 +15,13 @@ import kotlin.test.assertTrue
 class LocalDnsSourceLiveTest {
     private val os = System.getProperty("os.name").orEmpty()
 
+    /** En Windows, lo que imprime el guion tal cual, para ver por qué no dio servidores. */
+    private fun diagnosis(): String {
+        if (!os.startsWith("Windows")) return ""
+        val result = ProcessCommandRunner().run(WinLocalDnsSource.COMMAND, null)
+        return "\nsalida del guion (código ${result.exitCode}):\n${result.output}"
+    }
+
     @Test
     fun `the real network DNS can be read`() = runBlocking {
         val source = when {
@@ -25,7 +32,7 @@ class LocalDnsSourceLiveTest {
 
         val config = source.read()
 
-        assertTrue(config.servers.isNotEmpty(), "el equipo tiene DNS: $config")
+        assertTrue(config.servers.isNotEmpty(), "el equipo tiene DNS: $config${diagnosis()}")
         assertTrue(config.servers.all { parseIpv4(it) != null })
     }
 }

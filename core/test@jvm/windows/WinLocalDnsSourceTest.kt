@@ -4,6 +4,7 @@ import kotlinx.coroutines.runBlocking
 import org.uci.proxy.core.platform.CommandResult
 import org.uci.proxy.core.platform.windows.WinLocalDnsSource
 import org.uci.proxy.core.port.LocalDnsConfig
+import java.util.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -18,7 +19,11 @@ class WinLocalDnsSourceTest {
 
         assertEquals(LocalDnsConfig(listOf("10.0.0.3", "10.0.0.4"), listOf("uci.cu")), config)
         assertEquals("powershell.exe", command.first())
-        assertTrue("ProxyUCI*" in command.last(), "sin contar el adaptador del túnel")
+        assertEquals("-EncodedCommand", command[command.size - 2], "el guion va codificado, no se rompe por el camino")
+        val script = String(Base64.getDecoder().decode(command.last()), Charsets.UTF_16LE)
+        assertTrue("-notlike 'ProxyUCI*'" in script, "sin contar el adaptador del túnel")
+        assertTrue("\"server=${'$'}server\"" in script)
+        assertTrue("\${" !in script, "sin restos de la plantilla de Kotlin")
     }
 
     @Test
