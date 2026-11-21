@@ -114,4 +114,23 @@ class RuleSetTest {
         assertTrue(RoutingRules(enabled = true, rules = listOf(RouteRule(RuleKind.DOMAIN, "x.com", RouteExit.VPN))).usesVpn)
         assertFalse(RoutingRules(enabled = false, defaultExit = RouteExit.VPN).usesVpn, "apagadas no cuentan")
     }
+
+    @Test
+    fun `the first matching domain rule gives the exit known when resolving a name`() {
+        val set = rules(
+            RouteRule(RuleKind.IP, "10.0.0.0/8", RouteExit.PROXY),
+            RouteRule(RuleKind.DOMAIN, "correo.uci.cu", RouteExit.DIRECT),
+            RouteRule(RuleKind.DOMAIN, "*.uci.cu", RouteExit.PROXY),
+            default = RouteExit.VPN,
+        )
+
+        assertEquals(RouteExit.DIRECT, set.domainExitFor("Correo.UCI.cu."))
+        assertEquals(RouteExit.PROXY, set.domainExitFor("drst.uci.cu"))
+        assertEquals(null, set.domainExitFor("www.google.com"), "sin regla: ni la de IP ni la de por defecto cuentan")
+    }
+
+    @Test
+    fun `domain rules accept every exit`() {
+        assertEquals(RouteExit.entries, RoutingRules.exitsFor(RuleKind.DOMAIN))
+    }
 }
