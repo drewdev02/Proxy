@@ -119,8 +119,13 @@ data class ProfileEditorUiState(
     val routing: RoutingDraft = RoutingDraft(),
     /** Los motores de Otro País que hay en este equipo, en el orden en que se ofrecen. */
     val engines: List<CountryEngineKind> = listOf(CountryEngineKind.OPENVPN),
+    /** Consultar la cuota de la UCI con este perfil; null: según el proxy (sí, si es de la UCI). */
+    val uciQuota: Boolean? = null,
 ) {
     val isBusy: Boolean get() = isSaving || test == ProxyTestUiState.Running
+
+    /** Lo que se hará con la cuota, con lo escrito ahora en el formulario. */
+    val checksUciQuota: Boolean get() = uciQuota ?: ProxyProfile("", "", draft.host.trim(), 0, draft.protocol, "").isUciProxy
 }
 
 class ProfileEditorViewModel(
@@ -167,6 +172,7 @@ class ProfileEditorViewModel(
                 newRuleExit = if (existing?.countryExit != null) RouteExit.VPN else RouteExit.PROXY,
             ),
             engines = engines,
+            uciQuota = existing?.uciQuota,
         )
         if (existing != null) {
             viewModelScope.launch {
@@ -444,12 +450,17 @@ class ProfileEditorViewModel(
                             vpn.tailscale.toExit() to CountryExitSecrets.Tailscale(vpn.tailscale.authKey.trim())
                         else -> CountryExit.OpenVpn(vpn.fileName, vpn.username.trim()) to CountryExitSecrets.OpenVpn(vpn.ovpn, vpn.password)
                     }
-                    val profile = validation.profile.copy(countryExit = exit, routing = current.routing.rules)
+                    val profile = validation.profile.copy(countryExit = exit, routing = current.routing.rules, uciQuota = current.uciQuota)
                     val ok = guarded("guardar el perfil") { repository.save(profile, current.password, secrets) } != null
                     state.update { it.copy(isSaving = false, saved = ok, saveFailed = !ok) }
                 }
             }
         }
+    }
+
+    /** Consultar (o no) la cuota de la UCI con este perfil. */
+    fun setUciQuota(enabled: Boolean) {
+        state.update { it.copy(uciQuota = enabled, saveFailed = false) }
     }
 
     /** Frontera con la interfaz: un fallo del almacén se registra y se muestra, no tumba la app. */

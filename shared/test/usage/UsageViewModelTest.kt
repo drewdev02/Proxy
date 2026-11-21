@@ -10,6 +10,10 @@ import org.uci.proxy.core.traffic.TrafficRecorder
 import org.uci.proxy.core.traffic.TrafficStore
 import org.uci.proxy.core.traffic.TrafficUsage
 import org.uci.proxy.fakes.FakeTrafficHistory
+import kotlinx.coroutines.flow.MutableStateFlow
+import org.uci.proxy.quota.QuotaStatus
+import org.uci.proxy.quota.QuotaTracker
+import org.uci.proxy.quota.UciQuota
 import org.uci.proxy.fakes.MainDispatcherTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -69,6 +73,23 @@ class UsageViewModelTest : MainDispatcherTest() {
         history.add(today, listOf(usage(RouteExit.PROXY, "web.whatsapp.com", 80, app = "com.whatsapp"), usage(RouteExit.PROXY, "github.com", 40)))
 
         assertEquals(listOf("com.whatsapp"), viewModel.uiState.value.apps.map { it.name })
+    }
+
+    @Test
+    fun `the uci quota says when it was checked`() {
+        val tracker = object : QuotaTracker {
+            // Consultada hace 3 minutos.
+            override val status = MutableStateFlow(
+                QuotaStatus(enabled = true, quota = UciQuota(2000, 1500.0, "Profesores", clock.now().toEpochMilliseconds() - 180_000)),
+            )
+            override fun refresh() = Unit
+            override fun allowOverLimit() = Unit
+        }
+        val withQuota = UsageViewModel(history, recorder, tracker, clock).also { it.uiState.keepSubscribed() }
+
+        val quota = withQuota.uiState.value.quota
+        assertEquals(1500.0, quota.status.quota?.usedMb)
+        assertEquals("hace 3 min", quota.checkedAgo)
     }
 
     @Test

@@ -1,6 +1,10 @@
 package org.uci.proxy.usage
 
 import org.uci.proxy.core.traffic.NamedTraffic
+import org.uci.proxy.quota.QuotaCardUi
+import org.uci.proxy.quota.QuotaProblem
+import org.uci.proxy.quota.QuotaStatus
+import org.uci.proxy.quota.UciQuota
 import org.uci.proxy.ui.Snapshots
 import kotlin.test.Test
 
@@ -52,6 +56,24 @@ class UsageSnapshotTest {
             UsageScreen(UsageUiState(period = UsagePeriod.TODAY, today = today, loaded = true), wide = false)
         }
         snapshots.check("desktop-week", widthDp = 1100, heightDp = 900) { UsageScreen(week, wide = true) }
+
+        val quota = UciQuota(assignedMb = 2048, usedMb = 1454.2, level = "Profesores", checkedAtMillis = 0)
+        val status = QuotaStatus(enabled = true, profileId = "p1", account = "ana.perez", quota = quota)
+        snapshots.check("phone-quota", widthDp = 412, heightDp = 1500) {
+            UsageScreen(week.copy(quota = QuotaCardUi(status, checkedAgo = "hace 3 min")), wide = false)
+        }
+        snapshots.check("phone-quota-paused", widthDp = 412, heightDp = 1100) {
+            // Pasada del 100 %: la cuota de la UCI lo permite.
+            val paused = status.copy(quota = quota.copy(usedMb = 2310.0), paused = true, problem = QuotaProblem.UNREACHABLE)
+            UsageScreen(week.copy(quota = QuotaCardUi(paused, checkedAgo = "hace 2 h")), wide = false)
+        }
+        snapshots.check("phone-quota-wrong-password", widthDp = 412, heightDp = 900) {
+            val wrong = QuotaStatus(enabled = true, profileId = "p1", account = "ana.perez", problem = QuotaProblem.WRONG_CREDENTIALS)
+            UsageScreen(UsageUiState(period = UsagePeriod.TODAY, today = today, loaded = true, quota = QuotaCardUi(wrong)), wide = false)
+        }
+        snapshots.check("desktop-quota", widthDp = 1100, heightDp = 1000) {
+            UsageScreen(week.copy(quota = QuotaCardUi(status, checkedAgo = "hace 3 min")), wide = true)
+        }
         snapshots.assertAllMatch()
     }
 }

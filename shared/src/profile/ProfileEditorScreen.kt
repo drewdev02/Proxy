@@ -51,6 +51,7 @@ import org.uci.proxy.theme.ProxyUciTheme
 import org.uci.proxy.ui.components.UciButton
 import org.uci.proxy.ui.components.UciButtonVariant
 import org.uci.proxy.ui.components.UciDivider
+import org.uci.proxy.ui.components.UciSwitchRow
 import org.uci.proxy.ui.components.UciFileField
 import org.uci.proxy.ui.components.UciFilterChip
 import org.uci.proxy.ui.components.UciInlineAlert
@@ -100,6 +101,7 @@ internal fun ProfileEditorScreen(
         onDraftChange = viewModel::updateDraft,
         onPasswordChange = viewModel::updatePassword,
         onTest = viewModel::testProxy,
+        onUciQuotaChange = viewModel::setUciQuota,
         onSave = viewModel::save,
         onCancel = onClose,
     )
@@ -148,6 +150,7 @@ fun ProfileEditorScreen(
     routingActions: RoutingActions = RoutingActions.None,
     /** Las apps instaladas, para las reglas por app; null donde no se aplican. */
     appCatalog: AppCatalog? = null,
+    onUciQuotaChange: (Boolean) -> Unit = {},
 ) {
     Scaffold(
         // Con el teclado abierto, la barra de Guardar sube sobre él: siempre a mano y sin un hueco vacío encima del
@@ -173,7 +176,7 @@ fun ProfileEditorScreen(
                 verticalArrangement = Arrangement.spacedBy(ProxyUciTheme.spacing.md),
             ) {
                 ServerSection(state, onDraftChange)
-                AuthSection(state, onDraftChange, onPasswordChange, onTest)
+                AuthSection(state, onDraftChange, onPasswordChange, onTest, onUciQuotaChange)
                 if (vpnAvailable) {
                     CountryExitSection(state, exitActions, onVpnPickFile)
                     RoutingSection(
@@ -262,6 +265,7 @@ private fun AuthSection(
     onDraftChange: (ProfileDraft) -> Unit,
     onPasswordChange: (String) -> Unit,
     onTest: () -> Unit,
+    onUciQuotaChange: (Boolean) -> Unit,
 ) {
     val draft = state.draft
     UciSectionCard(
@@ -303,6 +307,15 @@ private fun AuthSection(
                 },
             )
         }
+        UciDivider()
+        UciSwitchRow(
+            title = "Consultar mi cuota de la UCI",
+            subtitle = "Con este usuario y contraseña se pregunta al servicio de cuotas de la UCI cuántos MB te quedan " +
+                "este mes. Se ve en Consumo.",
+            checked = state.checksUciQuota,
+            onCheckedChange = onUciQuotaChange,
+            enabled = !state.isBusy,
+        )
     }
 }
 

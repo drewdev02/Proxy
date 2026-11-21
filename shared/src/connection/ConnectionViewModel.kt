@@ -28,6 +28,8 @@ import org.uci.proxy.core.proxy.ProxyTestResult
 import org.uci.proxy.core.proxy.ProxyTester
 import org.uci.proxy.core.traffic.LiveTraffic
 import org.uci.proxy.core.traffic.TrafficMonitor
+import org.uci.proxy.quota.QuotaStatus
+import org.uci.proxy.quota.QuotaTracker
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 import kotlin.time.measureTimedValue
@@ -82,6 +84,8 @@ data class ConnectionUiState(
     val recentActivity: List<LogEntry> = emptyList(),
     /** El tráfico de la sesión en curso, medido en el motor. */
     val traffic: LiveTraffic = LiveTraffic(),
+    /** La cuota de la UCI del perfil activo, si la consulta. */
+    val quota: QuotaStatus = QuotaStatus(),
 ) {
     /** Con el túnel ocupado con un perfil no se cambia de perfil: primero hay que desconectar. */
     val canChangeProfile: Boolean
@@ -104,6 +108,7 @@ class ConnectionViewModel(
     private val logBuffer: LogBuffer,
     private val timeSource: TimeSource,
     private val traffic: TrafficMonitor,
+    private val quota: QuotaTracker = QuotaTracker.None,
 ) : ViewModel() {
     private val check = MutableStateFlow<ProxyCheck>(ProxyCheck.Idle)
     private val connectedSince = MutableStateFlow<TimeMark?>(null)
@@ -129,9 +134,9 @@ class ConnectionViewModel(
         activeProfileStore.activeProfileId,
         monitor.state,
         combine(check, connectedSince, ::Pair),
-        combine(logBuffer.entries, traffic.live, ::Pair),
-    ) { list, chosen, tunnel, (check, since), (log, live) ->
-        buildState(list, chosen, tunnel, check, since, log, live)
+        combine(logBuffer.entries, traffic.live, quota.status, ::Triple),
+    ) { list, chosen, tunnel, (check, since), (log, live, quotaStatus) ->
+        buildState(list, chosen, tunnel, check, since, log, live, quotaStatus)
     }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),
@@ -144,6 +149,7 @@ class ConnectionViewModel(
             connectedSince.value,
             logBuffer.entries.value,
             traffic.live.value,
+            quota.status.value,
         ),
     )
 
@@ -155,6 +161,7 @@ class ConnectionViewModel(
         since: TimeMark?,
         log: List<LogEntry>,
         live: LiveTraffic,
+        quotaStatus: QuotaStatus,
     ) = ConnectionUiState(
         tunnelAvailable = control.isAvailable,
         profiles = list,
@@ -164,6 +171,7 @@ class ConnectionViewModel(
         check = check,
         recentActivity = log.asReversed().asSequence().filter { it.level >= LogLevel.INFO }.take(RECENT_ACTIVITY).toList(),
         traffic = live,
+        quota = quotaStatus,
     )
 
     private fun activeProfile(list: List<ProxyProfile>, chosen: String?, tunnel: TunnelState): ProxyProfile? {
@@ -186,6 +194,8 @@ class ConnectionViewModel(
 
     fun connect() {
         val id = currentActiveProfile()?.id ?: return
+        // Conectar con la pausa por cuota activa es decidir seguir: no se vuelve a pausar hasta que el consumo baje.
+        if (quota.status.value.paused) quota.allowOverLimit()
         viewModelScope.launch { control.connect(id) }
     }
 

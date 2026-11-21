@@ -37,6 +37,7 @@ import org.uci.proxy.core.model.RouteExit
 import org.uci.proxy.core.traffic.NamedTraffic
 import org.uci.proxy.profile.label
 import org.uci.proxy.profile.tone
+import org.uci.proxy.quota.QuotaCard
 import org.uci.proxy.theme.ProxyUciTheme
 import org.uci.proxy.ui.components.UciBar
 import org.uci.proxy.ui.components.UciBarChart
@@ -54,9 +55,15 @@ import org.uci.proxy.ui.icons.UciIcons
 
 /** La pantalla Consumo a nivel de pantalla: obtiene su ViewModel y pasa estado y acciones a la versión sin estado. */
 @Composable
-internal fun UsageScreen(onBack: () -> Unit, viewModel: UsageViewModel = koinViewModel()) {
+internal fun UsageScreen(onBack: () -> Unit, onEditProfile: (String) -> Unit, viewModel: UsageViewModel = koinViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    UsageScreen(state, onPeriodChange = viewModel::selectPeriod, onBack = onBack)
+    UsageScreen(
+        state,
+        onPeriodChange = viewModel::selectPeriod,
+        onBack = onBack,
+        onRefreshQuota = viewModel::refreshQuota,
+        onEditProfile = { state.quota.status.profileId?.let(onEditProfile) },
+    )
 }
 
 /**
@@ -71,6 +78,8 @@ internal fun UsageScreen(
     onPeriodChange: (UsagePeriod) -> Unit = {},
     onBack: () -> Unit = {},
     wide: Boolean? = null,
+    onRefreshQuota: () -> Unit = {},
+    onEditProfile: () -> Unit = {},
 ) {
     val spacing = ProxyUciTheme.spacing
     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))) {
@@ -82,7 +91,13 @@ internal fun UsageScreen(
             UsagePeriod.entries.forEach { UciFilterChip(it.label, state.period == it, { onPeriodChange(it) }) }
         }
 
+        val quotaCard: @Composable () -> Unit = {
+            if (state.quota.status.enabled) QuotaCard(state.quota, onRefreshQuota, onEditProfile)
+        }
         if (state.loaded && state.total == 0L) {
+            if (state.quota.status.enabled) {
+                Column(Modifier.padding(horizontal = spacing.screenMargin, vertical = spacing.sm).widthIn(max = 720.dp)) { quotaCard() }
+            }
             UciEmptyState(
                 title = if (state.period == UsagePeriod.TODAY) "Hoy aún no hay consumo" else "Aún no hay consumo",
                 icon = UciIcons.DataUsage,
@@ -95,6 +110,8 @@ internal fun UsageScreen(
         androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             val twoColumns = wide ?: (maxWidth >= 840.dp)
             val summary: @Composable ColumnScope.() -> Unit = {
+                quotaCard()
+                if (state.quota.status.enabled) UciSectionHeader("En este equipo")
                 SummaryCard(state)
                 if (state.period != UsagePeriod.TODAY) DailyCard(state)
                 Footnote()

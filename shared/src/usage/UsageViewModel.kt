@@ -15,6 +15,10 @@ import org.uci.proxy.core.traffic.DailyTraffic
 import org.uci.proxy.core.traffic.NamedTraffic
 import org.uci.proxy.core.traffic.TrafficHistory
 import org.uci.proxy.core.traffic.TrafficRecorder
+import org.uci.proxy.quota.QuotaCardUi
+import org.uci.proxy.quota.QuotaStatus
+import org.uci.proxy.quota.QuotaTracker
+import kotlin.time.Clock
 
 /** Qué días se suman en la pantalla. */
 enum class UsagePeriod(val label: String, val days: Int) {
@@ -42,6 +46,8 @@ data class UsageUiState(
     val apps: List<NamedTraffic> = emptyList(),
     /** False hasta que llega la primera lectura de la base: así no se muestra «sin consumo» mientras carga. */
     val loaded: Boolean = false,
+    /** La cuota de la UCI del perfil activo; sin ella ([QuotaStatus.enabled] false) no se muestra. */
+    val quota: QuotaCardUi = QuotaCardUi(QuotaStatus()),
 ) {
     val proxy: Long get() = days.sumOf { it.proxy }
     val country: Long get() = days.sumOf { it.country }
@@ -56,6 +62,8 @@ data class UsageUiState(
 class UsageViewModel(
     private val history: TrafficHistory,
     private val recorder: TrafficRecorder,
+    private val quota: QuotaTracker = QuotaTracker.None,
+    private val clock: Clock = Clock.System,
 ) : ViewModel() {
     private val period = MutableStateFlow(UsagePeriod.WEEK)
 
@@ -64,20 +72,42 @@ class UsageViewModel(
         viewModelScope.launch { recorder.saveNow() }
     }
 
-    val uiState: StateFlow<UsageUiState> = period.flatMapLatest { chosen ->
-        val today = recorder.today()
-        val from = today - chosen.days + 1
-        combine(history.daily(from), history.topHosts(from, TOP), history.topApps(from, TOP)) { daily, hosts, apps ->
-            buildState(chosen, today, from, daily, hosts, apps)
-        }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UsageUiState(period = period.value))
+    val uiState: StateFlow<UsageUiState> = combine(
+        period.flatMapLatest { chosen ->
+            val today = recorder.today()
+            val from = today - chosen.days + 1
+            combine(history.daily(from), history.topHosts(from, TOP), history.topApps(from, TOP)) { daily, hosts, apps ->
+                buildState(chosen, today, from, daily, hosts, apps)
+            }
+        },
+        quota.status,
+    ) { usage, status -> usage.copy(quota = quotaUi(status)) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UsageUiState(period = period.value, quota = quotaUi(quota.status.value)))
 
     fun selectPeriod(chosen: UsagePeriod) {
         period.value = chosen
     }
 
+    fun refreshQuota() = quota.refresh()
+
+    private fun quotaUi(status: QuotaStatus) = QuotaCardUi(
+        status = status,
+        checkedAgo = status.quota?.let { agoText(clock.now().toEpochMilliseconds() - it.checkedAtMillis) },
+    )
+
     private companion object {
         const val TOP = 8
+    }
+}
+
+/** «ahora mismo», «hace 3 min», «hace 2 h», «hace 4 d». */
+internal fun agoText(millis: Long): String {
+    val minutes = millis / 60_000
+    return when {
+        minutes < 1 -> "ahora mismo"
+        minutes < 60 -> "hace $minutes min"
+        minutes < 24 * 60 -> "hace ${minutes / 60} h"
+        else -> "hace ${minutes / (24 * 60)} d"
     }
 }
 

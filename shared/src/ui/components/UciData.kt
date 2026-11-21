@@ -248,3 +248,35 @@ fun UciProportionBar(fraction: Float, modifier: Modifier = Modifier, color: Colo
         if (width > 0f) drawRoundRect(color, size = androidx.compose.ui.geometry.Size(width.coerceAtLeast(size.height), size.height), cornerRadius = radius)
     }
 }
+
+/**
+ * Anillo de una cuota: el arco lleno es lo gastado ([fraction], de 0 a 1) en [color]. En el centro, [content] (la cifra
+ * de lo que queda, por ejemplo).
+ */
+@Composable
+fun UciQuotaRing(
+    fraction: Float,
+    modifier: Modifier = Modifier,
+    color: Color = ProxyUciTheme.colors.active,
+    description: String? = null,
+    content: @Composable () -> Unit = {},
+) {
+    val track = ProxyUciTheme.colors.control
+    androidx.compose.foundation.layout.Box(
+        modifier.size(168.dp).semantics { if (description != null) contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(Modifier.fillMaxWidth().height(168.dp)) {
+            val stroke = 14.dp.toPx()
+            val inset = stroke / 2
+            val arcSize = androidx.compose.ui.geometry.Size(size.minDimension - stroke, size.minDimension - stroke)
+            val topLeft = Offset((size.width - arcSize.width) / 2, inset)
+            drawArc(track, startAngle = 0f, sweepAngle = 360f, useCenter = false, topLeft = topLeft, size = arcSize, style = Stroke(stroke))
+            val sweep = 360f * fraction.coerceIn(0f, 1f)
+            if (sweep > 0f) {
+                drawArc(color, startAngle = -90f, sweepAngle = sweep, useCenter = false, topLeft = topLeft, size = arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
+            }
+        }
+        content()
+    }
+}

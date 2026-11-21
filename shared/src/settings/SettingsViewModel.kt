@@ -80,6 +80,20 @@ class SettingsViewModel(
 
     fun setTryRawIp(enabled: Boolean) = repository.setTryRawIp(enabled)
 
+    /** Avisar (o no) al llegar al [threshold] % de la cuota de la UCI. */
+    fun setQuotaAlert(threshold: Int, enabled: Boolean) = repository.updateQuota { quota ->
+        quota.copy(alerts = if (enabled) (quota.alerts + threshold).distinct().sorted() else quota.alerts - threshold)
+    }
+
+    fun setQuotaCheckMinutes(minutes: Int) = repository.updateQuota { it.copy(checkMinutes = minutes) }
+
+    fun setQuotaPause(enabled: Boolean) = repository.updateQuota { it.copy(pauseAtLimit = enabled) }
+
+    fun setQuotaVerifyCertificate(enabled: Boolean) = repository.updateQuota { it.copy(verifyCertificate = enabled) }
+
+    /** Solo en modo desarrollo: otra dirección para el servicio (el simulador). Vacío vuelve al de la UCI. */
+    fun setQuotaServiceUrl(url: String) = repository.updateQuota { it.copy(serviceUrl = url.trim().ifEmpty { null }) }
+
     fun setServiceEnabled(id: String, enabled: Boolean) = repository.setNameServiceEnabled(id, enabled)
 
     /** [delta] negativo sube el servicio en la lista, positivo lo baja. */

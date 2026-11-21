@@ -90,6 +90,21 @@ class ProfileEditorViewModelTest : MainDispatcherTest() {
     }
 
     @Test
+    fun `the uci quota follows the proxy until it is switched by hand`() {
+        val viewModel = newViewModel()
+        viewModel.start(uci.id)
+        assertTrue(viewModel.uiState.value.checksUciQuota, "proxy.uci.cu: sí, sin tocar nada")
+
+        viewModel.updateDraft(viewModel.uiState.value.draft.copy(host = "10.0.0.1"))
+        assertFalse(viewModel.uiState.value.checksUciQuota)
+
+        viewModel.setUciQuota(true)
+        viewModel.save()
+
+        assertEquals(true, repository.profiles.value.single { it.id == uci.id }.uciQuota)
+    }
+
+    @Test
     fun `saving a valid new profile stores it with a generated id`() {
         val viewModel = newViewModel()
         viewModel.start(profileId = null)

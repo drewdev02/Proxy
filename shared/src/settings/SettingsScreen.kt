@@ -25,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,6 +57,8 @@ import org.uci.proxy.ui.components.UciStatusPill
 import org.uci.proxy.ui.components.UciSwitch
 import org.uci.proxy.ui.components.UciSwitchRow
 import org.uci.proxy.ui.components.UciTextField
+import org.uci.proxy.ui.components.UciFilterChip
+import org.uci.proxy.core.settings.QuotaSettings
 import org.uci.proxy.ui.components.UciTone
 import org.uci.proxy.ui.components.UciTopBar
 import org.uci.proxy.ui.components.colors
@@ -75,11 +78,21 @@ class SettingsActions(
     val onServiceRemove: (String) -> Unit = {},
     val onAddService: (name: String, template: String) -> ServiceValidation = { _, _ -> ServiceValidation.Invalid(emptySet()) },
     val onResetServices: () -> Unit = {},
+    val onQuotaAlertChange: (Int, Boolean) -> Unit = { _, _ -> },
+    val onQuotaCheckMinutesChange: (Int) -> Unit = {},
+    val onQuotaPauseChange: (Boolean) -> Unit = {},
+    val onQuotaVerifyCertificateChange: (Boolean) -> Unit = {},
+    /** Null fuera del modo desarrollo: entonces no se ofrece cambiar la dirección del servicio. */
+    val onQuotaServiceUrlChange: ((String) -> Unit)? = null,
 )
 
 /** Ajustes a nivel de pantalla: obtiene su ViewModel y pasa solo estado y acciones a la versión sin estado. */
 @Composable
-internal fun SettingsScreen(onBack: (() -> Unit)? = null, viewModel: SettingsViewModel = koinViewModel()) {
+internal fun SettingsScreen(
+    onBack: (() -> Unit)? = null,
+    developerMode: Boolean = false,
+    viewModel: SettingsViewModel = koinViewModel(),
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     SettingsScreen(
@@ -98,6 +111,11 @@ internal fun SettingsScreen(onBack: (() -> Unit)? = null, viewModel: SettingsVie
             onServiceRemove = viewModel::removeService,
             onAddService = viewModel::addService,
             onResetServices = viewModel::resetServices,
+            onQuotaAlertChange = viewModel::setQuotaAlert,
+            onQuotaCheckMinutesChange = viewModel::setQuotaCheckMinutes,
+            onQuotaPauseChange = viewModel::setQuotaPause,
+            onQuotaVerifyCertificateChange = viewModel::setQuotaVerifyCertificate,
+            onQuotaServiceUrlChange = if (developerMode) viewModel::setQuotaServiceUrl else null,
         ),
     )
 }
@@ -150,6 +168,7 @@ fun SettingsScreen(
                         onCheckedChange = actions.onIntranetDirectChange,
                     )
                 }
+                QuotaCard(settings.quota, actions)
                 NameServicesCard(settings, statuses, tests, actions, onAdd = { adding = true })
                 Spacer(Modifier.height(spacing.md))
             }
@@ -158,6 +177,70 @@ fun SettingsScreen(
 
     if (adding) {
         AddServiceSheet(onDismiss = { adding = false }, onAdd = actions.onAddService)
+    }
+}
+
+/** La cuota de navegación de la UCI: avisos, cada cuánto se consulta y la pausa al límite. */
+@Composable
+private fun QuotaCard(quota: QuotaSettings, actions: SettingsActions) {
+    val c = ProxyUciTheme.colors
+    UciSectionCard(
+        title = "Cuota de la UCI",
+        subtitle = "Los MB de navegación que la UCI da a tu cuenta",
+        icon = UciIcons.DataUsage,
+    ) {
+        Text(
+            "Con los perfiles de la UCI se consulta la cuota con el usuario y la contraseña del perfil, al abrir la app y " +
+                "cada pocos minutos mientras estás conectado. Se ve en Consumo.",
+            style = MaterialTheme.typography.bodySmall,
+            color = c.onSurfaceMuted,
+        )
+        Text("Avisar al llegar al", style = MaterialTheme.typography.labelLarge)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            QuotaSettings.ALERT_THRESHOLDS.forEach { threshold ->
+                val on = threshold in quota.alerts
+                UciFilterChip("$threshold %", on, { actions.onQuotaAlertChange(threshold, !on) })
+            }
+        }
+        Text("Consultar cada", style = MaterialTheme.typography.labelLarge)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            QuotaSettings.CHECK_INTERVALS.forEach { minutes ->
+                UciFilterChip("$minutes min", quota.checkMinutes == minutes, { actions.onQuotaCheckMinutesChange(minutes) })
+            }
+        }
+        UciDivider()
+        UciSwitchRow(
+            title = "Pausar el túnel al ${QuotaSettings.PAUSE_THRESHOLD} %",
+            subtitle = "Al llegar, se desconecta para no agotar la cuota sin darte cuenta. Puedes conectar igual: no vuelve " +
+                "a pausar hasta que tu consumo baje del ${QuotaSettings.PAUSE_THRESHOLD - 5} %.",
+            checked = quota.pauseAtLimit,
+            onCheckedChange = actions.onQuotaPauseChange,
+        )
+        UciDivider()
+        UciSwitchRow(
+            title = "Verificar el certificado del servicio",
+            subtitle = "Apágalo solo si la consulta falla por el certificado: el servicio de la UCI puede usar uno de una " +
+                "autoridad interna que el sistema no reconoce. La contraseña viaja en esa consulta.",
+            checked = quota.verifyCertificate,
+            onCheckedChange = actions.onQuotaVerifyCertificateChange,
+        )
+        actions.onQuotaServiceUrlChange?.let { onChange ->
+            UciDivider()
+            // El texto vive aquí y se guarda a la vez: si el campo mostrara lo guardado, que vuelve con retraso, se
+            // perderían letras al escribir rápido.
+            var url by rememberSaveable { mutableStateOf(quota.serviceUrl.orEmpty()) }
+            UciTextField(
+                value = url,
+                onValueChange = {
+                    url = it
+                    onChange(it)
+                },
+                label = "Servicio de cuotas (desarrollo)",
+                placeholder = "https://cuotas.uci.cu/servicios/v1/InetCuotasWS.php",
+                supportingText = "Para probar con tools/test_cuotas.py. Vacío: el de la UCI.",
+                mono = true,
+            )
+        }
     }
 }
 

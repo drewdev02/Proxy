@@ -56,6 +56,27 @@ class SettingsViewModelTest : MainDispatcherTest() {
     }
 
     @Test
+    fun `quota alerts intervals and the pause are stored`() {
+        viewModel.setQuotaAlert(50, false)
+        viewModel.setQuotaAlert(50, true)
+        viewModel.setQuotaAlert(75, false)
+        viewModel.setQuotaCheckMinutes(30)
+        viewModel.setQuotaPause(true)
+        viewModel.setQuotaVerifyCertificate(false)
+        viewModel.setQuotaServiceUrl("  http://10.0.2.2:8443/x  ")
+
+        val quota = viewModel.uiState.value.settings.quota
+        assertEquals(listOf(50, 90), quota.alerts)
+        assertEquals(30, quota.checkMinutes)
+        assertTrue(quota.pauseAtLimit)
+        assertFalse(quota.verifyCertificate)
+        assertEquals("http://10.0.2.2:8443/x", quota.serviceUrl)
+
+        viewModel.setQuotaServiceUrl("")
+        assertEquals(null, viewModel.uiState.value.settings.quota.serviceUrl)
+    }
+
+    @Test
     fun `the connectivity switch starts on`() {
         assertTrue(viewModel.uiState.value.settings.answerConnectivityChecks)
     }

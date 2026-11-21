@@ -3,6 +3,9 @@ package org.uci.proxy.connection
 import kotlin.test.Test
 import org.uci.proxy.core.traffic.TrafficDelta
 import org.uci.proxy.core.traffic.TrafficStore
+import kotlinx.coroutines.flow.MutableStateFlow
+import org.uci.proxy.quota.QuotaStatus
+import org.uci.proxy.quota.QuotaTracker
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -235,6 +238,28 @@ class ConnectionViewModelTest : MainDispatcherTest() {
         assertEquals(2_048, live.upRate)
         assertEquals(12_288, live.sessionTotal)
         assertEquals(3, live.connections)
+    }
+
+    @Test
+    fun `connecting while paused by the quota means going on this month`() {
+        val allowed = mutableListOf<Unit>()
+        val tracker = object : QuotaTracker {
+            override val status = MutableStateFlow(QuotaStatus(enabled = true, profileId = "p1", paused = true))
+            override fun refresh() = Unit
+            override fun allowOverLimit() {
+                allowed += Unit
+                status.value = status.value.copy(paused = false)
+            }
+        }
+        val vm = ConnectionViewModel(repository, StoredActiveProfileStore(storage), tunnel, tunnel, tester, permission, logs, clock, traffic, tracker)
+            .also { it.uiState.keepSubscribed() }
+        assertTrue(vm.uiState.value.quota.paused)
+
+        vm.connect()
+
+        assertEquals(1, allowed.size)
+        assertEquals(listOf("p1"), tunnel.connectRequests)
+        assertFalse(vm.uiState.value.quota.paused)
     }
 
     @Test

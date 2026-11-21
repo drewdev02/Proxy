@@ -108,13 +108,16 @@ fun App(
                             )
                         }
                         entry<Route.Usage> {
-                            UsageScreen(onBack = { backStack.removeLastOrNull() })
+                            UsageScreen(
+                                onBack = { backStack.removeLastOrNull() },
+                                onEditProfile = { backStack.add(Route.ProfileEditor(profileId = it)) },
+                            )
                         }
                         entry<Route.Catalog> {
                             ComponentCatalogScreen(onBack = { backStack.removeLastOrNull() })
                         }
                         // Pestañas: no tienen «Volver»; atrás lleva a Conexión.
-                        entry<Route.Settings> { SettingsScreen() }
+                        entry<Route.Settings> { SettingsScreen(developerMode = developerMode) }
                         entry<Route.Logs> { LogsScreen() }
                         entry<Route.ProfileEditor> { route ->
                             ProfileEditorScreen(

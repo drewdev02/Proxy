@@ -18,6 +18,8 @@ import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.proxy.ProxyTestResult
 import org.uci.proxy.core.traffic.LiveTraffic
+import org.uci.proxy.quota.QuotaStatus
+import org.uci.proxy.quota.UciQuota
 import org.uci.proxy.ui.Snapshots
 
 /** La pantalla Conexión en cada estado, en móvil y en escritorio, contra sus capturas de referencia. */
@@ -89,6 +91,10 @@ class ConnectionSnapshotTest {
                 connectedSince = connectedSince(),
                 check = ProxyCheck.Finished(ProxyTestResult.Success, 184),
                 traffic = liveTraffic,
+                quota = QuotaStatus(enabled = true, profileId = "p1", account = "ana.perez", quota = UciQuota(2048, 1454.2, "Profesores", 0)),
+            ),
+            "quota-paused" to base.copy(
+                quota = QuotaStatus(enabled = true, profileId = "p1", account = "ana.perez", quota = UciQuota(2048, 1890.0, "Profesores", 0), paused = true),
             ),
             "vpn-down" to base.copy(tunnel = TunnelState.Connected("p1", vpnDown = true)),
             "via-proxy" to base.copy(tunnel = TunnelState.Connected("p1", viaProxy = listOf("netflix.com", "hulu.com"))),

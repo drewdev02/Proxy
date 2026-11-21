@@ -50,6 +50,11 @@ import org.uci.proxy.ui.components.UciLatencyBadge
 import org.uci.proxy.ui.components.UciLogEntryCard
 import org.uci.proxy.ui.components.UciLogTag
 import org.uci.proxy.ui.components.UciMetricTile
+import org.uci.proxy.ui.components.UciQuotaRing
+import org.uci.proxy.ui.components.UciProportionBar
+import org.uci.proxy.ui.components.UciBarSegment
+import org.uci.proxy.ui.components.UciBar
+import org.uci.proxy.ui.components.UciBarChart
 import org.uci.proxy.ui.components.UciNavItem
 import org.uci.proxy.ui.components.UciNavigationRail
 import org.uci.proxy.ui.components.UciPasswordField
@@ -430,6 +435,19 @@ private fun DataSection() {
     Row(horizontalArrangement = Arrangement.spacedBy(ProxyUciTheme.spacing.gutterSmall)) {
         UciMetricTile("Conexiones", "34", Modifier.weight(1f), icon = UciIcons.Hub, caption = "TCP activas")
         UciMetricTile("Sesión", "02:45", Modifier.weight(1f), unit = "h", icon = UciIcons.Schedule, caption = "desde las 14:30")
+    }
+    Sub("Consumo")
+    val colors = ProxyUciTheme.colors
+    UciBarChart(
+        bars = listOf("Ju" to 3f, "Vi" to 5f, "Sá" to 4f, "Do" to 1f, "Lu" to 0f, "Ma" to 4.5f, "Mi" to 3.2f).mapIndexed { i, (day, value) ->
+            UciBar(day, listOf(UciBarSegment(value * 0.7f, colors.active), UciBarSegment(value * 0.3f, colors.routing)), highlighted = i == 6)
+        },
+    )
+    UciProportionBar(0.7f)
+    UciProportionBar(0.3f, color = colors.routing)
+    Row(horizontalArrangement = Arrangement.spacedBy(ProxyUciTheme.spacing.md)) {
+        UciQuotaRing(0.71f, color = colors.connected) { Text("594 MB", style = ProxyUciTheme.mono.metricSmall) }
+        UciQuotaRing(0.92f, color = colors.danger) { Text("158 MB", style = ProxyUciTheme.mono.metricSmall) }
     }
     Sub("Registro")
     UciLogEntryCard(

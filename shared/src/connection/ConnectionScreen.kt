@@ -3,6 +3,7 @@ package org.uci.proxy.connection
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -58,6 +59,9 @@ import org.uci.proxy.logs.formatLogTime
 import org.uci.proxy.logs.tone
 import org.uci.proxy.profile.label
 import org.uci.proxy.profile.tone
+import org.uci.proxy.quota.percentText
+import org.uci.proxy.quota.tone
+import org.uci.proxy.core.settings.QuotaSettings
 import org.uci.proxy.theme.ProxyUciTheme
 import org.uci.proxy.ui.components.UciBottomSheet
 import org.uci.proxy.ui.components.UciButton
@@ -253,11 +257,16 @@ private fun ActiveProfileCard(state: ConnectionUiState, profile: ProxyProfile, o
                 )
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        // Las etiquetas saltan de línea si no caben (perfil con Otro País, reglas y cuota en un móvil estrecho).
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             UciStatusPill(profile.protocol.name)
             // El motor importa: OpenVPN y Tailscale fallan y se configuran distinto.
             profile.countryExit?.let { UciStatusPill("Otro País · ${it.kind.label}", tone = UciTone.Routing) }
             if (profile.routing.enabled) UciStatusPill("Reglas", tone = UciTone.Routing)
+            // La cuota de la UCI, si este perfil la consulta y ya se sabe.
+            state.quota.quota?.takeIf { state.quota.enabled && state.quota.profileId == profile.id }?.let { quota ->
+                UciStatusPill("Cuota ${percentText(quota)}", tone = quota.tone)
+            }
         }
     }
 }
@@ -345,6 +354,15 @@ internal fun formatElapsed(duration: Duration): String {
 
 @Composable
 private fun StatusAlerts(state: ConnectionUiState, actions: ConnectionActions, onEdit: () -> Unit) {
+    if (state.quota.paused && state.tunnel !is TunnelState.Connected) {
+        UciInlineAlert(
+            "Llegaste al ${QuotaSettings.PAUSE_THRESHOLD} % de tu cuota de la UCI y el túnel se desconectó para no agotarla. " +
+                "Si conectas, no se vuelve a pausar hasta que tu consumo baje del ${QuotaSettings.PAUSE_THRESHOLD - 5} %.",
+            title = "En pausa por la cuota",
+            tone = UciTone.Danger,
+            action = { UciButton("Conectar igual", actions.onConnect, variant = UciButtonVariant.Text) },
+        )
+    }
     when (val tunnel = state.tunnel) {
         is TunnelState.Failed -> UciInlineAlert(
             tunnel.failure.reason().replaceFirstChar { it.uppercase() },
