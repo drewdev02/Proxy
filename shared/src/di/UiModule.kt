@@ -2,6 +2,7 @@ package org.uci.proxy.di
 
 import org.koin.core.module.dsl.viewModel
 import org.koin.core.module.dsl.viewModelOf
+import org.uci.proxy.usage.UsageViewModel
 import org.koin.dsl.module
 import org.uci.proxy.connection.ConnectionViewModel
 import org.uci.proxy.logs.LogsViewModel
@@ -26,6 +27,7 @@ val uiModule = module {
     }
     viewModelOf(::LogsViewModel)
     viewModelOf(::SettingsViewModel)
+    viewModelOf(::UsageViewModel)
     // El reloj va a mano: iOS no carga el módulo del túnel, que es donde está el TimeSource.
-    viewModel { ConnectionViewModel(get(), get(), get(), get(), get(), get(), get(), TimeSource.Monotonic) }
+    viewModel { ConnectionViewModel(get(), get(), get(), get(), get(), get(), get(), TimeSource.Monotonic, get()) }
 }

@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.uci.proxy.theme.ProxyUciTheme
@@ -34,6 +35,7 @@ import org.uci.proxy.theme.ProxyUciTheme
 /**
  * Tarjeta con una cifra grande y su unidad («4.8 MB/s», «34 conexiones»). Las cifras van en monoespaciada para
  * que no muevan la tarjeta al cambiar. [chart] es un hueco opcional bajo la cifra, para una [UciSparkline].
+ * Con [onClick] toda la tarjeta se puede pulsar (por ejemplo, para ver el detalle).
  */
 @Composable
 fun UciMetricTile(
@@ -44,10 +46,11 @@ fun UciMetricTile(
     icon: ImageVector? = null,
     caption: String? = null,
     accent: UciTone = UciTone.Neutral,
+    onClick: (() -> Unit)? = null,
     chart: (@Composable () -> Unit)? = null,
 ) {
     val c = ProxyUciTheme.colors
-    UciCard(modifier = modifier.semantics(mergeDescendants = true) {}) {
+    UciCard(modifier = modifier.semantics(mergeDescendants = true) {}, onClick = onClick) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(label, style = MaterialTheme.typography.labelLarge, color = c.onSurfaceMuted, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (icon != null) {
@@ -68,6 +71,9 @@ fun UciMetricTile(
 /**
  * Gráfica de línea pequeña, sin ejes, con un degradado suave debajo. Con menos de dos valores no dibuja nada.
  * Solo para datos medidos de verdad: no rellenar con valores inventados.
+ *
+ * Con [baseline] la escala empieza en ese valor en vez de en el mínimo: para velocidades, 0, así una línea plana en
+ * cero se ve abajo y no a media altura.
  */
 @Composable
 fun UciSparkline(
@@ -75,6 +81,7 @@ fun UciSparkline(
     modifier: Modifier = Modifier,
     color: Color = ProxyUciTheme.colors.active,
     description: String? = null,
+    baseline: Float? = null,
 ) {
     Canvas(
         modifier
@@ -83,7 +90,7 @@ fun UciSparkline(
             .semantics { if (description != null) contentDescription = description },
     ) {
         if (values.size < 2) return@Canvas
-        val min = values.min()
+        val min = baseline?.let { minOf(it, values.min()) } ?: values.min()
         val max = values.max()
         val range = (max - min).takeIf { it > 0f } ?: 1f
         val stepX = size.width / (values.size - 1)
@@ -164,5 +171,80 @@ fun UciLogEntryCard(
                 }
             }
         }
+    }
+}
+
+/** Un tramo de una barra: cuánto y de qué color. */
+@Immutable
+data class UciBarSegment(val value: Float, val color: Color)
+
+/** Una barra de [UciBarChart]: sus tramos apilados, de abajo arriba, y la etiqueta que va debajo. */
+@Immutable
+data class UciBar(val label: String, val segments: List<UciBarSegment>, val highlighted: Boolean = false) {
+    val total: Float get() = segments.sumOf { it.value.toDouble() }.toFloat()
+}
+
+/**
+ * Gráfica de barras apiladas, sin ejes: la más alta llega arriba. La barra [UciBar.highlighted] (hoy) lleva la etiqueta
+ * resaltada. Las etiquetas vacías no se dibujan, para poder poner solo algunas cuando hay muchas barras.
+ */
+@Composable
+fun UciBarChart(
+    bars: List<UciBar>,
+    modifier: Modifier = Modifier,
+    description: String? = null,
+) {
+    val c = ProxyUciTheme.colors
+    Column(modifier.fillMaxWidth().semantics { if (description != null) contentDescription = description }) {
+        Canvas(Modifier.fillMaxWidth().height(120.dp)) {
+            if (bars.isEmpty()) return@Canvas
+            val max = bars.maxOf { it.total }.takeIf { it > 0f } ?: 1f
+            val slot = size.width / bars.size
+            val barWidth = (slot * 0.6f).coerceAtMost(28.dp.toPx())
+            val gap = 2.dp.toPx()
+            bars.forEachIndexed { index, bar ->
+                val left = index * slot + (slot - barWidth) / 2
+                // Una barra vacía deja una raya, para que se vea que ese día cuenta (y fue cero).
+                if (bar.total <= 0f) {
+                    drawRect(c.cardBorder, Offset(left, size.height - gap), androidx.compose.ui.geometry.Size(barWidth, gap))
+                    return@forEachIndexed
+                }
+                var bottom = size.height
+                bar.segments.filter { it.value > 0f }.forEach { segment ->
+                    val height = (size.height * segment.value / max).coerceAtLeast(gap)
+                    drawRoundRect(
+                        segment.color,
+                        Offset(left, bottom - height),
+                        androidx.compose.ui.geometry.Size(barWidth, height - if (bottom < size.height) gap else 0f),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(3.dp.toPx()),
+                    )
+                    bottom -= height
+                }
+            }
+        }
+        Row(Modifier.fillMaxWidth().padding(top = 6.dp)) {
+            bars.forEach { bar ->
+                Text(
+                    bar.label,
+                    style = ProxyUciTheme.mono.badge,
+                    color = if (bar.highlighted) MaterialTheme.colorScheme.primary else c.onSurfaceFaint,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+/** Barra de proporción: [fraction] (0..1) de [color] sobre el fondo de los controles. */
+@Composable
+fun UciProportionBar(fraction: Float, modifier: Modifier = Modifier, color: Color = ProxyUciTheme.colors.active) {
+    val c = ProxyUciTheme.colors
+    Canvas(modifier.fillMaxWidth().height(6.dp)) {
+        val radius = androidx.compose.ui.geometry.CornerRadius(size.height / 2)
+        drawRoundRect(c.control, cornerRadius = radius)
+        val width = size.width * fraction.coerceIn(0f, 1f)
+        if (width > 0f) drawRoundRect(color, size = androidx.compose.ui.geometry.Size(width.coerceAtLeast(size.height), size.height), cornerRadius = radius)
     }
 }

@@ -11,6 +11,8 @@ dependencies:
   - $libs.koin.core: exported
   - $libs.kotlinx.coroutines.core: exported
   - $kotlin.serialization.json
+  # El día local, para sumar el consumo por día.
+  - $libs.kotlinx.datetime
   - $libs.ktor.network
 
 dependencies@jvm:

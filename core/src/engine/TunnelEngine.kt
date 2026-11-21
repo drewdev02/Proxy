@@ -25,6 +25,7 @@ import org.uci.proxy.core.proxy.ProxyConnector
 import org.uci.proxy.core.settings.AppSettings
 import org.uci.proxy.core.settings.NameServiceReporter
 import org.uci.proxy.core.tcp.TunTcpStack
+import org.uci.proxy.core.traffic.TrafficMeter
 import kotlin.time.TimeSource
 
 /**
@@ -142,12 +143,18 @@ class TunnelEngineFactory(
         split: SplitRouting? = null,
         /** El DNS de la red local, para abrir sin proxy lo que es interno; null si no se usa. */
         localDns: LocalDns? = null,
+        /** Dónde se cuentan los bytes que pasan; null si no se mide. */
+        meter: TrafficMeter? = null,
     ): TunnelEngine {
         val fakeDns = FakeDnsTable(plan.subnetBase)
         val connector = connectors.first { it.protocol == profile.protocol }
         val health = ProxyHealth(timeSource)
         val checks = ConnectivityChecks(settings.answerConnectivityChecks, health)
-        val relay = TunnelRelay(connector, profile, password, logger, health, checks, IpNamer(settings, nameReporter, timeSource))
+        val relay = TunnelRelay(
+            connector, profile, password, logger, health, checks, IpNamer(settings, nameReporter, timeSource),
+            meter = meter,
+            owner = owner,
+        )
 
         val start = timeSource.markNow()
         val tcp = TunTcpStack(
@@ -170,7 +177,7 @@ class TunnelEngineFactory(
             listOf(
                 local,
                 SplitDnsHandler(split, dns) { checks.dnsAddressFor(it) != null },
-                ExitRouterHandler(split, fakeDns, logger, owner, scope),
+                ExitRouterHandler(split, fakeDns, logger, owner, scope, meter),
                 TcpPacketHandler(tcp, fakeDns, split.link::hostFor),
                 UdpRejectHandler(),
             )

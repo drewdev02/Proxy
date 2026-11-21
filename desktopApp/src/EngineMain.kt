@@ -7,6 +7,7 @@ import org.uci.proxy.core.desktop.EngineNameForwarder
 import org.koin.dsl.module
 import org.uci.proxy.core.desktop.EngineArguments
 import org.uci.proxy.core.desktop.EngineSession
+import org.uci.proxy.core.traffic.TrafficStore
 import org.uci.proxy.core.desktop.MacElevatedEngineLauncher
 import org.uci.proxy.core.desktop.WindowsElevatedEngineLauncher
 import org.uci.proxy.core.di.coreModule
@@ -121,6 +122,7 @@ fun runEngine(args: List<String>) {
         logBuffer = koin.get(),
         maxDuration = EngineArguments.value(args, EngineArguments.MAX_SECONDS)?.toIntOrNull()?.seconds,
         nameForwarder = nameForwarder,
+        traffic = koin.get<TrafficStore>(),
     )
 
     runBlocking {

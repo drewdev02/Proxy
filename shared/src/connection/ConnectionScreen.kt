@@ -83,6 +83,7 @@ class ConnectionNavigation(
     val onEditProfile: (String) -> Unit = {},
     val onAddProfile: () -> Unit = {},
     val onOpenLogs: () -> Unit = {},
+    val onOpenUsage: () -> Unit = {},
 )
 
 /**
@@ -139,7 +140,7 @@ internal fun ConnectionScreen(
             // La barra inferior o lateral ya se ocupa de su borde: aquí solo arriba y a los lados.
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)),
     ) {
-        Header(state, Modifier.padding(horizontal = margin, vertical = spacing.md))
+        Header(state, navigation.onOpenUsage, Modifier.padding(horizontal = margin, vertical = spacing.md))
 
         val profile = state.activeProfile
         if (profile == null) {
@@ -157,6 +158,7 @@ internal fun ConnectionScreen(
             ActiveProfileCard(state, profile, onChange = { choosingProfile = true }, onEdit = { navigation.onEditProfile(profile.id) })
             PowerArea(state, actions)
             StatusAlerts(state, actions, onEdit = { navigation.onEditProfile(profile.id) })
+            if (state.tunnel is TunnelState.Connected) LiveTrafficSection(state.traffic, navigation.onOpenUsage)
         }
         val details: @Composable ColumnScope.() -> Unit = {
             ProxyCheckCard(state, actions.onTestProxy)
@@ -206,9 +208,11 @@ private fun ScrollColumn(modifier: Modifier, content: @Composable ColumnScope.()
 }
 
 @Composable
-private fun Header(state: ConnectionUiState, modifier: Modifier) {
-    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+private fun Header(state: ConnectionUiState, onOpenUsage: () -> Unit, modifier: Modifier) {
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("ProxyUCI", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f).semantics { heading() })
+        // El consumo guardado se puede ver también sin conexión.
+        if (state.tunnelAvailable) UciIconButton(UciIcons.BarChart, "Consumo", onOpenUsage, bordered = false)
         if (state.tunnelAvailable) {
             val (text, tone) = when (val tunnel = state.tunnel) {
                 TunnelState.Disconnected -> "Sin túnel" to UciTone.Neutral

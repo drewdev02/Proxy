@@ -33,6 +33,10 @@ internal sealed interface Route : NavKey {
     @Serializable
     data object Logs : Route
 
+    /** El consumo guardado: por día, por salida, por destino y por app. */
+    @Serializable
+    data object Usage : Route
+
     /** El catálogo de componentes; solo en modo desarrollo. */
     @Serializable
     data object Catalog : Route

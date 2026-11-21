@@ -7,6 +7,7 @@ import org.koin.dsl.KoinAppDeclaration
 import org.uci.proxy.core.di.coreModule
 import org.uci.proxy.core.di.platformModule
 import org.uci.proxy.core.log.LogRecorder
+import org.uci.proxy.core.traffic.TrafficRecorder
 import org.uci.proxy.core.port.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.PlatformInfo
@@ -27,6 +28,7 @@ fun initKoin(config: KoinAppDeclaration? = null): KoinApplication = startKoin {
 }.also { app ->
     // El registro se guarda en disco desde el arranque, haya o no alguien mirando la pantalla «Registro».
     app.koin.get<LogRecorder>().start()
+    app.koin.get<TrafficRecorder>().start()
     logStartup(app.koin.get(), app.koin.get())
 }
 

@@ -212,6 +212,10 @@ class TunTcpConnection internal constructor(
     val destinationAddress: Int get() = key.remoteIp
     val destinationPort: Int get() = key.remotePort
 
+    /** Dirección y puerto desde los que conecta la app: con el destino, identifican la conexión ante el sistema. */
+    val sourceAddress: Int get() = key.clientIp
+    val sourcePort: Int get() = key.clientPort
+
     private var state = State.SYN_RECEIVED
     private var receiveNext = irs + 1
     private var sendUnacknowledged = iss

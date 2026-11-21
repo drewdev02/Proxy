@@ -1,6 +1,7 @@
 package org.uci.proxy.core.engine
 
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
@@ -12,9 +13,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.selects.select
+import kotlinx.coroutines.withContext
 import org.uci.proxy.core.dns.LocalDnsPolicy
 import org.uci.proxy.core.dns.LocalDnsResolver
 import org.uci.proxy.core.model.ProxyProfile
+import org.uci.proxy.core.model.RouteExit
 import org.uci.proxy.core.packet.Ipv4Packet
 import org.uci.proxy.core.packet.Ipv4Route
 import org.uci.proxy.core.packet.NON_PUBLIC_RANGES
@@ -35,6 +38,9 @@ import org.uci.proxy.core.profile.AppDispatchers
 import org.uci.proxy.core.port.TunDevice
 import org.uci.proxy.core.profile.ProfileRepository
 import org.uci.proxy.core.routing.RuleSet
+import org.uci.proxy.core.traffic.TrafficMeter
+import org.uci.proxy.core.traffic.TrafficStore
+import kotlin.time.TimeSource
 import org.uci.proxy.core.vpn.VpnSession
 import kotlin.time.Duration.Companion.seconds
 import org.uci.proxy.core.port.EngineStateDirectories
@@ -82,6 +88,9 @@ class TunnelRunner(
     /** El DNS de la red real, para abrir sin proxy lo interno. Sin él (o sin [dnsTransport]), todo va como siempre. */
     private val localDnsSource: LocalDnsSource = LocalDnsSource.None,
     private val dnsTransport: DnsTransport? = null,
+    /** Donde se publica cada segundo el tráfico que pasó. */
+    private val traffic: TrafficStore = TrafficStore(),
+    private val timeSource: TimeSource = TimeSource.Monotonic,
 ) {
     /** Carga el perfil y su contraseña del almacén y ejecuta el túnel. */
     suspend fun run(platformTunnel: PlatformTunnel, profileId: String, settings: AppSettings = AppSettings()) {
@@ -161,18 +170,24 @@ class TunnelRunner(
             return
         }
 
-        val link = VpnLink(plan.tunAddress, logger, onViaProxy = { host -> noteViaProxy(host) })
+        val meter = TrafficMeter()
+        val link = VpnLink(plan.tunAddress, logger, onViaProxy = { host -> noteViaProxy(host) }, meter = meter)
         val split = rules?.let { SplitRouting(it, link) }
         val localDns = localDnsFor(localDnsConfig, settings, rules, reserved = listOf(plan.subnet))
         logger.log(LogLevel.INFO, TAG, "Túnel activo en ${plan.tunAddressText}, proxy $proxyAddress" + if (rules != null) ", con reglas de salida" else "")
         val vpnDown = retry != null && firstSession == null
         if (vpnDown) logger.log(LogLevel.WARN, TAG, "Otro País no conectó: lo que iba por él sale por el proxy")
+        traffic.reset()
         stateStore.set(TunnelState.Connected(profile.id, vpnDown = vpnDown))
         try {
             coroutineScope {
                 // En este ámbito viven también el temporizador TCP y los relés de cada conexión.
-                val engine = engineFactory.create(plan, output = tun, scope = this, profile = resolvedProfile, password = password, settings = settings, split = split, localDns = localDns)
+                val engine = engineFactory.create(
+                    plan, output = tun, scope = this, profile = resolvedProfile, password = password, settings = settings,
+                    split = split, localDns = localDns, meter = meter,
+                )
                 val loop = launch(dispatchers.background) { engine.run(tun) }
+                launch { sampleTraffic(meter) }
                 if (retry != null && firstAttempt != null) {
                     launch { superviseVpn(firstAttempt, link, tun, profile.id, retry) }
                 }
@@ -306,6 +321,9 @@ class TunnelRunner(
         }
 
         logger.log(LogLevel.INFO, TAG, "Túnel activo por Otro País (${vpn.exit.kind.tag}) en ${network.address}, DNS ${network.dnsServers.joinToString()}")
+        // Todo va por la VPN y no hay motor que vea a qué destino: se cuenta el total, sin destinos.
+        val meter = TrafficMeter()
+        traffic.reset()
         stateStore.set(TunnelState.Connected(profile.id))
         try {
             coroutineScope {
@@ -324,10 +342,21 @@ class TunnelRunner(
                         // La VPN solo lleva IPv4: el IPv6 que el sistema intente se descarta, como en el modo directo.
                         if (packet.isEmpty() || (packet[0].toInt() ushr 4) != 4) continue
                         val replies = Ipv4Packet.parse(packet)?.let { local.handle(it) }
-                        if (replies == null) session.writePacket(packet) else replies.forEach { tun.writePacket(it) }
+                        if (replies == null) {
+                            session.writePacket(packet)
+                            meter.count(RouteExit.VPN, host = null, app = null, up = packet.size.toLong(), down = 0)
+                        } else {
+                            replies.forEach { tun.writePacket(it) }
+                        }
                     }
                 }
-                val inbound = launch { session.receive { tun.writePacket(it) } }
+                val inbound = launch {
+                    session.receive {
+                        tun.writePacket(it)
+                        meter.count(RouteExit.VPN, host = null, app = null, up = 0, down = it.size.toLong())
+                    }
+                }
+                launch { sampleTraffic(meter) }
                 try {
                     select<Unit> {
                         outbound.onJoin { }
@@ -348,6 +377,24 @@ class TunnelRunner(
             session.close()
             stateStore.set(TunnelState.Disconnected)
             logger.log(LogLevel.INFO, TAG, "Túnel detenido")
+        }
+    }
+
+    /**
+     * Publica cada segundo lo que contó [meter], hasta que se cancela; entonces publica lo que quedaba, para no perder el
+     * último trozo de la sesión.
+     */
+    private suspend fun sampleTraffic(meter: TrafficMeter) {
+        var last = timeSource.markNow()
+        try {
+            while (true) {
+                delay(TRAFFIC_INTERVAL)
+                val elapsed = last.elapsedNow()
+                last = timeSource.markNow()
+                traffic.record(meter.drain(elapsed.inWholeMilliseconds))
+            }
+        } finally {
+            withContext(NonCancellable) { traffic.record(meter.drain(last.elapsedNow().inWholeMilliseconds)) }
         }
     }
 
@@ -398,6 +445,7 @@ class TunnelRunner(
         // Si el servidor VPN no empuja un DNS: una dirección pública, que de todos modos va por la VPN.
         const val FALLBACK_DNS = "1.1.1.1"
 
+        val TRAFFIC_INTERVAL = 1.seconds
         val VPN_RETRY_FIRST = 5.seconds
         val VPN_RETRY_MAX = 60.seconds
     }

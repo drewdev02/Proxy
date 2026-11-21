@@ -28,6 +28,7 @@ import org.uci.proxy.core.port.ConnectionOwner
 import org.uci.proxy.core.port.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.routing.RuleSet
+import org.uci.proxy.core.traffic.TrafficMeter
 import org.uci.proxy.core.vpn.VpnSession
 
 /** Lo que el motor necesita para repartir las conexiones entre el proxy, la VPN y el bloqueo. */
@@ -54,6 +55,8 @@ class VpnLink(
     private val appAddress: Int,
     private val logger: Logger,
     private val onViaProxy: (String) -> Unit = {},
+    /** Dónde se cuenta lo que llega por la VPN; lo que sale lo cuenta [ExitRouterHandler]. */
+    private val meter: TrafficMeter? = null,
 ) {
     private val lock = Mutex()
     private var session: VpnSession? = null
@@ -189,7 +192,8 @@ class VpnLink(
      */
     suspend fun inbound(bytes: ByteArray): ByteArray? {
         val packet = Ipv4Packet.parse(bytes) ?: return null
-        return lock.withLock {
+        var from: String? = null
+        val reply = lock.withLock {
             if (session == null || packet.destination != vpnAddress) return@withLock null
             val datagram = if (packet.source == vpnDns) UdpDatagram.parse(packet)?.takeIf { it.sourcePort == DNS_PORT } else null
             if (datagram != null && datagram.destinationPort == RESOLVER_PORT) {
@@ -209,8 +213,11 @@ class VpnLink(
             val invented = portsOf(packet)?.let { (remotePort, appPort) ->
                 inventedFor[Translated(packet.protocol, appPort, packet.source, remotePort)]
             }
+            from = hostByAddress[packet.source] ?: formatIpv4(packet.source)
             rewriteAddresses(packet, askedServer ?: invented ?: packet.source, appAddress)
         }
+        if (reply != null) meter?.count(RouteExit.VPN, from, app = null, up = 0, down = packet.totalLength.toLong())
+        return reply
     }
 
     /** Apunta el nombre de cada IP de la respuesta, y la primera IP de cada nombre. Se llama con el cerrojo tomado. */
@@ -297,6 +304,8 @@ class ExitRouterHandler(
     private val logger: Logger,
     private val owner: ConnectionOwner = ConnectionOwner.Unknown,
     private val scope: CoroutineScope? = null,
+    /** Dónde se cuenta lo que sale por la VPN; lo que vuelve lo cuenta [VpnLink]. */
+    private val meter: TrafficMeter? = null,
 ) : PacketHandler {
     private data class Flow(val protocol: Int, val sourcePort: Int, val destination: Int, val destinationPort: Int)
 
@@ -339,6 +348,7 @@ class ExitRouterHandler(
         if (!link.isUp) return null
         if (!fake) {
             if (!link.send(packet)) return null
+            countSent(packet, host)
             if (opening) logger.log(LogLevel.DEBUG, TAG, "Otro País: $target")
             return emptyList()
         }
@@ -347,12 +357,17 @@ class ExitRouterHandler(
         val real = link.addressFor(name)
         if (real != null) {
             if (!link.send(packet, destination = real)) return null
+            countSent(packet, name)
             if (opening) logger.log(LogLevel.DEBUG, TAG, "Otro País: $target (${formatIpv4(real)})")
             return emptyList()
         }
         if (link.isUnresolvable(name) || scope == null) return null
         scope.launch { link.resolve(name) }
         return emptyList()
+    }
+
+    private suspend fun countSent(packet: Ipv4Packet, host: String?) {
+        meter?.count(RouteExit.VPN, host ?: formatIpv4(packet.destination), app = null, up = packet.totalLength.toLong(), down = 0)
     }
 
     private fun decide(flow: Flow, packet: Ipv4Packet, host: String?, fake: Boolean, opening: Boolean): RouteExit {

@@ -109,6 +109,8 @@ val tunnelModule = module {
             stateDirectories = getOrNull<EngineStateDirectories>() ?: EngineStateDirectories.None,
             localDnsSource = getOrNull<LocalDnsSource>() ?: LocalDnsSource.None,
             dnsTransport = get(),
+            traffic = get(),
+            timeSource = get(),
         )
     }
 }

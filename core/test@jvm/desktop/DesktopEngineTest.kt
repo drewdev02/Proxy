@@ -48,6 +48,9 @@ import java.nio.file.Path
 import kotlin.io.path.exists
 import kotlin.test.AfterTest
 import kotlin.test.Test
+import org.uci.proxy.core.model.RouteExit
+import org.uci.proxy.core.traffic.TrafficDelta
+import org.uci.proxy.core.traffic.TrafficUsage
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -106,6 +109,22 @@ class EngineProtocolTest {
         assertNull(EngineProtocol.decodeNameStat("NAMESTAT sslip A_MEDIAS"))
         assertNull(EngineProtocol.decodeNameStat("NAMESTAT  WORKED"))
         assertNull(EngineProtocol.decodeNameStat("STATE connected"))
+    }
+
+    @Test
+    fun `a traffic measure survives the round trip and bad lines are rejected`() {
+        val delta = TrafficDelta(
+            millis = 1_002,
+            up = 40,
+            down = 900,
+            connections = 3,
+            usage = listOf(TrafficUsage(RouteExit.PROXY, "github.com", null, 40, 100), TrafficUsage(RouteExit.VPN, null, null, 0, 800)),
+        )
+
+        assertEquals(delta, EngineProtocol.decodeTraffic(EngineProtocol.encodeTraffic(delta)))
+        assertNull(EngineProtocol.decodeTraffic("TRAFFIC {no es json"))
+        assertNull(EngineProtocol.decodeTraffic("""TRAFFIC {"millis":1,"up":0,"down":0,"connections":0,"usage":[{"exit":"NUEVA","host":null,"app":null,"up":0,"down":0}]}"""))
+        assertNull(EngineProtocol.decodeTraffic("STATE connected"))
     }
 
     @Test

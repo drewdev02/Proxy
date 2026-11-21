@@ -17,6 +17,7 @@ import org.uci.proxy.core.port.LogLevel
 import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.proxy.ProxyTestResult
+import org.uci.proxy.core.traffic.LiveTraffic
 import org.uci.proxy.ui.Snapshots
 
 /** La pantalla Conexión en cada estado, en móvil y en escritorio, contra sus capturas de referencia. */
@@ -50,6 +51,15 @@ class ConnectionSnapshotTest {
 
     private val base = ConnectionUiState(profiles = listOf(uci, home), activeProfile = uci, recentActivity = activity)
 
+    // Un minuto de velocidades que suben y bajan, como al cargar una página y luego un vídeo.
+    private val liveTraffic = LiveTraffic(
+        downRates = List(60) { i -> (if (i in 20..45) 4_800_000L else 120_000L) + (i % 7) * 40_000L },
+        upRates = List(60) { i -> 60_000L + (i % 5) * 30_000L + if (i in 30..35) 700_000L else 0 },
+        sessionDown = 1_380_000_000,
+        sessionUp = 145_000_000,
+        connections = 34,
+    )
+
     private fun connectedSince(): kotlin.time.TimeMark {
         val clock = TestTimeSource()
         val mark = clock.markNow()
@@ -78,6 +88,7 @@ class ConnectionSnapshotTest {
                 tunnel = TunnelState.Connected("p1"),
                 connectedSince = connectedSince(),
                 check = ProxyCheck.Finished(ProxyTestResult.Success, 184),
+                traffic = liveTraffic,
             ),
             "vpn-down" to base.copy(tunnel = TunnelState.Connected("p1", vpnDown = true)),
             "via-proxy" to base.copy(tunnel = TunnelState.Connected("p1", viaProxy = listOf("netflix.com", "hulu.com"))),

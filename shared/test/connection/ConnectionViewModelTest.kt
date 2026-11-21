@@ -1,6 +1,8 @@
 package org.uci.proxy.connection
 
 import kotlin.test.Test
+import org.uci.proxy.core.traffic.TrafficDelta
+import org.uci.proxy.core.traffic.TrafficStore
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -42,6 +44,7 @@ class ConnectionViewModelTest : MainDispatcherTest() {
     private val permission = FakeLocalNetworkPermission()
     private val logs = LogBuffer()
     private val clock = TestTimeSource()
+    private val traffic = TrafficStore()
 
     private fun viewModel(
         proxyTester: FakeProxyTester = tester,
@@ -55,6 +58,7 @@ class ConnectionViewModelTest : MainDispatcherTest() {
         localNetworkPermission = permission,
         logBuffer = logs,
         timeSource = clock,
+        traffic = traffic,
     ).also { it.uiState.keepSubscribed() }
 
     @Test
@@ -84,7 +88,7 @@ class ConnectionViewModelTest : MainDispatcherTest() {
     fun `actions use the current data even when nobody is watching the screen`() {
         // Sin suscriptor el uiState no se recalcula (WhileSubscribed): las acciones deben leer de las fuentes.
         val unwatched = ConnectionViewModel(
-            repository, StoredActiveProfileStore(storage), tunnel, tunnel, tester, permission, logs, clock,
+            repository, StoredActiveProfileStore(storage), tunnel, tunnel, tester, permission, logs, clock, traffic,
         )
         unwatched.selectProfile("p2")
 
@@ -222,9 +226,21 @@ class ConnectionViewModelTest : MainDispatcherTest() {
     }
 
     @Test
+    fun `the live traffic comes from the engine measurements`() {
+        val vm = viewModel()
+        traffic.record(TrafficDelta(millis = 1_000, up = 2_048, down = 10_240, connections = 3))
+
+        val live = vm.uiState.value.traffic
+        assertEquals(10_240, live.downRate)
+        assertEquals(2_048, live.upRate)
+        assertEquals(12_288, live.sessionTotal)
+        assertEquals(3, live.connections)
+    }
+
+    @Test
     fun `no profiles means nothing to connect`() {
         val empty = ConnectionViewModel(
-            FakeProfileRepository(), StoredActiveProfileStore(storage), tunnel, tunnel, tester, permission, logs, clock,
+            FakeProfileRepository(), StoredActiveProfileStore(storage), tunnel, tunnel, tester, permission, logs, clock, traffic,
         ).also { it.uiState.keepSubscribed() }
 
         empty.connect()

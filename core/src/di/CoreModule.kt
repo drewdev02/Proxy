@@ -3,8 +3,11 @@ package org.uci.proxy.core.di
 import io.ktor.network.selector.SelectorManager
 import org.koin.core.module.dsl.bind
 import org.koin.core.module.dsl.singleOf
+import org.koin.dsl.bind
 import org.koin.dsl.module
 import org.uci.proxy.core.log.LogBuffer
+import org.uci.proxy.core.traffic.TrafficMonitor
+import org.uci.proxy.core.traffic.TrafficStore
 import org.uci.proxy.core.net.KtorTcpConnector
 import org.uci.proxy.core.port.TcpConnector
 import org.uci.proxy.core.profile.AppDispatchers
@@ -48,6 +51,8 @@ val coreModule = module {
     single<Clock> { Clock.System }
     // Los últimos mensajes de registro, para la pantalla «Registro». Cada plataforma envuelve su registrador con él.
     single { LogBuffer() }
+    // El tráfico de la sesión: lo publica el motor (o, en escritorio, la ventana con lo que le cuenta el motor).
+    single { TrafficStore() } bind TrafficMonitor::class
     single<IdGenerator> { RandomIdGenerator() }
     singleOf(::ProfileValidator)
     singleOf(::StoredProfileRepository) { bind<ProfileRepository>() }

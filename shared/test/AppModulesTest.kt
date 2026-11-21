@@ -14,6 +14,9 @@ import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.SecretStore
 import org.uci.proxy.di.appModules
 import org.uci.proxy.fakes.FakeLocalNetworkPermission
+import org.uci.proxy.fakes.FakeTrafficHistory
+import org.uci.proxy.core.traffic.TrafficHistory
+import org.uci.proxy.usage.UsageViewModel
 import org.uci.proxy.fakes.InMemoryKeyValueStore
 import org.uci.proxy.fakes.InMemorySecretStore
 import org.uci.proxy.fakes.RecordingLogger
@@ -36,6 +39,7 @@ class AppModulesTest {
         single<SecretStore> { InMemorySecretStore() }
         // La base de datos real escribiría en el disco del equipo (y en Android pide un Context).
         single<LogHistory> { InMemoryLogHistory() }
+        single<TrafficHistory> { FakeTrafficHistory() }
         single<LocalNetworkPermission> { FakeLocalNetworkPermission() }
         // En Android el túnel lo enlazan módulos de la propia app, que aquí no se cargan.
         single { FakeTunnel() } binds arrayOf(TunnelControl::class, TunnelMonitor::class)
@@ -56,6 +60,11 @@ class AppModulesTest {
     @Test
     fun `connection view model resolves from the app modules`() {
         assertNotNull(koin.get<ConnectionViewModel>())
+    }
+
+    @Test
+    fun `usage view model resolves from the app modules`() {
+        assertNotNull(koin.get<UsageViewModel>())
     }
 
     @Test

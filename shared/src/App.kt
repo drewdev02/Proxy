@@ -32,6 +32,7 @@ import org.uci.proxy.ui.catalog.ComponentCatalogScreen
 import org.uci.proxy.ui.components.UciNavItem
 import org.uci.proxy.ui.components.UciNavigationScaffold
 import org.uci.proxy.ui.icons.UciIcons
+import org.uci.proxy.usage.UsageScreen
 
 /** Requiere que la app haya llamado antes a [org.uci.proxy.di.initKoin]. */
 @Composable
@@ -91,6 +92,7 @@ fun App(
                                     onEditProfile = { backStack.add(Route.ProfileEditor(profileId = it)) },
                                     onAddProfile = { backStack.add(Route.ProfileEditor(profileId = null)) },
                                     onOpenLogs = { backStack.selectTab(Route.Logs) },
+                                    onOpenUsage = { backStack.add(Route.Usage) },
                                 ),
                             )
                         }
@@ -104,6 +106,9 @@ fun App(
                                     null
                                 },
                             )
+                        }
+                        entry<Route.Usage> {
+                            UsageScreen(onBack = { backStack.removeLastOrNull() })
                         }
                         entry<Route.Catalog> {
                             ComponentCatalogScreen(onBack = { backStack.removeLastOrNull() })

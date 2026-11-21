@@ -24,6 +24,30 @@ Escritorio y tableta (dos columnas, barra lateral):
 
 ![](../../shared/test@jvm/snapshots/macos/connection/desktop-connected.png)
 
+Con el túnel activo, «Tráfico en vivo» muestra las velocidades del último minuto, las conexiones abiertas por el proxy y
+lo transferido en la sesión. Captura real en el emulador de Android, navegando a través del simulador del proxy:
+
+![](android/conexion-trafico-en-vivo.png)
+
+## Consumo
+
+Lo que pasó por el túnel cada día, por salida (proxy u Otro País), por destino y por app (solo Android). Se abre desde
+el botón de la gráfica en la cabecera de Conexión o desde «Consumo» en el tráfico en vivo.
+
+| 7 días | 30 días | Sin consumo |
+|---|---|---|
+| ![](../../shared/test@jvm/snapshots/macos/usage/phone-week.png) | ![](../../shared/test@jvm/snapshots/macos/usage/phone-month.png) | ![](../../shared/test@jvm/snapshots/macos/usage/phone-empty.png) |
+
+Escritorio:
+
+![](../../shared/test@jvm/snapshots/macos/usage/desktop-week.png)
+
+Capturas reales en el emulador de Android:
+
+| Resumen y días | Destinos y apps |
+|---|---|
+| ![](android/consumo.png) | ![](android/consumo-destinos-apps.png) |
+
 En la app de macOS, la barra de título es transparente y la app ocupa toda la ventana: los botones de cerrar,
 minimizar y ampliar quedan sobre el fondo de la app (captura real de la ventana, no de las pruebas). En Windows 11 la
 barra se pinta del color del fondo.

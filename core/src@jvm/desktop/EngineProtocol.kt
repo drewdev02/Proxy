@@ -8,6 +8,7 @@ import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.settings.AppSettings
 import org.uci.proxy.core.settings.NameOutcome
+import org.uci.proxy.core.traffic.TrafficDelta
 import org.uci.proxy.core.vpn.CountryExitStart
 
 /*
@@ -19,6 +20,7 @@ import org.uci.proxy.core.vpn.CountryExitStart
  *   motor   -> ventana : STATE connected [vpn-down] | STATE disconnected | STATE failed <TunnelFailure>
  *   motor   -> ventana : LOG <json de EngineLog>    un mensaje de registro, para la pantalla «Registro» de la ventana
  *   motor   -> ventana : NAMESTAT <id del servicio> WORKED | REFUSED   cómo le fue a un servicio de nombres para IP
+ *   motor   -> ventana : TRAFFIC <json de TrafficDelta>   el tráfico del último segundo
  *   ventana -> motor   : STOP
  *
  * Si cualquiera de los dos cierra el socket, el otro da el túnel por terminado. Así el motor nunca
@@ -51,6 +53,21 @@ object EngineProtocol {
     private const val VIA_PROXY = "via-proxy="
 
     private const val NAMESTAT_PREFIX = "NAMESTAT "
+    private const val TRAFFIC_PREFIX = "TRAFFIC "
+
+    fun encodeTraffic(delta: TrafficDelta): String = TRAFFIC_PREFIX + json.encodeToString(TrafficDelta.serializer(), delta)
+
+    /** @return null si [line] no es un TRAFFIC válido. */
+    fun decodeTraffic(line: String): TrafficDelta? {
+        if (!line.startsWith(TRAFFIC_PREFIX)) return null
+        return try {
+            json.decodeFromString(TrafficDelta.serializer(), line.removePrefix(TRAFFIC_PREFIX))
+        } catch (_: kotlinx.serialization.SerializationException) {
+            null
+        } catch (_: IllegalArgumentException) {
+            null
+        }
+    }
 
     fun encodeNameStat(serviceId: String, outcome: NameOutcome): String = "$NAMESTAT_PREFIX$serviceId ${outcome.name}"
 

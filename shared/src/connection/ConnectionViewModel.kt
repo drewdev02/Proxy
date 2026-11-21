@@ -26,6 +26,8 @@ import org.uci.proxy.core.profile.ProfileRepository
 import org.uci.proxy.core.profile.resolveActiveProfileId
 import org.uci.proxy.core.proxy.ProxyTestResult
 import org.uci.proxy.core.proxy.ProxyTester
+import org.uci.proxy.core.traffic.LiveTraffic
+import org.uci.proxy.core.traffic.TrafficMonitor
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 import kotlin.time.measureTimedValue
@@ -78,6 +80,8 @@ data class ConnectionUiState(
     val check: ProxyCheck = ProxyCheck.Idle,
     /** Los últimos mensajes importantes del registro, el más reciente primero. */
     val recentActivity: List<LogEntry> = emptyList(),
+    /** El tráfico de la sesión en curso, medido en el motor. */
+    val traffic: LiveTraffic = LiveTraffic(),
 ) {
     /** Con el túnel ocupado con un perfil no se cambia de perfil: primero hay que desconectar. */
     val canChangeProfile: Boolean
@@ -88,7 +92,7 @@ data class ConnectionUiState(
 
 /**
  * La pantalla principal: el perfil activo, el botón de conectar, la prueba del proxy, cómo sale el tráfico y la
- * actividad reciente. Solo muestra datos reales; no hay contadores de tráfico porque el motor no los mide.
+ * actividad reciente y, con el túnel activo, el tráfico en vivo. Solo muestra datos reales, medidos en el motor.
  */
 class ConnectionViewModel(
     private val profiles: ProfileRepository,
@@ -99,6 +103,7 @@ class ConnectionViewModel(
     private val localNetworkPermission: LocalNetworkPermission,
     private val logBuffer: LogBuffer,
     private val timeSource: TimeSource,
+    private val traffic: TrafficMonitor,
 ) : ViewModel() {
     private val check = MutableStateFlow<ProxyCheck>(ProxyCheck.Idle)
     private val connectedSince = MutableStateFlow<TimeMark?>(null)
@@ -124,9 +129,9 @@ class ConnectionViewModel(
         activeProfileStore.activeProfileId,
         monitor.state,
         combine(check, connectedSince, ::Pair),
-        logBuffer.entries,
-    ) { list, chosen, tunnel, (check, since), log ->
-        buildState(list, chosen, tunnel, check, since, log)
+        combine(logBuffer.entries, traffic.live, ::Pair),
+    ) { list, chosen, tunnel, (check, since), (log, live) ->
+        buildState(list, chosen, tunnel, check, since, log, live)
     }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),
@@ -138,6 +143,7 @@ class ConnectionViewModel(
             check.value,
             connectedSince.value,
             logBuffer.entries.value,
+            traffic.live.value,
         ),
     )
 
@@ -148,6 +154,7 @@ class ConnectionViewModel(
         check: ProxyCheck,
         since: TimeMark?,
         log: List<LogEntry>,
+        live: LiveTraffic,
     ) = ConnectionUiState(
         tunnelAvailable = control.isAvailable,
         profiles = list,
@@ -156,6 +163,7 @@ class ConnectionViewModel(
         connectedSince = since,
         check = check,
         recentActivity = log.asReversed().asSequence().filter { it.level >= LogLevel.INFO }.take(RECENT_ACTIVITY).toList(),
+        traffic = live,
     )
 
     private fun activeProfile(list: List<ProxyProfile>, chosen: String?, tunnel: TunnelState): ProxyProfile? {
