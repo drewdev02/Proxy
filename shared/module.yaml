@@ -2,6 +2,10 @@ product:
   type: kmp/lib
   platforms: [ jvm, android, iosArm64, iosSimulatorArm64 ]
 
+# Escritorio y Android comparten el cliente HTTP (OkHttp) de la consulta de la cuota.
+aliases:
+  jvmAndAndroid: [ jvm, android ]
+
 dependencies:
   - //core: exported
   - //database
@@ -20,12 +24,21 @@ dependencies:
   - $libs.kotlinx.datetime
   - $libs.koin.compose
   - $libs.koin.compose.viewmodel
+  # La cuota de la UCI: un servicio SOAP de la intranet.
+  - $libs.ktor.client.core
+
+dependencies@jvmAndAndroid:
+  - $libs.ktor.client.okhttp
+
+dependencies@ios:
+  - $libs.ktor.client.darwin
 
 dependencies@android:
   - $compose.uiTooling
 
 test-dependencies:
   - $libs.koin.test
+  - $libs.ktor.client.mock
   - $libs.kotlinx.coroutines.test
 
 # Las pruebas de capturas (CatalogSnapshotTest) dibujan componentes sin ventana: necesitan Skia para el sistema actual.
