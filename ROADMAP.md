@@ -524,7 +524,7 @@ reglas, el perfil se comporta como antes: todo por el proxy, o todo por la VPN s
 |---|---|---|---|
 | Proxy | ✔ | ✔ | ✔ |
 | Otro País | ✔ | ✔ | ✔ |
-| Directo | — (sale por el proxy) | ✔ el rango no entra en la interfaz | ✔ la app queda fuera de la VPN |
+| Directo | ✔ si su dirección es interna (si no, por el proxy) | ✔ el rango no entra en la interfaz | ✔ la app queda fuera de la VPN |
 | Bloquear | ✔ | ✔ | ✔ |
 
 **Cómo funciona:** con reglas, la interfaz es la del modo directo (DNS falso y pila TCP propia) y, si alguna regla usa
@@ -535,6 +535,18 @@ una dirección inventada (el DNS no sabe qué app pregunta) se resuelve en ese m
 traduce en ambos sentidos; su primera conexión a cada sitio tarda un segundo más. Qué app abrió cada conexión lo dice
 Android (`getConnectionOwnerUid`, Android 10 o más) al abrirse.
 
+**La red local, sin proxy:** el proxy institucional no abre los sitios de su propia intranet (el de la UCI contesta 503
+a `drst.uci.cu`), que sin la app se abren directamente porque su dirección es interna. Al conectar, antes de capturar el
+DNS, se leen los servidores DNS y los dominios de búsqueda de la red real (`scutil` en macOS, PowerShell en Windows,
+`LinkProperties` en Android). Los nombres de esos dominios (`*.uci.cu`), y los de reglas de dominio «Directo», se
+preguntan a ese DNS; si la dirección es interna (10/8, 172.16/12, 192.168/16, 100.64/10), la app la recibe tal cual y su
+conexión va directa, porque esas direcciones nunca entran en la interfaz. Si es pública, o cae en la subred del túnel,
+sigue el camino de siempre. Solo se usan servidores DNS internos, así que la consulta tampoco entra en el túnel. Una regla
+de dominio que coincide manda sobre el ajuste («`*.uci.cu` → Proxy» lo desactiva para esos nombres). Vale con reglas y sin
+ellas, también con todo por Otro País. Lo controla el ajuste «Abrir la red local sin proxy», activo por defecto. Además,
+mientras el túnel está activo WPAD (`wpad`, `wpad.*`) contesta «no existe»: así el navegador no encuentra el proxy de la
+red ni lo usa por su cuenta, y deja de reintentarlo sin parar.
+
 **Si Otro País se cae:** lo suyo sale por el proxy, se avisa (notificación en Android, aviso en la tarjeta del perfil en
 todas; en escritorio el motor lo cuenta con `STATE connected vpn-down`) y se reintenta de 5 s a 60 s. No se reintenta con
 credenciales o archivo malos.
@@ -543,6 +555,7 @@ credenciales o archivo malos.
 |---|---|---|
 | Interfaz | Sección «Reglas de salida» en el editor del perfil; «Elegir app» con iconos y buscador en Android; aviso de Otro País caído | ✔ |
 | Núcleo | `RoutingRules`, `RuleSet`, `SplitRouting` (`VpnLink`, `SplitDnsHandler`, `ExitRouterHandler`), VPN supervisada en `TunnelRunner` | ✔ |
+| Red local | `LocalDnsSource` (`MacLocalDnsSource`, `WinLocalDnsSource`, `AndroidLocalDnsSource`), `KtorDnsTransport`, `LocalDnsPolicy`, `LocalDnsResolver`, `LocalDnsHandler`; ajuste `intranetDirect` | ✔ |
 | Adaptadores | `AndroidConnectionOwner`, apps directas con `addDisallowedApplication`, `PackageManagerAppCatalog`, rangos directos fuera de las rutas | ✔ |
 | Protocolo | `STATE connected vpn-down` entre el motor de escritorio y la ventana | ✔ |
 
@@ -551,12 +564,16 @@ caída y vuelta de la VPN, reglas por app) y del editor. `SplitRoutingLiveTest` 
 (se activa con variables de entorno). A mano: Android en emulador (Chrome por Otro País vio la IP de Canadá mientras el
 resto salía por el proxy) y macOS con la app de escritorio (`ifconfig.me` por Canadá, lo demás por el proxy, limpieza
 correcta al desconectar). En CI, `WindowsSplitTunnelE2ETest` con Wintun real y una VPN de bucle local en el proceso.
+Red local: `LocalDnsTunnelTest` (sin reglas, con reglas, todo por Otro País, ajuste apagado, regla que manda, DNS lento,
+WPAD), `LocalDnsTest`, `KtorDnsTransportTest` (UDP real en bucle local), la lectura de `scutil` y de PowerShell con salidas
+enlatadas, y `LocalDnsSourceLiveTest`, que lee el DNS real en los equipos de macOS y Windows de CI.
 
 **Limitaciones:** con DNS seguro en el navegador (DoH) solo valen las reglas de app o IP; una app que guardó en caché una
 dirección inventada sale por el proxy hasta volver a resolver (60 s como mucho).
 
 > Pendiente: reglas por app en Windows y macOS, crear reglas desde el registro, plantillas («Streaming → Otro País»),
-> y salida directa para dominios.
+> salida directa para dominios con dirección pública (haría falta una ruta por destino), y que la subred del túnel evite
+> los rangos que use la intranet.
 
 ---
 
