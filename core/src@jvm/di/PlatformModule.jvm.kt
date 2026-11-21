@@ -15,6 +15,10 @@ import org.uci.proxy.core.platform.JvmLocalAddresses
 import org.uci.proxy.core.platform.JvmAppDirectories
 import org.uci.proxy.core.port.EngineStateDirectories
 import org.uci.proxy.core.platform.JvmPlatformInfo
+import org.uci.proxy.core.platform.ProcessCommandRunner
+import org.uci.proxy.core.platform.macos.MacLocalDnsSource
+import org.uci.proxy.core.platform.windows.WinLocalDnsSource
+import org.uci.proxy.core.port.LocalDnsSource
 import org.uci.proxy.core.platform.MacKeychainSecretStore
 import org.uci.proxy.core.platform.Slf4jLogger
 import org.uci.proxy.core.platform.WindowsDpapiProtector
@@ -68,6 +72,14 @@ actual val platformModule: Module = module {
     // Lo que necesita el proceso del motor además de tunnelModule.
     singleOf(::JvmLocalAddresses) { bind<LocalAddresses>() }
     single<HostResolver> { JavaHostResolver(get<AppDispatchers>().background) }
+    // El DNS de la red real, para abrir sin proxy lo interno.
+    single<LocalDnsSource> {
+        when (get<PlatformInfo>().kind) {
+            PlatformKind.MACOS -> MacLocalDnsSource(ProcessCommandRunner())
+            PlatformKind.WINDOWS -> WinLocalDnsSource(ProcessCommandRunner())
+            else -> LocalDnsSource.None
+        }
+    }
     single { JvmAppDirectories.fromSystem(get()) }
     // El estado de los motores de Otro País (la identidad de un nodo de Tailscale), un directorio por perfil.
     single<EngineStateDirectories> {

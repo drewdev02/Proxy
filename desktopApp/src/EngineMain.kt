@@ -18,6 +18,7 @@ import org.uci.proxy.core.platform.JnaProbe
 import org.uci.proxy.core.vpn.tailscale.NativeTailscaleBridge
 import org.uci.proxy.core.vpn.tailscale.TailscaleBridge
 import org.uci.proxy.core.platform.ProcessCommandRunner
+import org.uci.proxy.core.port.LocalDnsSource
 import org.uci.proxy.core.platform.macos.JnaUtunOpener
 import org.uci.proxy.core.platform.macos.MacNetwork
 import org.uci.proxy.core.platform.macos.MacPlatformTunnel
@@ -83,7 +84,13 @@ fun runEngine(args: List<String>) {
     val runner = if (testRoutes == null) {
         koin.get<TunnelRunner>()
     } else {
-        TunnelRunner(koin.get(), koin.get(), koin.get(), koin.get(), koin.get(), dispatchers, logger, publicRoutes = testRoutes, engines = koin.get())
+        TunnelRunner(
+            koin.get(), koin.get(), koin.get(), koin.get(), koin.get(), dispatchers, logger,
+            publicRoutes = testRoutes,
+            engines = koin.get(),
+            localDnsSource = koin.getOrNull() ?: LocalDnsSource.None,
+            dnsTransport = koin.get(),
+        )
     }
     val tunnel = when (val kind = koin.get<PlatformInfo>().kind) {
         PlatformKind.MACOS -> MacPlatformTunnel(

@@ -15,7 +15,9 @@ import org.uci.proxy.core.platform.AndroidLocalAddresses
 import org.uci.proxy.core.platform.AndroidLocalNetworkPermission
 import org.uci.proxy.core.platform.AndroidVpnConsent
 import org.uci.proxy.core.platform.AndroidPlatformInfo
+import org.uci.proxy.core.platform.AndroidLocalDnsSource
 import org.uci.proxy.core.platform.JavaHostResolver
+import org.uci.proxy.core.port.LocalDnsSource
 import org.uci.proxy.core.platform.JavaSecureRandomBytes
 import org.uci.proxy.core.platform.LogcatLogger
 import org.uci.proxy.core.platform.SharedPreferencesKeyValueStore
@@ -68,6 +70,8 @@ actual val platformModule: Module = module {
         EngineStateDirectories { id -> java.io.File(base, id).path }
     }
     single<HostResolver> { JavaHostResolver(get<AppDispatchers>().background) }
+    // El DNS de la red real, para abrir sin proxy lo interno.
+    single<LocalDnsSource> { AndroidLocalDnsSource(get<Context>()) }
     single<KeyValueStore> { SharedPreferencesKeyValueStore(get<Context>(), SETTINGS_FILE) }
     single<SecretStore> {
         EncryptedSecretStore(
