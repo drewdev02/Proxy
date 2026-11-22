@@ -16,4 +16,9 @@
     <string name="ui_power_connecting">Connecting</string>
     <string name="ui_power_connected">Connected</string>
     <string name="ui_power_error">Error</string>
+
+    <string name="nav_connection">Connection</string>
+    <string name="nav_logs">Logs</string>
+    <string name="nav_profiles">Profiles</string>
+    <string name="nav_settings">Settings</string>
 </resources>

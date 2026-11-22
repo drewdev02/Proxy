@@ -19,4 +19,10 @@
     <string name="ui_power_connecting">Conectando</string>
     <string name="ui_power_connected">Conectado</string>
     <string name="ui_power_error">Error</string>
+
+    <!-- Pestañas de la navegación principal. -->
+    <string name="nav_connection">Conexión</string>
+    <string name="nav_logs">Registros</string>
+    <string name="nav_profiles">Perfiles</string>
+    <string name="nav_settings">Ajustes</string>
 </resources>

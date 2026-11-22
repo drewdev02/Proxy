@@ -12,6 +12,7 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import org.jetbrains.compose.reload.DevelopmentEntryPoint
+import org.jetbrains.compose.resources.stringResource
 import org.uci.proxy.apps.AppCatalog
 import org.uci.proxy.apps.LocalAppCatalog
 import org.uci.proxy.connection.ConnectionNavigation
@@ -26,6 +27,8 @@ import org.uci.proxy.navigation.routesConfiguration
 import org.uci.proxy.navigation.selectTab
 import org.uci.proxy.profile.ProfileEditorScreen
 import org.uci.proxy.profile.ProfileListScreen
+import org.uci.proxy.resources.Res
+import org.uci.proxy.resources.*
 import org.uci.proxy.settings.SettingsScreen
 import org.uci.proxy.theme.ProxyUciTheme
 import org.uci.proxy.ui.catalog.ComponentCatalogScreen
@@ -60,10 +63,10 @@ fun App(
     ProxyUciTheme {
         val backStack = rememberNavBackStack(routesConfiguration, Route.Connection)
         val tabs = listOf<UciNavItem<Route>>(
-            UciNavItem(Route.Connection, "Conexión", UciIcons.Shield),
-            UciNavItem(Route.Logs, "Registros", UciIcons.Logs),
-            UciNavItem(Route.ProfileList, "Perfiles", UciIcons.Badge),
-            UciNavItem(Route.Settings, "Ajustes", UciIcons.Tune),
+            UciNavItem(Route.Connection, stringResource(Res.string.nav_connection), UciIcons.Shield),
+            UciNavItem(Route.Logs, stringResource(Res.string.nav_logs), UciIcons.Logs),
+            UciNavItem(Route.ProfileList, stringResource(Res.string.nav_profiles), UciIcons.Badge),
+            UciNavItem(Route.Settings, stringResource(Res.string.nav_settings), UciIcons.Tune),
         )
 
         Surface(color = MaterialTheme.colorScheme.background) {
