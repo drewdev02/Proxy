@@ -83,6 +83,10 @@ jobs:
         run: ${{ matrix.kotlin }} test -m desktopEngine --platform jvm
       - name: Pruebas de la interfaz
         run: ${{ matrix.kotlin }} test -m shared --platform jvm
+      # Que los documentos no apunten a enlaces ni rutas de código que ya no existen.
+      - name: Documentos al día
+        if: matrix.name == 'Linux'
+        run: python3 tools/check_docs.py
       # El servicio de cuotas de la UCI, de mentira, contra el que se prueba la consulta de la cuota.
       - name: Simulador del servicio de cuotas
         if: matrix.name == 'Linux'
