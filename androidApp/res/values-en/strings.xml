@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">ProxyUCI</string>
+    <string name="vpn_channel_name">Active connection</string>
+    <string name="vpn_notification_title">ProxyUCI connected</string>
+    <string name="vpn_notification_text">The device traffic goes through the proxy.</string>
+    <string name="vpn_alerts_channel_name">Other Country alerts</string>
+    <string name="quota_channel_name">UCI quota</string>
+    <string name="vpn_down_title">Other Country is unavailable</string>
+    <string name="vpn_down_text">Traffic that went through the VPN goes through the proxy while it retries.</string>
+    <string name="vpn_back_title">Other Country is back</string>
+    <string name="vpn_back_text">Traffic from your rules goes through the VPN again.</string>
+</resources>
