@@ -321,20 +321,16 @@ class LocalDnsTunnelTest {
     fun `through Otro País without rules the local network is answered here and the rest goes to the VPN`() =
         runTest(UnconfinedTestDispatcher()) {
             connect(profile.copy(countryExit = CountryExit.OpenVpn("pais.ovpn", "vpnuser")), vpn = start)
-            val vpnDns = parseIpv4("10.98.0.1")!!
-            val address = parseIpv4("10.98.0.3")!!
-            fun ask(name: String, port: Int) =
-                send(buildUdpPacket(address, vpnDns, sourcePort = port, destinationPort = 53, payload = dnsQuery(name, id = 0x4242)))
 
-            ask("drst.uci.cu", 41000)
+            askDns("drst.uci.cu", port = 41000)
             assertEquals(0 to "10.0.0.13", lastAnswer())
             assertTrue(session.sent.isEmpty())
 
-            ask("wpad.uci.cu", 41001)
+            askDns("wpad.uci.cu", port = 41001)
             assertEquals(3 to null, lastAnswer())
 
-            ask("www.google.com", 41002)
-            assertEquals(1, session.sent.size, "lo demás va a la VPN tal cual")
+            askDns("www.google.com", port = 41002)
+            assertEquals(parseIpv4("10.98.0.1"), Ipv4Packet.parse(session.sent.single())!!.destination, "lo demás se pregunta al DNS de la VPN")
             assertTrue(platformTunnel.config!!.routes.none { it.contains(parseIpv4("10.0.0.13")!!) })
         }
 }

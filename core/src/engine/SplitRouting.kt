@@ -32,8 +32,12 @@ import org.uci.proxy.core.routing.RuleSet
 import org.uci.proxy.core.traffic.TrafficMeter
 import org.uci.proxy.core.vpn.VpnSession
 
-/** Lo que el motor necesita para repartir las conexiones entre el proxy, la VPN y el bloqueo. */
-class SplitRouting(val rules: RuleSet, val link: VpnLink)
+/**
+ * Lo que el motor necesita para repartir las conexiones entre el proxy, la VPN y el bloqueo.
+ *
+ * @param fallbackToProxy si lo que va por la VPN sale por el proxy mientras está caída; si no, se bloquea.
+ */
+class SplitRouting(val rules: RuleSet, val link: VpnLink, val fallbackToProxy: Boolean = true)
 
 /**
  * La VPN tal como la usa el motor con reglas de salida: puede no estar, caerse y volver.
@@ -301,10 +305,10 @@ class SplitDnsHandler(
         if (datagram.destinationPort != DNS_PORT) return null
         val question = DnsResponder.parseQuestionOf(datagram.payload)
         if (question != null && question.type == DnsResponder.TYPE_A && !hasOverride(question.name) &&
-            routing.rules.exitFor(question.name, address = null) == RouteExit.VPN &&
-            routing.link.sendDnsQuery(packet, datagram, question.name)
+            routing.rules.exitFor(question.name, address = null) == RouteExit.VPN
         ) {
-            return emptyList()
+            // Sin VPN y sin vuelta al proxy no se contesta: un DNS falso llevaría la conexión al proxy.
+            if (routing.link.sendDnsQuery(packet, datagram, question.name) || !routing.fallbackToProxy) return emptyList()
         }
         return fallback.handle(packet)
     }
@@ -371,9 +375,9 @@ class ExitRouterHandler(
     /** @return lo que se devuelve a la app (nada), o null si la conexión debe seguir por el proxy. */
     private suspend fun sendThroughVpn(packet: Ipv4Packet, host: String?, fake: Boolean, opening: Boolean, target: String): List<ByteArray>? {
         val link = routing.link
-        if (!link.isUp) return null
+        if (!link.isUp) return whileVpnDown(packet)
         if (!fake) {
-            if (!link.send(packet)) return null
+            if (!link.send(packet)) return whileVpnDown(packet)
             countSent(packet, host)
             if (opening) logger.log(LogLevel.DEBUG, TAG, "Otro País: $target")
             return emptyList()
@@ -382,7 +386,7 @@ class ExitRouterHandler(
         val name = host ?: return null
         val real = link.addressFor(name)
         if (real != null) {
-            if (!link.send(packet, destination = real)) return null
+            if (!link.send(packet, destination = real)) return whileVpnDown(packet)
             countSent(packet, name)
             if (opening) logger.log(LogLevel.DEBUG, TAG, "Otro País: $target (${formatIpv4(real)})")
             return emptyList()
@@ -390,6 +394,13 @@ class ExitRouterHandler(
         if (link.isUnresolvable(name) || scope == null) return null
         scope.launch { link.resolve(name) }
         return emptyList()
+    }
+
+    /** Sin VPN: por el proxy (null), o bloqueado si el ajuste lo pide (RST en TCP, nada en UDP). */
+    private fun whileVpnDown(packet: Ipv4Packet): List<ByteArray>? {
+        if (routing.fallbackToProxy) return null
+        val segment = TcpSegment.parse(packet) ?: return emptyList()
+        return listOfNotNull(reset(packet, segment))
     }
 
     private suspend fun countSent(packet: Ipv4Packet, host: String?) {

@@ -70,6 +70,7 @@ class SettingsActions(
     val onBack: (() -> Unit)? = null,
     val onAnswerConnectivityChecksChange: (Boolean) -> Unit = {},
     val onIntranetDirectChange: (Boolean) -> Unit = {},
+    val onVpnFallbackToProxyChange: (Boolean) -> Unit = {},
     val onNameByIpChange: (Boolean) -> Unit = {},
     val onTryRawIpChange: (Boolean) -> Unit = {},
     val onServiceEnabledChange: (String, Boolean) -> Unit = { _, _ -> },
@@ -103,6 +104,7 @@ internal fun SettingsScreen(
             onBack = onBack,
             onAnswerConnectivityChecksChange = viewModel::setAnswerConnectivityChecks,
             onIntranetDirectChange = viewModel::setIntranetDirect,
+            onVpnFallbackToProxyChange = viewModel::setVpnFallbackToProxy,
             onNameByIpChange = viewModel::setNameByIp,
             onTryRawIpChange = viewModel::setTryRawIp,
             onServiceEnabledChange = viewModel::setServiceEnabled,
@@ -166,6 +168,13 @@ fun SettingsScreen(
                             "abrirlos. Para otros sitios internos, añade una regla de dominio con salida «Directo».",
                         checked = settings.intranetDirect,
                         onCheckedChange = actions.onIntranetDirectChange,
+                    )
+                    UciDivider()
+                    UciSwitchRow(
+                        title = "Si Otro País se cae, salir por el proxy",
+                        subtitle = "Si está apagado, lo que va por Otro País se bloquea hasta que vuelva.",
+                        checked = settings.vpnFallbackToProxy,
+                        onCheckedChange = actions.onVpnFallbackToProxyChange,
                     )
                 }
                 QuotaCard(settings.quota, actions)

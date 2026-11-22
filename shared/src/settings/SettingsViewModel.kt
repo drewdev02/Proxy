@@ -76,6 +76,8 @@ class SettingsViewModel(
 
     fun setIntranetDirect(enabled: Boolean) = repository.setIntranetDirect(enabled)
 
+    fun setVpnFallbackToProxy(enabled: Boolean) = repository.setVpnFallbackToProxy(enabled)
+
     fun setNameByIp(enabled: Boolean) = repository.setNameByIp(enabled)
 
     fun setTryRawIp(enabled: Boolean) = repository.setTryRawIp(enabled)

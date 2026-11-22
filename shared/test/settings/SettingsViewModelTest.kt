@@ -103,6 +103,16 @@ class SettingsViewModelTest : MainDispatcherTest() {
     }
 
     @Test
+    fun `the Otro País fallback switch starts on and is stored`() {
+        assertTrue(viewModel.uiState.value.settings.vpnFallbackToProxy)
+
+        viewModel.setVpnFallbackToProxy(false)
+
+        assertFalse(viewModel.uiState.value.settings.vpnFallbackToProxy)
+        assertFalse(StoredSettingsRepository(store).settings.value.vpnFallbackToProxy)
+    }
+
+    @Test
     fun `names for public IPs start on with the two factory services`() {
         val settings = viewModel.uiState.value.settings
 
