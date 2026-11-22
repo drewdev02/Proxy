@@ -25,6 +25,7 @@ import org.uci.proxy.core.platform.macos.MacNetwork
 import org.uci.proxy.core.platform.macos.MacPlatformTunnel
 import org.uci.proxy.core.platform.windows.JnaWintunOpener
 import org.uci.proxy.core.platform.windows.ResourceWintunDllLocator
+import org.uci.proxy.core.platform.windows.WindowsProtectedDirectory
 import org.uci.proxy.core.platform.windows.WinNetwork
 import org.uci.proxy.core.platform.windows.WinPlatformTunnel
 import org.uci.proxy.core.port.Logger
@@ -71,7 +72,7 @@ fun runEngine(args: List<String>) {
                 if (System.getProperty("os.name").orEmpty().startsWith("Windows")) {
                     single<TailscaleBridge> {
                         val (dir, file) = NativeTailscaleBridge.desktopResourceDir() ?: return@single TailscaleBridge.Unavailable
-                        NativeTailscaleBridge.fromResource(dir, file, root = windowsNativeDirectory())
+                        NativeTailscaleBridge.fromResource(dir, file, root = windowsNativeDirectory(), prepareRoot = WindowsProtectedDirectory::prepare)
                     }
                 }
             },
@@ -107,7 +108,7 @@ fun runEngine(args: List<String>) {
         )
         PlatformKind.WINDOWS -> WinPlatformTunnel(
             network = WinNetwork(ProcessCommandRunner()),
-            wintunOpener = JnaWintunOpener(ResourceWintunDllLocator(windowsNativeDirectory())),
+            wintunOpener = JnaWintunOpener(ResourceWintunDllLocator(windowsNativeDirectory(), prepareRoot = WindowsProtectedDirectory::prepare)),
             ioDispatcher = dispatchers.background,
             logger = logger,
         )
@@ -175,7 +176,8 @@ fun runSelfTest(reportFile: String) {
 /**
  * Carpeta donde el motor elevado extrae `wintun.dll`. Está bajo `ProgramData` y no bajo el perfil del
  * usuario: el motor carga esa DLL con privilegios de Administrador, así que no debe salir de un
- * lugar donde un proceso sin privilegios pueda sustituirla.
+ * lugar donde un proceso sin privilegios pueda sustituirla. Antes de usarla se protege con
+ * [WindowsProtectedDirectory]: un usuario normal puede crear carpetas en `ProgramData`.
  */
 private fun windowsNativeDirectory() =
     Path(System.getenv("ProgramData") ?: "C:\\ProgramData").resolve("ProxyUCI").resolve("native")
