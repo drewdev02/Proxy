@@ -10,8 +10,8 @@ import org.uci.proxy.core.desktop.EngineLauncher
 import org.uci.proxy.core.desktop.EngineProcess
 import org.uci.proxy.core.fakes.InMemoryKeyValueStore
 import org.uci.proxy.core.fakes.InMemorySecretStore
-import org.uci.proxy.core.settings.NameServiceReporter
-import org.uci.proxy.core.settings.StoredSettingsRepository
+import org.uci.proxy.core.port.NameServiceReporter
+import org.uci.proxy.core.data.StoredSettingsRepository
 import org.uci.proxy.core.log.LogBuffer
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.ProxyProtocol

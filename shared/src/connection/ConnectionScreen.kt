@@ -61,7 +61,7 @@ import org.uci.proxy.profile.label
 import org.uci.proxy.profile.tone
 import org.uci.proxy.quota.percentText
 import org.uci.proxy.quota.tone
-import org.uci.proxy.core.settings.QuotaSettings
+import org.uci.proxy.core.model.QuotaSettings
 import org.uci.proxy.theme.ProxyUciTheme
 import org.uci.proxy.ui.components.UciBottomSheet
 import org.uci.proxy.ui.components.UciButton

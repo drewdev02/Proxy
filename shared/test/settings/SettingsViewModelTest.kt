@@ -5,13 +5,13 @@ import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.ProxyProtocol
 import org.uci.proxy.core.proxy.NameServiceTestResult
 import org.uci.proxy.core.proxy.NameServiceTester
-import org.uci.proxy.core.settings.IpNameService
+import org.uci.proxy.core.model.IpNameService
 import org.uci.proxy.core.settings.IpNameServiceValidator
-import org.uci.proxy.core.settings.NameOutcome
+import org.uci.proxy.core.model.NameOutcome
 import org.uci.proxy.core.settings.ServiceError
 import org.uci.proxy.core.settings.ServiceValidation
-import org.uci.proxy.core.settings.StoredNameServiceStatusRepository
-import org.uci.proxy.core.settings.StoredSettingsRepository
+import org.uci.proxy.core.data.StoredNameServiceStatusRepository
+import org.uci.proxy.core.data.StoredSettingsRepository
 import org.uci.proxy.fakes.FakeLocalNetworkPermission
 import org.uci.proxy.fakes.FakeProfileRepository
 import org.uci.proxy.fakes.FakeTunnel

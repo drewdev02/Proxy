@@ -1,8 +1,8 @@
 package org.uci.proxy.settings
 
 import org.uci.proxy.core.proxy.NameServiceTestResult
-import org.uci.proxy.core.settings.AppSettings
-import org.uci.proxy.core.settings.IpNameService
+import org.uci.proxy.core.model.AppSettings
+import org.uci.proxy.core.model.IpNameService
 import org.uci.proxy.ui.Snapshots
 import kotlin.test.Test
 

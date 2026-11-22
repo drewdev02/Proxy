@@ -1,7 +1,7 @@
 package org.uci.proxy.core.desktop
 
-import org.uci.proxy.core.settings.NameOutcome
-import org.uci.proxy.core.settings.NameServiceReporter
+import org.uci.proxy.core.model.NameOutcome
+import org.uci.proxy.core.port.NameServiceReporter
 
 /**
  * Del lado del motor: lo que el túnel cuenta de los servicios de nombres no se puede mostrar aquí (la pantalla de Ajustes

@@ -1,39 +1,15 @@
-package org.uci.proxy.core.settings
+package org.uci.proxy.core.data
 
+import org.uci.proxy.core.model.NameOutcome
+import org.uci.proxy.core.model.NameServiceStatus
+import org.uci.proxy.core.port.NameServiceStatusRepository
+import kotlin.time.Clock
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.SerializationException
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.uci.proxy.core.port.KeyValueStore
-import kotlin.time.Clock
-
-/** Qué pasó la última vez que se pidió un destino al proxy con el nombre de un servicio. */
-enum class NameOutcome {
-    /** El proxy abrió el túnel. */
-    WORKED,
-
-    /** El proxy rechazó el nombre (403 o similar). */
-    REFUSED,
-}
-
-@Serializable
-data class NameServiceStatus(val outcome: NameOutcome, val atMillis: Long)
-
-/** Quien se entera de cómo le fue a cada servicio: el túnel avisa y la pantalla de Ajustes lo muestra. */
-fun interface NameServiceReporter {
-    fun report(serviceId: String, outcome: NameOutcome)
-
-    companion object {
-        val None = NameServiceReporter { _, _ -> }
-    }
-}
-
-interface NameServiceStatusRepository : NameServiceReporter {
-    /** El último resultado de cada servicio, por id. */
-    val statuses: StateFlow<Map<String, NameServiceStatus>>
-}
 
 /**
  * Recuerda el último resultado de cada servicio, también entre arranques. Para no escribir en disco con cada conexión,

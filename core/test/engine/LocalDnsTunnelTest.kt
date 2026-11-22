@@ -40,7 +40,7 @@ import org.uci.proxy.core.port.LocalDnsConfig
 import org.uci.proxy.core.port.LocalDnsSource
 import org.uci.proxy.core.common.AppDispatchers
 import org.uci.proxy.core.profile.StoredProfileRepository
-import org.uci.proxy.core.settings.AppSettings
+import org.uci.proxy.core.model.AppSettings
 import org.uci.proxy.core.vpn.CountryExitStart
 import org.uci.proxy.core.vpn.VpnConnectResult
 import org.uci.proxy.core.vpn.VpnNetwork

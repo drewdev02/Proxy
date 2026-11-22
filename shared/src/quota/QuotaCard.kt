@@ -11,7 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import org.uci.proxy.core.settings.QuotaSettings
+import org.uci.proxy.core.model.QuotaSettings
 import org.uci.proxy.theme.ProxyUciTheme
 import org.uci.proxy.ui.components.UciButton
 import org.uci.proxy.ui.components.UciButtonVariant

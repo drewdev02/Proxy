@@ -11,7 +11,7 @@ import org.uci.proxy.core.model.ProxyProtocol
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.common.AppDispatchers
 import org.uci.proxy.core.profile.StoredActiveProfileStore
-import org.uci.proxy.core.settings.StoredSettingsRepository
+import org.uci.proxy.core.data.StoredSettingsRepository
 import org.uci.proxy.fakes.FakeProfileRepository
 import org.uci.proxy.fakes.FakeTunnel
 import org.uci.proxy.fakes.InMemoryKeyValueStore

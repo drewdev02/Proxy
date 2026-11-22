@@ -6,8 +6,8 @@ import org.uci.proxy.core.model.LogEntry
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.port.TunnelState
-import org.uci.proxy.core.settings.AppSettings
-import org.uci.proxy.core.settings.NameOutcome
+import org.uci.proxy.core.model.AppSettings
+import org.uci.proxy.core.model.NameOutcome
 import org.uci.proxy.core.traffic.TrafficDelta
 import org.uci.proxy.core.vpn.CountryExitStart
 

@@ -44,7 +44,7 @@ import kotlin.time.TimeSource
 import org.uci.proxy.core.vpn.VpnSession
 import kotlin.time.Duration.Companion.seconds
 import org.uci.proxy.core.port.EngineStateDirectories
-import org.uci.proxy.core.settings.AppSettings
+import org.uci.proxy.core.model.AppSettings
 import org.uci.proxy.core.vpn.CountryEngines
 import org.uci.proxy.core.vpn.CountryExitStart
 import org.uci.proxy.core.vpn.ExitContext

@@ -18,8 +18,8 @@ import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.common.AppDispatchers
 import org.uci.proxy.core.profile.ProfileRepository
 import org.uci.proxy.core.traffic.TrafficStore
-import org.uci.proxy.core.settings.NameServiceReporter
-import org.uci.proxy.core.settings.SettingsRepository
+import org.uci.proxy.core.port.NameServiceReporter
+import org.uci.proxy.core.port.SettingsRepository
 import org.uci.proxy.core.port.EngineStateDirectories
 import org.uci.proxy.core.vpn.CountryExitStart
 import java.io.IOException

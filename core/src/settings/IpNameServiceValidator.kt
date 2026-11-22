@@ -1,5 +1,7 @@
 package org.uci.proxy.core.settings
 
+import org.uci.proxy.core.model.IpNameService
+
 enum class ServiceError {
     /** Falta el nombre con el que se muestra. */
     NAME_EMPTY,

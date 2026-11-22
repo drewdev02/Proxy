@@ -1,5 +1,8 @@
-package org.uci.proxy.core.settings
+package org.uci.proxy.core.data
 
+import org.uci.proxy.core.model.AppSettings
+import org.uci.proxy.core.model.IpNameService
+import org.uci.proxy.core.model.QuotaSettings
 import org.uci.proxy.core.fakes.InMemoryKeyValueStore
 import kotlin.test.Test
 import kotlin.test.assertEquals

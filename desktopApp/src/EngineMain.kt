@@ -2,7 +2,7 @@ package org.uci.proxy
 
 import kotlinx.coroutines.runBlocking
 import org.koin.core.context.startKoin
-import org.uci.proxy.core.settings.NameServiceReporter
+import org.uci.proxy.core.port.NameServiceReporter
 import org.uci.proxy.core.desktop.EngineNameForwarder
 import org.koin.dsl.module
 import org.uci.proxy.core.desktop.EngineArguments

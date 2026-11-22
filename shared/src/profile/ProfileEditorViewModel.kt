@@ -17,8 +17,8 @@ import org.uci.proxy.core.routing.parseRule
 import org.uci.proxy.core.model.CountryEngineKind
 import org.uci.proxy.core.model.CountryExit
 import org.uci.proxy.core.model.CountryExitSecrets
-import org.uci.proxy.core.settings.AppSettings
-import org.uci.proxy.core.settings.SettingsRepository
+import org.uci.proxy.core.model.AppSettings
+import org.uci.proxy.core.port.SettingsRepository
 import org.uci.proxy.core.vpn.CountryEngineCatalog
 import org.uci.proxy.core.vpn.tailscale.ExitNodeListing
 import org.uci.proxy.core.vpn.tailscale.TailscaleExitNode

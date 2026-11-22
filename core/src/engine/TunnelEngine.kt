@@ -22,8 +22,8 @@ import org.uci.proxy.core.port.RandomBytes
 import org.uci.proxy.core.port.TunDevice
 import org.uci.proxy.core.proxy.IpNamer
 import org.uci.proxy.core.proxy.ProxyConnector
-import org.uci.proxy.core.settings.AppSettings
-import org.uci.proxy.core.settings.NameServiceReporter
+import org.uci.proxy.core.model.AppSettings
+import org.uci.proxy.core.port.NameServiceReporter
 import org.uci.proxy.core.tcp.TunTcpStack
 import org.uci.proxy.core.traffic.TrafficMeter
 import kotlin.time.TimeSource

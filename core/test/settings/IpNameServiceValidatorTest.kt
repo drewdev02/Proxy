@@ -1,5 +1,6 @@
 package org.uci.proxy.core.settings
 
+import org.uci.proxy.core.model.IpNameService
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs

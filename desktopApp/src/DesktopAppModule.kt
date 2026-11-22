@@ -10,7 +10,7 @@ import org.uci.proxy.core.port.PlatformInfo
 import org.uci.proxy.core.port.PlatformKind
 import org.uci.proxy.core.port.TunnelControl
 import org.uci.proxy.core.port.TunnelMonitor
-import org.uci.proxy.core.settings.NameServiceStatusRepository
+import org.uci.proxy.core.port.NameServiceStatusRepository
 
 /** Clase principal del programa: el motor es este mismo programa relanzado con privilegios. */
 internal const val MAIN_CLASS = "org.uci.proxy.MainKt"

@@ -26,8 +26,8 @@ import org.uci.proxy.core.profile.ActiveProfileStore
 import org.uci.proxy.core.common.AppDispatchers
 import org.uci.proxy.core.profile.ProfileRepository
 import org.uci.proxy.core.profile.resolveActiveProfileId
-import org.uci.proxy.core.settings.QuotaSettings
-import org.uci.proxy.core.settings.SettingsRepository
+import org.uci.proxy.core.model.QuotaSettings
+import org.uci.proxy.core.port.SettingsRepository
 import kotlin.math.floor
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds

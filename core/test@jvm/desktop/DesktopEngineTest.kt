@@ -23,9 +23,9 @@ import org.uci.proxy.core.fakes.RecordingLogger
 import org.uci.proxy.core.log.BufferedLogger
 import org.uci.proxy.core.log.LogBuffer
 import org.uci.proxy.core.model.LogEntry
-import org.uci.proxy.core.settings.AppSettings
-import org.uci.proxy.core.settings.NameOutcome
-import org.uci.proxy.core.settings.StoredSettingsRepository
+import org.uci.proxy.core.model.AppSettings
+import org.uci.proxy.core.model.NameOutcome
+import org.uci.proxy.core.data.StoredSettingsRepository
 import org.uci.proxy.core.model.LogLevel
 import kotlin.time.Clock
 import org.uci.proxy.core.model.ProxyProfile

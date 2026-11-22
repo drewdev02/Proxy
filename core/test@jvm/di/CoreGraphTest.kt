@@ -13,8 +13,8 @@ import org.uci.proxy.core.port.SecretStore
 import org.uci.proxy.core.proxy.HttpConnectConnector
 import org.uci.proxy.core.proxy.ProxyConnector
 import org.uci.proxy.core.proxy.Socks5Connector
-import org.uci.proxy.core.settings.NameServiceReporter
-import org.uci.proxy.core.settings.NameServiceStatusRepository
+import org.uci.proxy.core.port.NameServiceReporter
+import org.uci.proxy.core.port.NameServiceStatusRepository
 import org.uci.proxy.core.vpn.CountryEngineCatalog
 import org.uci.proxy.core.vpn.CountryEngines
 import org.uci.proxy.core.vpn.EngineCatalog

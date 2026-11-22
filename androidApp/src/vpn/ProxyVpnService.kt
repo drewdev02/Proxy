@@ -26,7 +26,7 @@ import org.uci.proxy.core.engine.TunnelRunner
 import org.uci.proxy.core.platform.AndroidPlatformTunnel
 import org.uci.proxy.core.platform.TunnelServiceContract
 import org.uci.proxy.core.common.AppDispatchers
-import org.uci.proxy.core.settings.SettingsRepository
+import org.uci.proxy.core.port.SettingsRepository
 
 /**
  * Servicio de VPN: punto de entrada que crea el sistema. Solo traduce las órdenes de Android

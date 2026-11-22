@@ -10,7 +10,7 @@ import org.uci.proxy.core.proxy.ProxyConnectResult
 import org.uci.proxy.core.proxy.ProxyConnector
 import org.uci.proxy.core.proxy.ProxyFailure
 import org.uci.proxy.core.proxy.ProxyTarget
-import org.uci.proxy.core.settings.NameServiceReporter
+import org.uci.proxy.core.port.NameServiceReporter
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 

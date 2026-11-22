@@ -13,8 +13,8 @@ import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.proxy.ProxyConnectResult
 import org.uci.proxy.core.proxy.ProxyFailure
 import org.uci.proxy.core.proxy.ProxyTarget
-import org.uci.proxy.core.settings.AppSettings
-import org.uci.proxy.core.settings.IpNameService
+import org.uci.proxy.core.model.AppSettings
+import org.uci.proxy.core.model.IpNameService
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs

@@ -5,7 +5,7 @@ import org.uci.proxy.core.model.CountryExit
 import org.uci.proxy.core.model.CountryExitSecrets
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.port.TunnelFailure
-import org.uci.proxy.core.settings.AppSettings
+import org.uci.proxy.core.model.AppSettings
 import org.uci.proxy.core.vpn.tailscale.ExitNodeListing
 import org.uci.proxy.core.vpn.tailscale.TailscaleEngine
 

@@ -18,13 +18,13 @@ import org.uci.proxy.core.common.IdGenerator
 import org.uci.proxy.core.profile.ProfileRepository
 import org.uci.proxy.core.proxy.NameServiceTestResult
 import org.uci.proxy.core.proxy.NameServiceTester
-import org.uci.proxy.core.settings.AppSettings
+import org.uci.proxy.core.model.AppSettings
 import org.uci.proxy.core.settings.IpNameServiceValidator
-import org.uci.proxy.core.settings.NameOutcome
-import org.uci.proxy.core.settings.NameServiceStatus
-import org.uci.proxy.core.settings.NameServiceStatusRepository
+import org.uci.proxy.core.model.NameOutcome
+import org.uci.proxy.core.model.NameServiceStatus
+import org.uci.proxy.core.port.NameServiceStatusRepository
 import org.uci.proxy.core.settings.ServiceValidation
-import org.uci.proxy.core.settings.SettingsRepository
+import org.uci.proxy.core.port.SettingsRepository
 
 /** Lo que muestra la fila de un servicio tras pulsar «Probar». */
 sealed interface ServiceTestUi {

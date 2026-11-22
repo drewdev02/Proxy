@@ -26,7 +26,7 @@ import org.uci.proxy.core.common.AppDispatchers
 import org.uci.proxy.core.proxy.BasicAuthScheme
 import org.uci.proxy.core.proxy.HttpConnectConnector
 import org.uci.proxy.core.proxy.NtlmAuthScheme
-import org.uci.proxy.core.settings.AppSettings
+import org.uci.proxy.core.model.AppSettings
 import org.uci.proxy.core.vpn.CountryExitStart
 import org.uci.proxy.core.vpn.ExitContext
 import org.uci.proxy.core.vpn.ProxyDialer
