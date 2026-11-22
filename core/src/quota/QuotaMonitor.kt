@@ -1,5 +1,14 @@
-package org.uci.proxy.quota
+package org.uci.proxy.core.quota
 
+import org.uci.proxy.core.data.QuotaStore
+import org.uci.proxy.core.model.UciQuota
+import org.uci.proxy.core.port.QuotaFetch
+import org.uci.proxy.core.port.QuotaNotifier
+import org.uci.proxy.core.port.UciQuotaService
+import kotlin.math.floor
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.minutes
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -16,22 +25,18 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import org.uci.proxy.core.model.ProxyProfile
+import org.uci.proxy.core.common.AppDispatchers
 import org.uci.proxy.core.model.LogLevel
+import org.uci.proxy.core.model.ProxyProfile
+import org.uci.proxy.core.model.QuotaSettings
+import org.uci.proxy.core.port.ActiveProfileStore
 import org.uci.proxy.core.port.Logger
+import org.uci.proxy.core.port.ProfileRepository
+import org.uci.proxy.core.port.SettingsRepository
 import org.uci.proxy.core.port.TunnelControl
 import org.uci.proxy.core.port.TunnelMonitor
 import org.uci.proxy.core.port.TunnelState
-import org.uci.proxy.core.port.ActiveProfileStore
-import org.uci.proxy.core.common.AppDispatchers
-import org.uci.proxy.core.port.ProfileRepository
 import org.uci.proxy.core.profile.resolveActiveProfileId
-import org.uci.proxy.core.model.QuotaSettings
-import org.uci.proxy.core.port.SettingsRepository
-import kotlin.math.floor
-import kotlin.time.Clock
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.minutes
 
 /** Por qué no se pudo consultar la cuota la última vez. */
 enum class QuotaProblem { WRONG_CREDENTIALS, UNREACHABLE, UNTRUSTED_CERTIFICATE, SERVICE_CHANGED }
@@ -68,16 +73,6 @@ interface QuotaTracker {
             override fun refresh() = Unit
             override fun allowOverLimit() = Unit
         }
-    }
-}
-
-/** Avisa a la persona fuera de la app (una notificación del sistema), donde la plataforma lo permite. */
-fun interface QuotaNotifier {
-    fun notify(title: String, message: String)
-
-    companion object {
-        /** Donde no hay notificaciones propias: el aviso queda en el registro y en la app. */
-        val None = QuotaNotifier { _, _ -> }
     }
 }
 
@@ -279,10 +274,10 @@ class QuotaMonitor(
 }
 
 /** «71 %». */
-internal fun percentText(quota: UciQuota): String = "${floor(quota.percent).toInt()} %"
+fun percentText(quota: UciQuota): String = "${floor(quota.percent).toInt()} %"
 
 /** «1420,5 MB». */
-internal fun mbText(mb: Double): String {
+fun mbText(mb: Double): String {
     val tenths = kotlin.math.round(mb * 10).toLong()
     return if (tenths % 10 == 0L) "${tenths / 10} MB" else "${tenths / 10},${tenths % 10} MB"
 }

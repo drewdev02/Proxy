@@ -1,4 +1,4 @@
-package org.uci.proxy.quota
+package org.uci.proxy.core.quota
 
 /*
  * El servicio de cuotas de la UCI (SOAP 1.1, rpc/encoded, hecho en PHP), en la intranet. Su WSDL, en
@@ -12,7 +12,7 @@ package org.uci.proxy.quota
  * por posición (como UCIProxy, que también funcionaba con otro namespace y otra acción).
  * Para probar sin la red de la UCI: tools/test_cuotas.py.
  */
-internal object QuotaSoap {
+object QuotaSoap {
     const val SERVICE_URL = "https://cuotas.uci.cu/servicios/v1/InetCuotasWS.php"
     const val SOAP_ACTION = "urn:InetCuotasWSAction"
     const val NAMESPACE = "urn:InetCuotasWS"

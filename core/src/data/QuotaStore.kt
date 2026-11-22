@@ -1,5 +1,6 @@
-package org.uci.proxy.quota
+package org.uci.proxy.core.data
 
+import org.uci.proxy.core.model.UciQuota
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import org.uci.proxy.core.port.KeyValueStore

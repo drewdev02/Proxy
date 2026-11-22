@@ -1,5 +1,12 @@
 package org.uci.proxy.quota
 
+import org.uci.proxy.core.data.QuotaStore
+import org.uci.proxy.core.model.UciQuota
+import org.uci.proxy.core.port.QuotaFetch
+import org.uci.proxy.core.port.UciQuotaService
+import org.uci.proxy.core.quota.QuotaMonitor
+import org.uci.proxy.core.quota.QuotaProblem
+import org.uci.proxy.core.quota.QuotaSoap
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope

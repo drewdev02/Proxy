@@ -5,12 +5,12 @@ import org.koin.core.module.dsl.viewModelOf
 import org.uci.proxy.usage.UsageViewModel
 import org.koin.dsl.bind
 import org.koin.dsl.module
-import org.uci.proxy.quota.QuotaTracker
+import org.uci.proxy.core.quota.QuotaTracker
 import org.uci.proxy.quota.HttpUciQuotaService
-import org.uci.proxy.quota.QuotaMonitor
-import org.uci.proxy.quota.QuotaNotifier
-import org.uci.proxy.quota.QuotaStore
-import org.uci.proxy.quota.UciQuotaService
+import org.uci.proxy.core.quota.QuotaMonitor
+import org.uci.proxy.core.port.QuotaNotifier
+import org.uci.proxy.core.data.QuotaStore
+import org.uci.proxy.core.port.UciQuotaService
 import org.uci.proxy.connection.ConnectionViewModel
 import org.uci.proxy.logs.LogsViewModel
 import org.uci.proxy.profile.ProfileEditorViewModel

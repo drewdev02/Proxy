@@ -1,5 +1,6 @@
-package org.uci.proxy.quota
+package org.uci.proxy.core.quota
 
+import org.uci.proxy.core.model.UciQuota
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

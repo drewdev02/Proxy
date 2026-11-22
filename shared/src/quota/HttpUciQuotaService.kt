@@ -1,5 +1,8 @@
 package org.uci.proxy.quota
 
+import org.uci.proxy.core.port.QuotaFetch
+import org.uci.proxy.core.port.UciQuotaService
+import org.uci.proxy.core.quota.QuotaSoap
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.header
@@ -9,45 +12,6 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import kotlinx.coroutines.CancellationException
-import kotlinx.serialization.Serializable
-
-/** La cuota de navegación de una cuenta de la UCI, tal como la dio el servicio. */
-@Serializable
-data class UciQuota(
-    val assignedMb: Long,
-    val usedMb: Double,
-    /** El nivel de navegación de la cuenta (estudiante, profesor…), tal cual lo da la UCI. */
-    val level: String,
-    /** Cuándo se consultó, en milisegundos desde 1970. */
-    val checkedAtMillis: Long,
-) {
-    /** Cuánto se ha gastado, de 0 a 100 (o más, si el servicio da más de lo asignado). */
-    val percent: Double get() = if (assignedMb <= 0) 0.0 else usedMb * 100 / assignedMb
-
-    val remainingMb: Double get() = (assignedMb - usedMb).coerceAtLeast(0.0)
-}
-
-/** El resultado de una consulta. */
-sealed interface QuotaFetch {
-    data class Success(val assignedMb: Long, val usedMb: Double, val level: String) : QuotaFetch
-
-    /** El servicio rechazó el usuario o la contraseña. */
-    data class WrongCredentials(val message: String) : QuotaFetch
-
-    /** No se llegó al servicio: fuera de la red de la UCI, sin red, o no contestó a tiempo. */
-    data class Unreachable(val message: String) : QuotaFetch
-
-    /** El certificado del servicio no se pudo verificar: quizá es de una autoridad interna de la UCI. */
-    data class UntrustedCertificate(val message: String) : QuotaFetch
-
-    /** Contestó algo que no se entiende: el servicio cambió. */
-    data class ServiceChanged(val message: String) : QuotaFetch
-}
-
-/** Pregunta la cuota de una cuenta de la UCI. */
-fun interface UciQuotaService {
-    suspend fun fetch(account: String, password: String, url: String, verifyCertificate: Boolean): QuotaFetch
-}
 
 /**
  * Un cliente HTTP que va siempre sin proxy (el servicio es de la intranet, como en UCIProxy) y, con [verifyCertificate]

@@ -18,8 +18,8 @@ import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.proxy.ProxyTestResult
 import org.uci.proxy.core.traffic.LiveTraffic
-import org.uci.proxy.quota.QuotaStatus
-import org.uci.proxy.quota.UciQuota
+import org.uci.proxy.core.quota.QuotaStatus
+import org.uci.proxy.core.model.UciQuota
 import org.uci.proxy.ui.Snapshots
 
 /** La pantalla Conexión en cada estado, en móvil y en escritorio, contra sus capturas de referencia. */

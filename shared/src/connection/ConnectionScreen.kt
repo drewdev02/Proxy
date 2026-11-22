@@ -59,7 +59,7 @@ import org.uci.proxy.logs.formatLogTime
 import org.uci.proxy.logs.tone
 import org.uci.proxy.profile.label
 import org.uci.proxy.profile.tone
-import org.uci.proxy.quota.percentText
+import org.uci.proxy.core.quota.percentText
 import org.uci.proxy.quota.tone
 import org.uci.proxy.core.model.QuotaSettings
 import org.uci.proxy.theme.ProxyUciTheme

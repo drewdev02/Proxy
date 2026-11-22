@@ -4,8 +4,8 @@ import kotlin.test.Test
 import org.uci.proxy.core.traffic.TrafficDelta
 import org.uci.proxy.core.traffic.TrafficStore
 import kotlinx.coroutines.flow.MutableStateFlow
-import org.uci.proxy.quota.QuotaStatus
-import org.uci.proxy.quota.QuotaTracker
+import org.uci.proxy.core.quota.QuotaStatus
+import org.uci.proxy.core.quota.QuotaTracker
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull

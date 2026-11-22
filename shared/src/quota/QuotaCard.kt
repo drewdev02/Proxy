@@ -1,5 +1,10 @@
 package org.uci.proxy.quota
 
+import org.uci.proxy.core.model.UciQuota
+import org.uci.proxy.core.quota.QuotaProblem
+import org.uci.proxy.core.quota.QuotaStatus
+import org.uci.proxy.core.quota.mbText
+import org.uci.proxy.core.quota.percentText
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row

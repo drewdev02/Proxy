@@ -16,8 +16,8 @@ import org.uci.proxy.core.model.NamedTraffic
 import org.uci.proxy.core.port.TrafficHistory
 import org.uci.proxy.core.traffic.TrafficRecorder
 import org.uci.proxy.quota.QuotaCardUi
-import org.uci.proxy.quota.QuotaStatus
-import org.uci.proxy.quota.QuotaTracker
+import org.uci.proxy.core.quota.QuotaStatus
+import org.uci.proxy.core.quota.QuotaTracker
 import kotlin.time.Clock
 
 /** Qué días se suman en la pantalla. */

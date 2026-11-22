@@ -11,9 +11,9 @@ import org.uci.proxy.core.traffic.TrafficStore
 import org.uci.proxy.core.model.TrafficUsage
 import org.uci.proxy.fakes.FakeTrafficHistory
 import kotlinx.coroutines.flow.MutableStateFlow
-import org.uci.proxy.quota.QuotaStatus
-import org.uci.proxy.quota.QuotaTracker
-import org.uci.proxy.quota.UciQuota
+import org.uci.proxy.core.quota.QuotaStatus
+import org.uci.proxy.core.quota.QuotaTracker
+import org.uci.proxy.core.model.UciQuota
 import org.uci.proxy.fakes.MainDispatcherTest
 import kotlin.test.Test
 import kotlin.test.assertEquals

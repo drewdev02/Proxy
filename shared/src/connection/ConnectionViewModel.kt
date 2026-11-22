@@ -28,8 +28,8 @@ import org.uci.proxy.core.proxy.ProxyTestResult
 import org.uci.proxy.core.proxy.ProxyTester
 import org.uci.proxy.core.traffic.LiveTraffic
 import org.uci.proxy.core.traffic.TrafficMonitor
-import org.uci.proxy.quota.QuotaStatus
-import org.uci.proxy.quota.QuotaTracker
+import org.uci.proxy.core.quota.QuotaStatus
+import org.uci.proxy.core.quota.QuotaTracker
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 import kotlin.time.measureTimedValue
