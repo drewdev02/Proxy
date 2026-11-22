@@ -1,5 +1,6 @@
 package org.uci.proxy.core.vpn
 
+import kotlinx.coroutines.CancellationException
 import org.uci.proxy.core.model.CountryEngineKind
 import org.uci.proxy.core.model.CountryExitSecrets
 import org.uci.proxy.core.model.CountryExit
@@ -66,7 +67,11 @@ class OpenVpnEngine(
             } catch (e: InvalidCertificateException) {
                 logger.log(LogLevel.ERROR, TAG, e.message.orEmpty())
                 return VpnConnectResult.Failed(TunnelFailure.VPN_PROFILE_INVALID)
-            } catch (e: OpenVpnException) {
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // También un corte del proxy a mitad (TcpException): otro servidor puede responder, y si ninguno lo hace
+                // el túnel debe caer al proxy en vez de romperse.
                 logger.log(LogLevel.WARN, TAG, "Falló el handshake con ${remote.host}:${remote.port}: ${e.message}")
                 handshakeFailed = true
             }

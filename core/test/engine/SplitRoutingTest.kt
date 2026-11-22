@@ -48,6 +48,7 @@ import org.uci.proxy.core.packet.writeInt
 import org.uci.proxy.core.packet.writeU16
 import org.uci.proxy.core.port.ConnectionOwner
 import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.port.TcpException
 import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.profile.AppDispatchers
@@ -68,7 +69,11 @@ private class ScriptedVpnSession : VpnSession {
     var closed = false
         private set
 
+    /** La sesión murió por debajo: escribir lanza, como OpenVPN con la conexión del proxy rota. */
+    var broken = false
+
     override suspend fun writePacket(packet: ByteArray) {
+        if (broken) throw TcpException("conexión con el proxy perdida")
         sent += packet
     }
 
@@ -320,6 +325,30 @@ class SplitRoutingTest {
         assertEquals(TunnelState.Connected("p1"), stateStore.state.value)
         askDns("www.netflix.com", port = 41001)
         assertEquals(1, session.sent.size, "la nueva sesión recibe la consulta")
+    }
+
+    @Test
+    fun `a VPN session that fails to write sends its traffic through the proxy without bringing the tunnel down`() = runTest(UnconfinedTestDispatcher()) {
+        connect()
+        askDns("www.netflix.com")
+        fromVpn(vpnDnsAnswer("www.netflix.com", "52.1.2.3"))
+        val server = parseIpv4("52.1.2.3")!!
+        val first = session
+
+        first.broken = true
+        send(syn(server))
+
+        assertAnsweredByProxyStack(server)
+        assertTrue(first.closed, "se cierra para que el supervisor vea la caída")
+        assertEquals(TunnelState.Connected("p1", vpnDown = true), stateStore.state.value)
+        assertFalse(tun.closed, "el túnel sigue en pie")
+        val written = tun.written.size
+        askDns("www.netflix.com", port = 41001)
+        assertEquals(written + 1, tun.written.size, "contestado con el DNS falso, para ir por el proxy")
+
+        advanceTimeBy(6.seconds)
+        runCurrent()
+        assertEquals(TunnelState.Connected("p1"), stateStore.state.value, "y se reintenta como en cualquier caída")
     }
 
     @Test

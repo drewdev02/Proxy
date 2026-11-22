@@ -100,7 +100,14 @@ class TailscaleEngine(
             tempDir = bridge.tempDir,
             timeoutMs = startTimeoutMs,
         )
-        val started = parse<StartReply>(startBridge(config, proxy))
+        val reply = try {
+            startBridge(config, proxy)
+        } catch (e: Exception) {
+            // Sin esto el proxy local quedaría abierto; el fallo lo trata CountryEngines.
+            proxy.close()
+            throw e
+        }
+        val started = parse<StartReply>(reply)
         drainLogs()
         val handle = started?.handle
         val network = started?.network

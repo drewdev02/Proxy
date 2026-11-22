@@ -1,5 +1,6 @@
 package org.uci.proxy.core.engine
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -95,12 +96,33 @@ class VpnLink(
         unresolvable.clear()
     }
 
-    suspend fun detach() = lock.withLock {
+    suspend fun detach() = lock.withLock { forget() }
+
+    private fun forget() {
         session = null
         pendingDns.clear()
         resolving.values.forEach { it.second.complete(Unit) }
         resolving.clear()
         resolvingHosts.clear()
+    }
+
+    /**
+     * Escribe en [current]; si la sesión murió, la suelta y la cierra (así el supervisor ve la caída y reintenta) para
+     * que lo que iba por ella salga por el proxy en vez de tumbar el bucle del motor.
+     */
+    private suspend fun write(current: VpnSession, bytes: ByteArray): Boolean {
+        try {
+            current.writePacket(bytes)
+            return true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            logger.log(LogLevel.WARN, TAG, "No se pudo escribir en la VPN: ${e.message}. Su tráfico sale por el proxy")
+            // Solo si sigue siendo la misma: el supervisor pudo haber puesto ya otra.
+            val dropped = lock.withLock { (session === current).also { if (it) forget() } }
+            if (dropped) current.close()
+            return false
+        }
     }
 
     /** Cierra la sesión en curso sin esperar al cerrojo, para despertar su lectura al detener el túnel. */
@@ -132,8 +154,7 @@ class VpnLink(
             }
             current to rewriteAddresses(packet, vpnAddress, destination)
         }
-        current.writePacket(translated)
-        return true
+        return write(current, translated)
     }
 
     /**
@@ -148,8 +169,7 @@ class VpnLink(
             current to rewriteAddresses(packet, vpnAddress, vpnDns)
         }
         logger.log(LogLevel.DEBUG, TAG, "DNS por Otro País: $host")
-        current.writePacket(translated)
-        return true
+        return write(current, translated)
     }
 
     /**
@@ -168,7 +188,13 @@ class VpnLink(
             Triple(current, buildUdpPacket(vpnAddress, vpnDns, RESOLVER_PORT, DNS_PORT, buildDnsQuery(name, id)), done)
         }
         logger.log(LogLevel.DEBUG, TAG, "Resolviendo por Otro País: $name")
-        current.writePacket(query)
+        if (!write(current, query)) {
+            lock.withLock {
+                resolvingHosts.remove(name)
+                resolving.entries.removeAll { it.value.first == name }
+            }
+            return
+        }
         val answered = withTimeoutOrNull(timeoutMs) { done.await() } != null
         val failed = lock.withLock {
             resolvingHosts.remove(name)

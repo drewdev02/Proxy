@@ -333,27 +333,31 @@ class TunnelRunner(
                 val requeued = Channel<Ipv4Packet>(REQUEUE_CAPACITY, BufferOverflow.DROP_OLDEST)
                 val local = LocalDnsHandler(localDns, tun, this, logger) { requeued.trySend(it) }
                 val outbound = launch(dispatchers.background) {
-                    while (true) {
-                        val packet = tun.readPacket() ?: break
+                    vpnFailureEnds("enviar") {
                         while (true) {
-                            val waiting = requeued.tryReceive().getOrNull() ?: break
-                            session.writePacket(waiting.bytes)
-                        }
-                        // La VPN solo lleva IPv4: el IPv6 que el sistema intente se descarta, como en el modo directo.
-                        if (packet.isEmpty() || (packet[0].toInt() ushr 4) != 4) continue
-                        val replies = Ipv4Packet.parse(packet)?.let { local.handle(it) }
-                        if (replies == null) {
-                            session.writePacket(packet)
-                            meter.count(RouteExit.VPN, host = null, app = null, up = packet.size.toLong(), down = 0)
-                        } else {
-                            replies.forEach { tun.writePacket(it) }
+                            val packet = tun.readPacket() ?: break
+                            while (true) {
+                                val waiting = requeued.tryReceive().getOrNull() ?: break
+                                session.writePacket(waiting.bytes)
+                            }
+                            // La VPN solo lleva IPv4: el IPv6 que el sistema intente se descarta, como en el modo directo.
+                            if (packet.isEmpty() || (packet[0].toInt() ushr 4) != 4) continue
+                            val replies = Ipv4Packet.parse(packet)?.let { local.handle(it) }
+                            if (replies == null) {
+                                session.writePacket(packet)
+                                meter.count(RouteExit.VPN, host = null, app = null, up = packet.size.toLong(), down = 0)
+                            } else {
+                                replies.forEach { tun.writePacket(it) }
+                            }
                         }
                     }
                 }
                 val inbound = launch {
-                    session.receive {
-                        tun.writePacket(it)
-                        meter.count(RouteExit.VPN, host = null, app = null, up = 0, down = it.size.toLong())
+                    vpnFailureEnds("recibir") {
+                        session.receive {
+                            tun.writePacket(it)
+                            meter.count(RouteExit.VPN, host = null, app = null, up = 0, down = it.size.toLong())
+                        }
                     }
                 }
                 launch { sampleTraffic(meter) }
@@ -377,6 +381,17 @@ class TunnelRunner(
             session.close()
             stateStore.set(TunnelState.Disconnected)
             logger.log(LogLevel.INFO, TAG, "Túnel detenido")
+        }
+    }
+
+    /** Un fallo de la VPN termina ese sentido como si la sesión se cerrara, en vez de propagarse fuera del túnel. */
+    private suspend fun vpnFailureEnds(what: String, block: suspend () -> Unit) {
+        try {
+            block()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            logger.log(LogLevel.WARN, TAG, "La VPN falló al $what: ${e.message}")
         }
     }
 

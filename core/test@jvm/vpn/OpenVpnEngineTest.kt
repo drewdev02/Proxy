@@ -1,6 +1,7 @@
 package org.uci.proxy.core.vpn
 
 import kotlinx.coroutines.test.runTest
+import org.uci.proxy.core.fakes.FakeCountryEngine
 import org.uci.proxy.core.fakes.FakeProxyConnector
 import org.uci.proxy.core.fakes.FakeTunnelConnection
 import org.uci.proxy.core.fakes.RecordingLogger
@@ -9,6 +10,7 @@ import org.uci.proxy.core.model.CountryExitSecrets
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.ProxyProtocol
 import org.uci.proxy.core.port.RandomBytes
+import org.uci.proxy.core.port.TcpException
 import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.proxy.ProxyConnectResult
 import org.uci.proxy.core.proxy.ProxyFailure
@@ -236,6 +238,38 @@ class OpenVpnEngineTest {
         val connector = FakeProxyConnector { ProxyConnectResult.Connected(FakeTunnelConnection().also { it.end() }) }
 
         val result = exit(connector).connect(proxy, "x", start(ovpn(remotes = "remote 192.0.2.10 443")))
+
+        assertEquals(VpnConnectResult.Failed(TunnelFailure.VPN_HANDSHAKE_FAILED), result)
+    }
+
+    @Test
+    fun `a proxy that cuts the connection mid handshake moves on to the next server`() = runTest {
+        val connector = FakeProxyConnector { target ->
+            val connection = FakeTunnelConnection()
+            if (target.port == 443) connection.fail() else connection.end()
+            ProxyConnectResult.Connected(connection)
+        }
+
+        val result = exit(connector).connect(proxy, "x", start(ovpn()))
+
+        assertEquals(listOf(ProxyTarget("192.0.2.10", 443), ProxyTarget("192.0.2.11", 7770)), connector.targets)
+        assertEquals(VpnConnectResult.Failed(TunnelFailure.VPN_HANDSHAKE_FAILED), result)
+    }
+
+    @Test
+    fun `a cut connection with the only server is a failed handshake and not an exception`() = runTest {
+        val connector = FakeProxyConnector { ProxyConnectResult.Connected(FakeTunnelConnection().also { it.fail() }) }
+
+        val result = exit(connector).connect(proxy, "x", start(ovpn(remotes = "remote 192.0.2.10 443")))
+
+        assertEquals(VpnConnectResult.Failed(TunnelFailure.VPN_HANDSHAKE_FAILED), result)
+    }
+
+    @Test
+    fun `an engine that throws is a failure and not an exception for the tunnel`() = runTest {
+        val engines = CountryEngines(listOf(FakeCountryEngine(onConnect = { _, _ -> throw TcpException("conexión con el proxy perdida") })))
+
+        val result = engines.connect(ExitContext(proxy, "x", AppSettings()), start(ovpn()))
 
         assertEquals(VpnConnectResult.Failed(TunnelFailure.VPN_HANDSHAKE_FAILED), result)
     }
