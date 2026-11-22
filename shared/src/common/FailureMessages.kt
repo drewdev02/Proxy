@@ -71,25 +71,61 @@ internal fun TunnelFailure.reasonText(): String = when (this) {
 @Composable
 internal fun TunnelFailure.message(): String = stringResource(Res.string.error_tunnel_failed, reasonText())
 
-/** Si el fallo se arregla cambiando datos del perfil (usuario, contraseña, servidor, archivo .ovpn, nodo de salida). */
-internal val TunnelFailure.isFixedInProfile: Boolean
+/** Lo que la interfaz ofrece para arreglar un fallo, junto a su frase. */
+internal enum class FailureAction {
+    /** Cambiar datos del perfil: usuario, contraseña, servidor, protocolo, archivo .ovpn o nodo de salida. */
+    EDIT_PROFILE,
+
+    /** Probar el proxy, para ver qué le pasa. */
+    TEST_PROXY,
+
+    /** Dar a la app un permiso que se negó (red local). */
+    OPEN_APP_SETTINGS,
+
+    /** Quitar otra VPN que ocupa el sitio. */
+    OPEN_VPN_SETTINGS,
+
+    /** Volver a intentarlo: el fallo puede ser pasajero. */
+    RETRY,
+}
+
+internal val TunnelFailure.action: FailureAction
     get() = when (this) {
         is TunnelFailure.ProxyHostUnresolved,
         TunnelFailure.ProxyAuthRequired,
         TunnelFailure.ProxyAuthFailed,
+        is TunnelFailure.ProxyAuthUnsupported,
         is TunnelFailure.ProxyProtocolMismatch,
         TunnelFailure.VpnSecretsMissing,
         is TunnelFailure.OvpnInvalid,
         TunnelFailure.TailscaleConfigInvalid,
+        TunnelFailure.EngineUnavailable,
         TunnelFailure.VpnServerBlocked,
         TunnelFailure.VpnAuthFailed,
         TunnelFailure.TailscaleKeyExpired,
         is TunnelFailure.ExitNodeNotFound,
         TunnelFailure.ExitNodeNotChosen,
-        -> true
-        is TunnelFailure.ProxyUnreachable -> kind == NetFailure.REFUSED || kind == NetFailure.NAME_NOT_FOUND
-        is TunnelFailure.VpnHandshakeFailed -> issue == VpnHandshakeIssue.SERVER_CERTIFICATE
-        else -> false
+        -> FailureAction.EDIT_PROFILE
+        is TunnelFailure.ProxyUnreachable -> when (kind) {
+            // El puerto o el nombre del perfil están mal; lo demás puede ser la red o el proxy, y la prueba lo dice.
+            NetFailure.REFUSED, NetFailure.NAME_NOT_FOUND, NetFailure.PROTOCOL -> FailureAction.EDIT_PROFILE
+            else -> FailureAction.TEST_PROXY
+        }
+        is TunnelFailure.VpnHandshakeFailed -> when (issue) {
+            VpnHandshakeIssue.SERVER_CERTIFICATE, VpnHandshakeIssue.UNSUPPORTED_CIPHER, VpnHandshakeIssue.UNSUPPORTED_SERVER ->
+                FailureAction.EDIT_PROFILE
+            else -> FailureAction.RETRY
+        }
+        TunnelFailure.LocalNetworkDenied -> FailureAction.OPEN_APP_SETTINGS
+        TunnelFailure.InterfaceUnavailable -> FailureAction.OPEN_VPN_SETTINGS
+        TunnelFailure.VpnPermissionDenied,
+        TunnelFailure.EngineStopped,
+        TunnelFailure.ProfileNotFound,
+        TunnelFailure.NoNetwork,
+        TunnelFailure.VpnServerUnreachable,
+        TunnelFailure.TailscaleBusy,
+        TunnelFailure.EngineInternal,
+        -> FailureAction.RETRY
     }
 
 /** Por qué falló la búsqueda de nodos de salida de Tailscale, contado desde la pantalla de búsqueda. */
@@ -182,3 +218,27 @@ internal fun OvpnConfigError.message(): String = when (this) {
     OvpnConfigError.BadTlsCryptKey -> stringResource(Res.string.error_ovpn_bad_tls_crypt_key)
     OvpnConfigError.InvalidCa -> stringResource(Res.string.error_ovpn_invalid_ca)
 }
+
+/** El código de un resultado fallido de la prueba del proxy, para «Detalles»; null si fue bien. */
+internal val ProxyTestResult.code: String?
+    get() = when (this) {
+        ProxyTestResult.Success -> null
+        ProxyTestResult.Timeout -> "PX-TIMEOUT"
+        is ProxyTestResult.Failure -> when (val failure = failure) {
+            ProxyFailure.AuthRequired -> "PX-AUTH-REQUIRED"
+            ProxyFailure.AuthRejected -> "PX-AUTH"
+            is ProxyFailure.UnsupportedAuth -> "PX-AUTH-SCHEME"
+            is ProxyFailure.Refused -> "PX-REFUSED-${failure.reason.name}"
+            is ProxyFailure.Unreachable -> "PX-NET-${failure.kind.name}"
+            is ProxyFailure.ProtocolError -> "PX-PROTO-${failure.issue.name}"
+        }
+    }
+
+/** Lo que dijo el proxy o el sistema, tal cual, para «Detalles»; null si no hay nada que añadir. */
+internal val ProxyTestResult.technicalDetail: String?
+    get() = when (val failure = (this as? ProxyTestResult.Failure)?.failure) {
+        is ProxyFailure.Refused -> failure.detail
+        is ProxyFailure.Unreachable -> failure.detail
+        is ProxyFailure.ProtocolError -> failure.detail
+        else -> null
+    }?.takeIf { it.isNotBlank() }

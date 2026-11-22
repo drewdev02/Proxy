@@ -96,4 +96,11 @@
     <string name="error_ovpn_invalid_ca">El certificado de la autoridad (&lt;ca&gt;) del archivo está dañado.</string>
     <string name="error_exit_search_key_expired">La clave de autenticación caducó: crea una nueva en la consola de Tailscale.</string>
     <string name="error_exit_search_busy">Ya hay otra sesión de Tailscale abierta en la app. Desconéctala y vuelve a buscar.</string>
+    <string name="failure_details_show">Detalles</string>
+    <string name="failure_details_hide">Ocultar detalles</string>
+    <string name="failure_details_code">Código: %1$s</string>
+    <string name="failure_details_log_hint">El Registro tiene más información.</string>
+    <string name="failure_details_copy">Copiar</string>
+    <string name="failure_action_open_app_settings">Abrir permisos</string>
+    <string name="failure_action_open_vpn_settings">Ajustes de VPN</string>
 </resources>

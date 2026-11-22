@@ -88,4 +88,11 @@
     <string name="error_ovpn_invalid_ca">The file's certificate authority (&lt;ca&gt;) is damaged.</string>
     <string name="error_exit_search_key_expired">The auth key has expired: create a new one in the Tailscale console.</string>
     <string name="error_exit_search_busy">Another Tailscale session is already open in the app. Disconnect it and search again.</string>
+    <string name="failure_details_show">Details</string>
+    <string name="failure_details_hide">Hide details</string>
+    <string name="failure_details_code">Code: %1$s</string>
+    <string name="failure_details_log_hint">The Log has more information.</string>
+    <string name="failure_details_copy">Copy</string>
+    <string name="failure_action_open_app_settings">Open permissions</string>
+    <string name="failure_action_open_vpn_settings">VPN settings</string>
 </resources>

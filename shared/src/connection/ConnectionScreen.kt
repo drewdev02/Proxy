@@ -43,7 +43,13 @@ import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import org.uci.proxy.common.LocalNetworkDeniedForTest
-import org.uci.proxy.common.isFixedInProfile
+import org.uci.proxy.common.FailureAction
+import org.uci.proxy.common.FailureDetails
+import org.uci.proxy.common.SystemSettings
+import org.uci.proxy.common.SystemSettingsPage
+import org.uci.proxy.common.action
+import org.uci.proxy.common.code
+import org.uci.proxy.common.technicalDetail
 import org.uci.proxy.common.message
 import org.uci.proxy.common.percentText
 import org.uci.proxy.common.reasonText
@@ -88,6 +94,8 @@ import org.uci.proxy.ui.components.UciStatusDot
 import org.uci.proxy.ui.components.UciStatusPill
 import org.uci.proxy.ui.components.UciTone
 import org.uci.proxy.ui.icons.UciIcons
+import org.uci.proxy.core.port.code
+import org.koin.compose.koinInject
 
 /** Lo que la pantalla puede pedir a quien la contiene (navegar a otras pantallas). */
 class ConnectionNavigation(
@@ -106,6 +114,7 @@ internal fun ConnectionScreen(
     wide: Boolean,
     navigation: ConnectionNavigation,
     viewModel: ConnectionViewModel = koinViewModel(),
+    systemSettings: SystemSettings = koinInject(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     ConnectionScreen(
@@ -116,6 +125,7 @@ internal fun ConnectionScreen(
             onDisconnect = viewModel::disconnect,
             onSelectProfile = viewModel::selectProfile,
             onTestProxy = viewModel::testProxy,
+            systemSettings = systemSettings,
         ),
         navigation = navigation,
     )
@@ -127,6 +137,8 @@ class ConnectionActions(
     val onDisconnect: () -> Unit = {},
     val onSelectProfile: (String) -> Unit = {},
     val onTestProxy: () -> Unit = {},
+    /** Para llevar a los ajustes del sistema cuando un fallo se arregla allí; None donde no se puede. */
+    val systemSettings: SystemSettings = SystemSettings.None,
 )
 
 /**
@@ -384,18 +396,15 @@ private fun StatusAlerts(state: ConnectionUiState, actions: ConnectionActions, o
         )
     }
     when (val tunnel = state.tunnel) {
-        is TunnelState.Failed -> UciInlineAlert(
-            tunnel.failure.reasonText(),
-            title = stringResource(Res.string.connection_failed_title),
-            tone = UciTone.Danger,
-            action = {
-                if (tunnel.failure.isFixedInProfile) {
-                    UciButton(stringResource(Res.string.connection_edit_profile), onEdit, variant = UciButtonVariant.Text)
-                } else {
-                    UciButton(stringResource(Res.string.connection_retry), actions.onConnect, variant = UciButtonVariant.Text)
-                }
-            },
-        )
+        is TunnelState.Failed -> Column {
+            UciInlineAlert(
+                tunnel.failure.reasonText(),
+                title = stringResource(Res.string.connection_failed_title),
+                tone = UciTone.Danger,
+                action = { FailureActionButton(tunnel.failure.action, actions, onEdit) },
+            )
+            FailureDetails(tunnel.failure.code)
+        }
         is TunnelState.Connected -> when (tunnel.proxyProblem) {
             // Lo más grave primero: con el proxy fallando, no carga nada de lo que pasa por él.
             ProxyProblem.AUTH_REJECTED -> UciInlineAlert(
@@ -413,6 +422,29 @@ private fun StatusAlerts(state: ConnectionUiState, actions: ConnectionActions, o
             null -> ConnectedAlerts(tunnel)
         }
         else -> Unit
+    }
+}
+
+/** El botón que arregla un fallo: editar el perfil, probar el proxy, ir a los ajustes del sistema o reintentar. */
+@Composable
+private fun FailureActionButton(action: FailureAction, actions: ConnectionActions, onEdit: () -> Unit) {
+    val settingsPage = when (action) {
+        FailureAction.OPEN_APP_SETTINGS -> SystemSettingsPage.APP
+        FailureAction.OPEN_VPN_SETTINGS -> SystemSettingsPage.VPN
+        else -> null
+    }
+    when {
+        action == FailureAction.EDIT_PROFILE ->
+            UciButton(stringResource(Res.string.connection_edit_profile), onEdit, variant = UciButtonVariant.Text)
+        action == FailureAction.TEST_PROXY ->
+            UciButton(stringResource(Res.string.connection_test_proxy_action), actions.onTestProxy, variant = UciButtonVariant.Text)
+        settingsPage != null && actions.systemSettings.canOpen(settingsPage) -> UciButton(
+            stringResource(if (settingsPage == SystemSettingsPage.APP) Res.string.failure_action_open_app_settings else Res.string.failure_action_open_vpn_settings),
+            { actions.systemSettings.open(settingsPage) },
+            variant = UciButtonVariant.Text,
+        )
+        // Reintentar, o donde no se puede llevar a los ajustes del sistema.
+        else -> UciButton(stringResource(Res.string.connection_retry), actions.onConnect, variant = UciButtonVariant.Text)
     }
 }
 
@@ -460,8 +492,13 @@ private fun ProxyCheckCard(state: ConnectionUiState, onTest: () -> Unit) {
                     UciStatusPill(stringResource(Res.string.connection_check_ok, check.millis), tone = UciTone.Success, icon = UciIcons.Check)
                     Text(stringResource(Res.string.connection_check_success), style = MaterialTheme.typography.bodyMedium, color = ProxyUciTheme.colors.onSurfaceMuted)
                 }
-                ProxyTestResult.Timeout -> UciInlineAlert(check.result.message(), tone = UciTone.Warning)
-                is ProxyTestResult.Failure -> UciInlineAlert(check.result.message(), tone = UciTone.Danger)
+                ProxyTestResult.Timeout, is ProxyTestResult.Failure -> Column {
+                    UciInlineAlert(
+                        check.result.message(),
+                        tone = if (check.result == ProxyTestResult.Timeout) UciTone.Warning else UciTone.Danger,
+                    )
+                    check.result.code?.let { FailureDetails(it, check.result.technicalDetail) }
+                }
             }
         }
     }

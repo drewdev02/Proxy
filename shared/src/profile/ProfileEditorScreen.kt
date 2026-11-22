@@ -67,6 +67,9 @@ import org.uci.proxy.ui.components.UciTextField
 import org.uci.proxy.ui.components.UciTone
 import org.uci.proxy.ui.components.UciTopBar
 import org.uci.proxy.ui.icons.UciIcons
+import org.uci.proxy.common.FailureDetails
+import org.uci.proxy.common.code
+import org.uci.proxy.common.technicalDetail
 
 /**
  * El editor de perfil a nivel de pantalla: obtiene su ViewModel y pasa solo estado y acciones a la versión sin estado.
@@ -310,14 +313,17 @@ private fun AuthSection(
         when (val test = state.test) {
             ProxyTestUiState.Idle, ProxyTestUiState.Running -> Unit
             ProxyTestUiState.LocalNetworkDenied -> UciInlineAlert(stringResource(LocalNetworkDeniedForTest), tone = UciTone.Warning)
-            is ProxyTestUiState.Finished -> UciInlineAlert(
-                test.result.message(),
-                tone = when (test.result) {
-                    ProxyTestResult.Success -> UciTone.Success
-                    ProxyTestResult.Timeout -> UciTone.Warning
-                    is ProxyTestResult.Failure -> UciTone.Danger
-                },
-            )
+            is ProxyTestUiState.Finished -> Column {
+                UciInlineAlert(
+                    test.result.message(),
+                    tone = when (test.result) {
+                        ProxyTestResult.Success -> UciTone.Success
+                        ProxyTestResult.Timeout -> UciTone.Warning
+                        is ProxyTestResult.Failure -> UciTone.Danger
+                    },
+                )
+                test.result.code?.let { FailureDetails(it, test.result.technicalDetail) }
+            }
         }
         UciDivider()
         UciSwitchRow(
