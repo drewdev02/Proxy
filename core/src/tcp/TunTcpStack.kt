@@ -14,6 +14,7 @@ import org.uci.proxy.core.packet.TcpSegment
 import org.uci.proxy.core.packet.buildTcpPacket
 import org.uci.proxy.core.port.PacketWriter
 import org.uci.proxy.core.port.RandomBytes
+import org.uci.proxy.core.port.NetFailure
 import org.uci.proxy.core.port.TcpException
 
 /*
@@ -409,7 +410,7 @@ class TunTcpConnection internal constructor(
             var waiter: CompletableDeferred<Unit>? = null
 
             stack.locked {
-                if (aborted || localFinQueued) throw TcpException("La conexión de la app ya está cerrada")
+                if (aborted || localFinQueued) throw TcpException(NetFailure.CLOSED, "La conexión de la app ya está cerrada")
 
                 val inFlight = sendNext - sendUnacknowledged
                 var available = peerWindow.coerceIn(0, MAX_WINDOW) - inFlight

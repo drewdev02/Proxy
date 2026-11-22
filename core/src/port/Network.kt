@@ -27,7 +27,64 @@ fun interface TcpConnector {
     suspend fun connect(host: String, port: Int): TcpConnection
 }
 
-class TcpException(message: String, cause: Throwable? = null) : Exception(message, cause)
+/** Por qué falló una conexión TCP, para poder decir algo más útil que «no se pudo conectar». */
+enum class NetFailure {
+    /** El equipo no tiene red: ninguna interfaz con salida. */
+    NO_NETWORK,
+
+    /** El nombre no existe en el DNS, o el DNS no contesta. */
+    NAME_NOT_FOUND,
+
+    /** El equipo existe, pero nadie escucha en ese puerto. */
+    REFUSED,
+
+    /** No contestó a tiempo. */
+    TIMEOUT,
+
+    /** No hay ruta hasta el equipo: está apagado o una red intermedia lo impide. */
+    NO_ROUTE,
+
+    /** El otro lado cortó la conexión de golpe. */
+    RESET,
+
+    /** El otro lado cerró la conexión antes de terminar de responder. */
+    CLOSED,
+
+    /** Respondió algo que no es lo esperado (por ejemplo, no es un proxy HTTP). */
+    PROTOCOL,
+
+    OTHER,
+}
+
+/** Un fallo de red. El mensaje es para el registro; [kind] es lo que la interfaz cuenta. */
+class TcpException(val kind: NetFailure, message: String, cause: Throwable? = null) : Exception(message, cause)
+
+/**
+ * Clasifica una excepción de la librería de red. Cada plataforma lanza tipos distintos (las de `java.net` en JVM y
+ * Android, errores POSIX en iOS), así que se mira el nombre de la clase y el mensaje de cada causa.
+ */
+fun classifyNetworkError(error: Throwable): NetFailure {
+    for (cause in generateSequence(error) { it.cause }.take(MAX_CAUSES)) {
+        if (cause is TcpException) return cause.kind
+        val name = cause::class.simpleName.orEmpty()
+        val message = cause.message.orEmpty().lowercase()
+        fun says(vararg words: String) = words.any { it in message }
+        when {
+            name == "UnknownHostException" || name == "UnresolvedAddressException" ||
+                says("nodename nor servname", "no address associated", "unable to resolve", "name or service not known", "unknown host") ->
+                return NetFailure.NAME_NOT_FOUND
+            says("network is unreachable", "enetunreach", "network is down", "enetdown") -> return NetFailure.NO_NETWORK
+            name == "NoRouteToHostException" || says("no route to host", "host is unreachable", "ehostunreach") -> return NetFailure.NO_ROUTE
+            says("connection refused", "econnrefused") -> return NetFailure.REFUSED
+            name.contains("Timeout") || says("timed out", "etimedout", "timeout") -> return NetFailure.TIMEOUT
+            says("connection reset", "econnreset", "broken pipe", "epipe") -> return NetFailure.RESET
+            name == "ConnectException" -> return NetFailure.REFUSED
+        }
+    }
+    return NetFailure.OTHER
+}
+
+private const val MAX_CAUSES = 8
 
 /** Bytes aleatorios de calidad criptográfica, del generador del sistema. */
 fun interface RandomBytes {

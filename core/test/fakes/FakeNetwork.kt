@@ -2,6 +2,7 @@ package org.uci.proxy.core.fakes
 
 import org.uci.proxy.core.port.TcpConnection
 import org.uci.proxy.core.port.TcpConnector
+import org.uci.proxy.core.port.NetFailure
 import org.uci.proxy.core.port.TcpException
 
 /**
@@ -23,7 +24,7 @@ class FakeConnection(private val onWrite: (ByteArray) -> ByteArray?) : TcpConnec
     }
 
     override suspend fun write(bytes: ByteArray) {
-        if (closedByServer) throw TcpException("conexión cerrada por el servidor")
+        if (closedByServer) throw TcpException(NetFailure.CLOSED, "conexión cerrada por el servidor")
         written += bytes
         val reply = onWrite(bytes)
         if (reply == null) closedByServer = true else if (reply.isNotEmpty()) pending += reply
@@ -53,4 +54,4 @@ class FakeTcpConnector(private val newConnection: (index: Int) -> FakeConnection
 }
 
 /** Un conector que nunca logra conectar. */
-val unreachableConnector = TcpConnector { host, _ -> throw TcpException("no se pudo conectar con $host") }
+val unreachableConnector = TcpConnector { host, _ -> throw TcpException(NetFailure.REFUSED, "no se pudo conectar con $host") }
