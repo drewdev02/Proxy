@@ -1,5 +1,6 @@
 package org.uci.proxy.core.engine
 
+import org.uci.proxy.core.engine.handler.LocalDnsHandler
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelChildren

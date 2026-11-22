@@ -1,5 +1,11 @@
 package org.uci.proxy.core.engine
 
+import org.uci.proxy.core.engine.handler.DnsPacketHandler
+import org.uci.proxy.core.engine.handler.ExitRouterHandler
+import org.uci.proxy.core.engine.handler.LocalDnsHandler
+import org.uci.proxy.core.engine.handler.SplitDnsHandler
+import org.uci.proxy.core.engine.handler.TcpPacketHandler
+import org.uci.proxy.core.engine.handler.UdpRejectHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel

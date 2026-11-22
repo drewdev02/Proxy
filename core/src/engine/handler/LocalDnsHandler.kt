@@ -1,5 +1,6 @@
-package org.uci.proxy.core.engine
+package org.uci.proxy.core.engine.handler
 
+import org.uci.proxy.core.engine.LocalDns
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
@@ -14,9 +15,6 @@ import org.uci.proxy.core.packet.buildUdpPacket
 import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.PacketWriter
-
-/** El DNS de la red local tal como lo usa el túnel: qué nombres le tocan y quién los resuelve. */
-class LocalDns(val policy: LocalDnsPolicy, val resolver: LocalDnsResolver)
 
 /**
  * Atiende las consultas DNS de los nombres de la red local (ver [LocalDnsPolicy]): si el DNS de la red les da una
