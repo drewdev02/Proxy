@@ -60,6 +60,9 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
+import org.uci.proxy.core.vpn.OvpnConfigError
+import org.uci.proxy.core.vpn.VpnHandshakeIssue
+import org.uci.proxy.core.port.NetFailure
 
 class EngineProtocolTest {
     private val profile = ProxyProfile("p1", "UCI", "proxy.uci.cu", 3128, ProxyProtocol.HTTP, "andrey")
@@ -160,13 +163,20 @@ class EngineProtocolTest {
         val viaProxy = TunnelState.Connected("p1", viaProxy = listOf("example.com", "www.google.com"))
         assertEquals(viaProxy, roundTrip(viaProxy))
         assertEquals(TunnelState.Disconnected, roundTrip(TunnelState.Disconnected))
-        TunnelFailure.entries.forEach { assertEquals(TunnelState.Failed(it), roundTrip(TunnelState.Failed(it))) }
+        listOf(
+            TunnelFailure.ProxyAuthFailed,
+            TunnelFailure.ProxyUnreachable(NetFailure.TIMEOUT),
+            TunnelFailure.OvpnInvalid(OvpnConfigError.CompressionNotSupported("lz4-v2")),
+            TunnelFailure.VpnHandshakeFailed(VpnHandshakeIssue.UNSUPPORTED_CIPHER, "BF-CBC"),
+            TunnelFailure.ExitNodeNotFound("casa"),
+        ).forEach { assertEquals(TunnelState.Failed(it), roundTrip(TunnelState.Failed(it))) }
     }
 
     @Test
     fun `connecting is never sent and unknown lines are ignored`() {
         assertNull(EngineProtocol.encodeState(TunnelState.Connecting("p1")))
-        assertNull(EngineProtocol.decodeState("STATE failed ALGO_NUEVO", "p1"))
+        // Un fallo que esta versión no conoce sigue siendo un fallo.
+        assertEquals(TunnelState.Failed(TunnelFailure.EngineInternal), EngineProtocol.decodeState("STATE failed ALGO_NUEVO", "p1"))
         assertNull(EngineProtocol.decodeState("cualquier cosa", "p1"))
     }
 }
@@ -248,7 +258,7 @@ class DesktopTunnelIntegrationTest {
     private val nameForwarder = EngineNameForwarder()
     private val windowNameStatus = java.util.concurrent.CopyOnWriteArrayList<Pair<String, NameOutcome>>()
     private var receivedVpn: Triple<ProxyProfile, String, CountryExitStart>? = null
-    private var vpnResult: VpnConnectResult = VpnConnectResult.Failed(TunnelFailure.VPN_AUTH_FAILED)
+    private var vpnResult: VpnConnectResult = VpnConnectResult.Failed(TunnelFailure.VpnAuthFailed)
     private var receivedHost: String? = null
     private var engineMaxDuration: Duration? = null
 
@@ -322,7 +332,7 @@ class DesktopTunnelIntegrationTest {
         assertEquals("proxypass", proxyPassword)
         assertEquals(CountryExitStart(withVpn.countryExit!!, CountryExitSecrets.OpenVpn("client\n", "vpnpass")), vpn)
         assertEquals("10.8.0.20", proxy.host, "el motor resolvió el proxy antes de abrir la VPN")
-        assertEquals(TunnelState.Failed(TunnelFailure.VPN_AUTH_FAILED), state)
+        assertEquals(TunnelState.Failed(TunnelFailure.VpnAuthFailed), state)
     }
 
     @Test
@@ -332,7 +342,7 @@ class DesktopTunnelIntegrationTest {
 
         controller.connect(withVpn.id)
 
-        assertEquals(TunnelState.Failed(TunnelFailure.VPN_PROFILE_INVALID), controller.state.value)
+        assertEquals(TunnelState.Failed(TunnelFailure.VpnSecretsMissing), controller.state.value)
         assertNull(receivedVpn)
         assertNull(tokenFileSeen, "no se lanzó el motor, que pediría privilegios para nada")
     }
@@ -425,7 +435,7 @@ class DesktopTunnelIntegrationTest {
 
         controller.connect(profile.id)
 
-        assertEquals(TunnelState.Failed(TunnelFailure.INTERFACE_UNAVAILABLE), awaitState { it is TunnelState.Failed })
+        assertEquals(TunnelState.Failed(TunnelFailure.InterfaceUnavailable), awaitState { it is TunnelState.Failed })
     }
 
     @Test
@@ -442,7 +452,7 @@ class DesktopTunnelIntegrationTest {
 
         controller.connect(profile.id)
 
-        assertEquals(TunnelState.Failed(TunnelFailure.VPN_PERMISSION_DENIED), awaitState { it is TunnelState.Failed })
+        assertEquals(TunnelState.Failed(TunnelFailure.VpnPermissionDenied), awaitState { it is TunnelState.Failed })
     }
 
     @Test
@@ -489,7 +499,7 @@ class DesktopTunnelIntegrationTest {
 
         controller.connect("no-existe")
 
-        assertEquals(TunnelState.Failed(TunnelFailure.PROFILE_NOT_FOUND), controller.state.value)
+        assertEquals(TunnelState.Failed(TunnelFailure.ProfileNotFound), controller.state.value)
         assertFalse(launched)
     }
 

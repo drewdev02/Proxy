@@ -96,14 +96,14 @@ class TunnelRunner(
     suspend fun run(platformTunnel: PlatformTunnel, profileId: String, settings: AppSettings = AppSettings()) {
         val profile = profiles.profiles.value.firstOrNull { it.id == profileId }
         if (profile == null) {
-            stateStore.set(TunnelState.Failed(TunnelFailure.PROFILE_NOT_FOUND))
+            stateStore.set(TunnelState.Failed(TunnelFailure.ProfileNotFound))
             return
         }
         val exit = profile.countryExit
         val start = if (exit == null) null else profiles.exitSecrets(profileId)?.let { CountryExitStart(exit, it, stateDirectories.forProfile(profileId)) }
         if (exit != null && start == null) {
             logger.log(LogLevel.ERROR, TAG, "El perfil sale por Otro País pero no se pudieron leer sus secretos")
-            stateStore.set(TunnelState.Failed(TunnelFailure.VPN_PROFILE_INVALID))
+            stateStore.set(TunnelState.Failed(TunnelFailure.VpnSecretsMissing))
             return
         }
         run(platformTunnel, profile, profiles.password(profileId), settings, start)
@@ -125,7 +125,7 @@ class TunnelRunner(
         val proxyAddress = hostResolver.resolveIpv4(profile.host)
         if (proxyAddress == null) {
             logger.log(LogLevel.ERROR, TAG, "No se pudo resolver el proxy ${profile.host}")
-            stateStore.set(TunnelState.Failed(TunnelFailure.PROXY_HOST_UNRESOLVED))
+            stateStore.set(TunnelState.Failed(TunnelFailure.ProxyHostUnresolved(profile.host)))
             return
         }
         val resolvedProfile = profile.copy(host = proxyAddress)
@@ -166,7 +166,7 @@ class TunnelRunner(
         } catch (e: TunnelUnavailableException) {
             logger.log(LogLevel.ERROR, TAG, "No se pudo crear la interfaz: ${e.message}")
             firstSession?.close()
-            stateStore.set(TunnelState.Failed(TunnelFailure.INTERFACE_UNAVAILABLE))
+            stateStore.set(TunnelState.Failed(TunnelFailure.InterfaceUnavailable))
             return
         }
 
@@ -316,7 +316,7 @@ class TunnelRunner(
         } catch (e: TunnelUnavailableException) {
             logger.log(LogLevel.ERROR, TAG, "No se pudo crear la interfaz: ${e.message}")
             session.close()
-            stateStore.set(TunnelState.Failed(TunnelFailure.INTERFACE_UNAVAILABLE))
+            stateStore.set(TunnelState.Failed(TunnelFailure.InterfaceUnavailable))
             return
         }
 

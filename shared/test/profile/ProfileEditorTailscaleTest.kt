@@ -153,7 +153,7 @@ class ProfileEditorTailscaleTest : MainDispatcherTest() {
 
     @Test
     fun `a search rejected by the network explains why`() {
-        catalog.listing = ExitNodeListing.Failed(TunnelFailure.VPN_AUTH_FAILED, "invalid key")
+        catalog.listing = ExitNodeListing.Failed(TunnelFailure.VpnAuthFailed, "invalid key")
         val viewModel = newViewModel()
         viewModel.tailscaleProfile()
 

@@ -265,7 +265,7 @@ class TunnelRunnerTest {
 
         runner.run(platformTunnel, PROFILE.id)
 
-        assertEquals(TunnelState.Failed(TunnelFailure.PROXY_HOST_UNRESOLVED), stateStore.state.value)
+        assertEquals(TunnelState.Failed(TunnelFailure.ProxyHostUnresolved(PROFILE.host)), stateStore.state.value)
         assertEquals(null, platformTunnel.config)
     }
 
@@ -356,7 +356,7 @@ class TunnelRunnerTest {
 
         runner.run(platformTunnel, "no-existe")
 
-        assertEquals(TunnelState.Failed(TunnelFailure.PROFILE_NOT_FOUND), stateStore.state.value)
+        assertEquals(TunnelState.Failed(TunnelFailure.ProfileNotFound), stateStore.state.value)
         assertEquals(null, platformTunnel.config)
     }
 
@@ -368,6 +368,6 @@ class TunnelRunnerTest {
 
         runner.run(platformTunnel, PROFILE.id)
 
-        assertEquals(TunnelState.Failed(TunnelFailure.INTERFACE_UNAVAILABLE), stateStore.state.value)
+        assertEquals(TunnelState.Failed(TunnelFailure.InterfaceUnavailable), stateStore.state.value)
     }
 }

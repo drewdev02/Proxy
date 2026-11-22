@@ -44,15 +44,33 @@ interface CountryEngine {
     suspend fun connect(context: ExitContext, start: CountryExitStart): VpnConnectResult
 
     /** Si un fallo no se arregla reintentando (credenciales o configuración malas): el túnel deja de reintentar. */
-    fun isPermanent(failure: TunnelFailure): Boolean = failure in PERMANENT_FAILURES
+    fun isPermanent(failure: TunnelFailure): Boolean = isPermanentFailure(failure)
 
     companion object {
-        val PERMANENT_FAILURES = setOf(
-            TunnelFailure.VPN_AUTH_FAILED,
-            TunnelFailure.VPN_PROFILE_INVALID,
-            TunnelFailure.PROXY_AUTH_FAILED,
-            TunnelFailure.EXIT_NODE_NOT_FOUND,
-            TunnelFailure.ENGINE_UNAVAILABLE,
+        /** Lo que no cambia por volver a intentarlo: credenciales, configuración o algo que el servidor no admite. */
+        fun isPermanentFailure(failure: TunnelFailure): Boolean = when (failure) {
+            TunnelFailure.VpnAuthFailed,
+            TunnelFailure.TailscaleKeyExpired,
+            TunnelFailure.VpnSecretsMissing,
+            is TunnelFailure.OvpnInvalid,
+            TunnelFailure.TailscaleConfigInvalid,
+            TunnelFailure.ProxyAuthFailed,
+            TunnelFailure.ProxyAuthRequired,
+            is TunnelFailure.ProxyAuthUnsupported,
+            is TunnelFailure.ProxyProtocolMismatch,
+            is TunnelFailure.ExitNodeNotFound,
+            TunnelFailure.ExitNodeNotChosen,
+            TunnelFailure.EngineUnavailable,
+            -> true
+            is TunnelFailure.VpnHandshakeFailed -> failure.issue in PERMANENT_HANDSHAKE_ISSUES
+            else -> false
+        }
+
+        private val PERMANENT_HANDSHAKE_ISSUES = setOf(
+            VpnHandshakeIssue.SERVER_CERTIFICATE,
+            VpnHandshakeIssue.UNSUPPORTED_CIPHER,
+            VpnHandshakeIssue.UNSUPPORTED_SERVER,
+            VpnHandshakeIssue.UNAVAILABLE,
         )
     }
 }
@@ -69,12 +87,12 @@ class CountryEngines(engines: List<CountryEngine>) {
 
     /** Abre la sesión con el motor de la salida, o falla con un motivo claro si no está disponible. */
     suspend fun connect(context: ExitContext, start: CountryExitStart): VpnConnectResult {
-        val engine = get(start.exit.kind) ?: return VpnConnectResult.Failed(TunnelFailure.ENGINE_UNAVAILABLE)
+        val engine = get(start.exit.kind) ?: return VpnConnectResult.Failed(TunnelFailure.EngineUnavailable)
         return engine.connect(context, start)
     }
 
     fun isPermanent(kind: CountryEngineKind, failure: TunnelFailure): Boolean =
-        byKind[kind]?.isPermanent(failure) ?: (failure in CountryEngine.PERMANENT_FAILURES)
+        byKind[kind]?.isPermanent(failure) ?: CountryEngine.isPermanentFailure(failure)
 
     companion object {
         val None = CountryEngines(emptyList())

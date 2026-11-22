@@ -6,15 +6,13 @@
     <string name="error_tunnel_vpn_permission_denied">Hace falta autorizar la conexión VPN.</string>
     <string name="error_tunnel_local_network_denied">La app necesita permiso para acceder a la red local y alcanzar el proxy.</string>
     <string name="error_tunnel_profile_not_found">El perfil ya no existe.</string>
-    <string name="error_tunnel_interface_unavailable">El sistema no permitió crear la conexión VPN.</string>
-    <string name="error_tunnel_proxy_host_unresolved">No se encuentra el servidor del perfil.</string>
+    <string name="error_tunnel_interface_unavailable">El sistema no permitió crear la conexión VPN. Si otra app tiene una VPN siempre activa, desactívala y vuelve a intentarlo.</string>
+    <string name="error_tunnel_proxy_host_unresolved">No se encuentra el servidor del proxy «%1$s»: revisa su nombre o que estés en la red correcta.</string>
     <string name="error_tunnel_proxy_auth_failed">El proxy rechazó el usuario o la contraseña.</string>
-    <string name="error_tunnel_vpn_profile_invalid">La configuración de Otro País no sirve (el archivo .ovpn debe ser OpenVPN sobre TCP; la dirección del servidor de Tailscale debe ser válida). Revísala en el perfil.</string>
-    <string name="error_tunnel_vpn_server_unreachable">El proxy no dejó llegar al servidor de Otro País.</string>
+    <string name="error_tunnel_vpn_server_unreachable">No se pudo llegar al servidor de Otro País a través del proxy: no responde o el proxy no llega a él.</string>
     <string name="error_tunnel_vpn_server_blocked">La política del proxy bloqueó el acceso a los servidores de Otro País. Con OpenVPN, prueba con otro servidor, uno con puerto 443.</string>
     <string name="error_tunnel_vpn_auth_failed">Otro País rechazó las credenciales (usuario y contraseña de la VPN, o clave de Tailscale).</string>
-    <string name="error_tunnel_vpn_handshake_failed">El servidor de Otro País no completó la conexión.</string>
-    <string name="error_tunnel_exit_node_not_found">El nodo de salida de Tailscale no existe en la red, o hay varios y no se eligió ninguno.</string>
+    <string name="error_tunnel_exit_node_not_found">El nodo de salida «%1$s» no existe en la red de Tailscale. Elige otro en el perfil.</string>
     <string name="error_tunnel_engine_unavailable">El motor de Otro País del perfil no está disponible en este equipo.</string>
 
     <!-- La prueba del proxy. El detalle (%1$s) es técnico y sale tal cual: una línea de estado HTTP, un código SOCKS… -->
@@ -74,7 +72,28 @@
     <string name="error_exit_search_server_unreachable">No se pudo llegar al servidor de control a través del proxy.</string>
     <string name="error_exit_search_engine_unavailable">Tailscale no está disponible en este equipo.</string>
     <string name="error_exit_search_invalid_server">La dirección del servidor de control no es válida.</string>
-    <string name="error_exit_search_other">No se pudo buscar los nodos de salida (puede que haya otra sesión de Tailscale abierta).</string>
+    <string name="error_exit_search_other">No se pudo buscar los nodos de salida.</string>
     <string name="error_exit_search_no_nodes">La red no tiene ningún nodo de salida.</string>
     <string name="error_exit_search_failed">No se pudo buscar los nodos de salida.</string>
+    <string name="error_tunnel_engine_stopped">El motor del túnel se detuvo inesperadamente. Vuelve a conectar; si se repite, mira el Registro.</string>
+    <string name="error_tunnel_no_network">No hay conexión a la red. Conéctate a una red y vuelve a intentarlo.</string>
+    <string name="error_tunnel_proxy_auth_required">El proxy pide usuario y contraseña, y el perfil no tiene.</string>
+    <string name="error_tunnel_vpn_secrets_missing">No se pudieron leer los datos guardados de Otro País (el archivo .ovpn, la contraseña o la clave). Vuelve a ponerlos en el perfil.</string>
+    <string name="error_tunnel_ovpn_invalid">El archivo .ovpn del perfil no sirve. %1$s</string>
+    <string name="error_tunnel_tailscale_config_invalid">La dirección del servidor de control de Tailscale no es válida. Revísala en el perfil.</string>
+    <string name="error_tunnel_tailscale_key_expired">La clave de autenticación de Tailscale caducó. Crea una nueva en la consola de Tailscale y ponla en el perfil.</string>
+    <string name="error_tunnel_handshake_timeout">El servidor de Otro País no respondió a tiempo.</string>
+    <string name="error_tunnel_handshake_closed">El servidor de Otro País cerró la conexión antes de terminar de conectar.</string>
+    <string name="error_tunnel_handshake_server_certificate">El servidor de Otro País no es el que espera el archivo .ovpn: su certificado no lo firma la autoridad del perfil.</string>
+    <string name="error_tunnel_handshake_tls">Falló la conexión segura (TLS) con el servidor de Otro País.</string>
+    <string name="error_tunnel_handshake_cipher">El servidor de Otro País usa el cifrado %1$s, que la app no admite (solo AES-GCM).</string>
+    <string name="error_tunnel_handshake_unsupported">El servidor de Otro País usa una opción de OpenVPN que la app no admite.</string>
+    <string name="error_tunnel_handshake_session_ended">El servidor de Otro País terminó la sesión.</string>
+    <string name="error_tunnel_handshake_session_ended_reason">El servidor de Otro País terminó la sesión: %1$s.</string>
+    <string name="error_tunnel_tailscale_busy">Ya hay una sesión de Tailscale abierta en la app. Espera a que termine la búsqueda de nodos y vuelve a conectar.</string>
+    <string name="error_tunnel_exit_node_not_chosen">La red de Tailscale tiene varios nodos de salida: elige uno en el perfil.</string>
+    <string name="error_tunnel_engine_internal">Falló el motor de Otro País. Vuelve a conectar; si se repite, mira el Registro.</string>
+    <string name="error_ovpn_invalid_ca">El certificado de la autoridad (&lt;ca&gt;) del archivo está dañado.</string>
+    <string name="error_exit_search_key_expired">La clave de autenticación caducó: crea una nueva en la consola de Tailscale.</string>
+    <string name="error_exit_search_busy">Ya hay otra sesión de Tailscale abierta en la app. Desconéctala y vuelve a buscar.</string>
 </resources>

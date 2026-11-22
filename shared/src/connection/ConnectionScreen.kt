@@ -46,7 +46,7 @@ import org.uci.proxy.common.LocalNetworkDeniedForTest
 import org.uci.proxy.common.isFixedInProfile
 import org.uci.proxy.common.message
 import org.uci.proxy.common.percentText
-import org.uci.proxy.common.reason
+import org.uci.proxy.common.reasonText
 import org.uci.proxy.core.log.LogEntry
 import org.uci.proxy.core.model.CountryExit
 import org.uci.proxy.core.model.ProxyProfile
@@ -382,7 +382,7 @@ private fun StatusAlerts(state: ConnectionUiState, actions: ConnectionActions, o
     }
     when (val tunnel = state.tunnel) {
         is TunnelState.Failed -> UciInlineAlert(
-            stringResource(tunnel.failure.reason),
+            tunnel.failure.reasonText(),
             title = stringResource(Res.string.connection_failed_title),
             tone = UciTone.Danger,
             action = {
@@ -576,7 +576,7 @@ private fun ConnectionScreenPhonePreview() {
 @Preview(widthDp = 412, heightDp = 900)
 @Composable
 private fun ConnectionScreenFailedPreview() {
-    ProxyUciTheme { ConnectionScreen(previewState.copy(tunnel = TunnelState.Failed(TunnelFailure.PROXY_AUTH_FAILED)), wide = false) }
+    ProxyUciTheme { ConnectionScreen(previewState.copy(tunnel = TunnelState.Failed(TunnelFailure.ProxyAuthFailed)), wide = false) }
 }
 
 @Preview(widthDp = 1100, heightDp = 760)

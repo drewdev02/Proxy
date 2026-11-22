@@ -115,7 +115,8 @@ object EngineProtocol {
             // Los nombres no llevan espacios ni comas: van en una sola palabra.
             (if (state.viaProxy.isNotEmpty()) " $VIA_PROXY" + state.viaProxy.joinToString(",") else "")
         TunnelState.Disconnected -> STATE_PREFIX + "disconnected"
-        is TunnelState.Failed -> STATE_PREFIX + "failed " + state.failure.name
+        // El fallo lleva datos (el servidor, el cifrado…): va en JSON, que no tiene saltos de línea.
+        is TunnelState.Failed -> STATE_PREFIX + "failed " + json.encodeToString(TunnelFailure.serializer(), state.failure)
         is TunnelState.Connecting -> null
     }
 
@@ -130,7 +131,14 @@ object EngineProtocol {
                 viaProxy = parts.firstOrNull { it.startsWith(VIA_PROXY) }?.removePrefix(VIA_PROXY)?.split(',')?.filter { it.isNotEmpty() }.orEmpty(),
             )
             "disconnected" -> TunnelState.Disconnected
-            "failed" -> TunnelFailure.entries.firstOrNull { it.name == parts.getOrNull(1) }?.let(TunnelState::Failed)
+            "failed" -> try {
+                TunnelState.Failed(json.decodeFromString(TunnelFailure.serializer(), line.removePrefix(STATE_PREFIX).removePrefix("failed ")))
+            } catch (_: kotlinx.serialization.SerializationException) {
+                // Un motor de otra versión con un fallo que esta no conoce: al menos se dice que falló.
+                TunnelState.Failed(TunnelFailure.EngineInternal)
+            } catch (_: IllegalArgumentException) {
+                TunnelState.Failed(TunnelFailure.EngineInternal)
+            }
             else -> null
         }
     }

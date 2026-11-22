@@ -10,6 +10,7 @@ import org.uci.proxy.core.proxy.ProxyFailure
 import org.uci.proxy.core.proxy.RefusalReason
 import org.uci.proxy.core.proxy.ProxyTestResult
 import org.uci.proxy.core.vpn.OvpnConfigError
+import org.uci.proxy.core.vpn.VpnHandshakeIssue
 import org.uci.proxy.resources.Res
 import org.uci.proxy.resources.*
 
@@ -20,50 +21,88 @@ import org.uci.proxy.resources.*
  * Los `when` no tienen `else`: un fallo nuevo en el núcleo no compila hasta que tenga su texto.
  */
 
-/** Por qué falló la conexión del túnel, como frase completa. */
-internal val TunnelFailure.reason: StringResource
-    get() = when (this) {
-        TunnelFailure.VPN_PERMISSION_DENIED -> Res.string.error_tunnel_vpn_permission_denied
-        TunnelFailure.LOCAL_NETWORK_DENIED -> Res.string.error_tunnel_local_network_denied
-        TunnelFailure.PROFILE_NOT_FOUND -> Res.string.error_tunnel_profile_not_found
-        TunnelFailure.INTERFACE_UNAVAILABLE -> Res.string.error_tunnel_interface_unavailable
-        TunnelFailure.PROXY_HOST_UNRESOLVED -> Res.string.error_tunnel_proxy_host_unresolved
-        TunnelFailure.PROXY_AUTH_FAILED -> Res.string.error_tunnel_proxy_auth_failed
-        TunnelFailure.VPN_PROFILE_INVALID -> Res.string.error_tunnel_vpn_profile_invalid
-        TunnelFailure.VPN_SERVER_UNREACHABLE -> Res.string.error_tunnel_vpn_server_unreachable
-        TunnelFailure.VPN_SERVER_BLOCKED -> Res.string.error_tunnel_vpn_server_blocked
-        TunnelFailure.VPN_AUTH_FAILED -> Res.string.error_tunnel_vpn_auth_failed
-        TunnelFailure.VPN_HANDSHAKE_FAILED -> Res.string.error_tunnel_vpn_handshake_failed
-        TunnelFailure.EXIT_NODE_NOT_FOUND -> Res.string.error_tunnel_exit_node_not_found
-        TunnelFailure.ENGINE_UNAVAILABLE -> Res.string.error_tunnel_engine_unavailable
+/** Por qué falló la conexión del túnel, como frase completa que dice qué pasó y, si se sabe, qué hacer. */
+@Composable
+internal fun TunnelFailure.reasonText(): String = when (this) {
+    TunnelFailure.VpnPermissionDenied -> stringResource(Res.string.error_tunnel_vpn_permission_denied)
+    TunnelFailure.LocalNetworkDenied -> stringResource(Res.string.error_tunnel_local_network_denied)
+    TunnelFailure.InterfaceUnavailable -> stringResource(Res.string.error_tunnel_interface_unavailable)
+    TunnelFailure.EngineStopped -> stringResource(Res.string.error_tunnel_engine_stopped)
+    TunnelFailure.ProfileNotFound -> stringResource(Res.string.error_tunnel_profile_not_found)
+    TunnelFailure.NoNetwork -> stringResource(Res.string.error_tunnel_no_network)
+    is TunnelFailure.ProxyHostUnresolved -> stringResource(Res.string.error_tunnel_proxy_host_unresolved, host)
+    is TunnelFailure.ProxyUnreachable -> stringResource(kind.proxyReason)
+    TunnelFailure.ProxyAuthRequired -> stringResource(Res.string.error_tunnel_proxy_auth_required)
+    TunnelFailure.ProxyAuthFailed -> stringResource(Res.string.error_tunnel_proxy_auth_failed)
+    is TunnelFailure.ProxyAuthUnsupported ->
+        if (schemes.isEmpty()) {
+            stringResource(Res.string.error_proxy_unsupported_auth)
+        } else {
+            stringResource(Res.string.error_proxy_unsupported_auth_schemes, schemes.joinToString())
+        }
+    is TunnelFailure.ProxyProtocolMismatch -> stringResource(Res.string.error_proxy_protocol_mismatch, stringResource(issue.text))
+    TunnelFailure.VpnSecretsMissing -> stringResource(Res.string.error_tunnel_vpn_secrets_missing)
+    is TunnelFailure.OvpnInvalid -> stringResource(Res.string.error_tunnel_ovpn_invalid, error.message())
+    TunnelFailure.TailscaleConfigInvalid -> stringResource(Res.string.error_tunnel_tailscale_config_invalid)
+    TunnelFailure.EngineUnavailable -> stringResource(Res.string.error_tunnel_engine_unavailable)
+    TunnelFailure.VpnServerUnreachable -> stringResource(Res.string.error_tunnel_vpn_server_unreachable)
+    TunnelFailure.VpnServerBlocked -> stringResource(Res.string.error_tunnel_vpn_server_blocked)
+    TunnelFailure.VpnAuthFailed -> stringResource(Res.string.error_tunnel_vpn_auth_failed)
+    TunnelFailure.TailscaleKeyExpired -> stringResource(Res.string.error_tunnel_tailscale_key_expired)
+    is TunnelFailure.VpnHandshakeFailed -> when (issue) {
+        VpnHandshakeIssue.TIMEOUT -> stringResource(Res.string.error_tunnel_handshake_timeout)
+        VpnHandshakeIssue.CLOSED -> stringResource(Res.string.error_tunnel_handshake_closed)
+        VpnHandshakeIssue.SERVER_CERTIFICATE -> stringResource(Res.string.error_tunnel_handshake_server_certificate)
+        VpnHandshakeIssue.TLS_FAILED -> stringResource(Res.string.error_tunnel_handshake_tls)
+        VpnHandshakeIssue.UNSUPPORTED_CIPHER -> stringResource(Res.string.error_tunnel_handshake_cipher, subject ?: "?")
+        VpnHandshakeIssue.UNSUPPORTED_SERVER -> stringResource(Res.string.error_tunnel_handshake_unsupported)
+        VpnHandshakeIssue.SESSION_ENDED ->
+            subject?.let { stringResource(Res.string.error_tunnel_handshake_session_ended_reason, it) }
+                ?: stringResource(Res.string.error_tunnel_handshake_session_ended)
+        VpnHandshakeIssue.UNAVAILABLE -> stringResource(Res.string.error_tunnel_engine_unavailable)
     }
+    TunnelFailure.TailscaleBusy -> stringResource(Res.string.error_tunnel_tailscale_busy)
+    is TunnelFailure.ExitNodeNotFound -> stringResource(Res.string.error_tunnel_exit_node_not_found, name)
+    TunnelFailure.ExitNodeNotChosen -> stringResource(Res.string.error_tunnel_exit_node_not_chosen)
+    TunnelFailure.EngineInternal -> stringResource(Res.string.error_tunnel_engine_internal)
+}
 
 /** La frase completa: «No se pudo conectar. …». */
 @Composable
-internal fun TunnelFailure.message(): String = stringResource(Res.string.error_tunnel_failed, stringResource(reason))
+internal fun TunnelFailure.message(): String = stringResource(Res.string.error_tunnel_failed, reasonText())
 
-/** Si el fallo se arregla cambiando datos del perfil (usuario, contraseña, servidor, archivo .ovpn). */
+/** Si el fallo se arregla cambiando datos del perfil (usuario, contraseña, servidor, archivo .ovpn, nodo de salida). */
 internal val TunnelFailure.isFixedInProfile: Boolean
     get() = when (this) {
-        TunnelFailure.PROXY_HOST_UNRESOLVED,
-        TunnelFailure.PROXY_AUTH_FAILED,
-        TunnelFailure.VPN_PROFILE_INVALID,
-        TunnelFailure.VPN_SERVER_BLOCKED,
-        TunnelFailure.VPN_AUTH_FAILED,
-        TunnelFailure.EXIT_NODE_NOT_FOUND,
+        is TunnelFailure.ProxyHostUnresolved,
+        TunnelFailure.ProxyAuthRequired,
+        TunnelFailure.ProxyAuthFailed,
+        is TunnelFailure.ProxyProtocolMismatch,
+        TunnelFailure.VpnSecretsMissing,
+        is TunnelFailure.OvpnInvalid,
+        TunnelFailure.TailscaleConfigInvalid,
+        TunnelFailure.VpnServerBlocked,
+        TunnelFailure.VpnAuthFailed,
+        TunnelFailure.TailscaleKeyExpired,
+        is TunnelFailure.ExitNodeNotFound,
+        TunnelFailure.ExitNodeNotChosen,
         -> true
+        is TunnelFailure.ProxyUnreachable -> kind == NetFailure.REFUSED || kind == NetFailure.NAME_NOT_FOUND
+        is TunnelFailure.VpnHandshakeFailed -> issue == VpnHandshakeIssue.SERVER_CERTIFICATE
         else -> false
     }
 
 /** Por qué falló la búsqueda de nodos de salida de Tailscale, contado desde la pantalla de búsqueda. */
 internal val TunnelFailure.exitSearchReason: StringResource
     get() = when (this) {
-        TunnelFailure.VPN_AUTH_FAILED -> Res.string.error_exit_search_vpn_auth_failed
-        TunnelFailure.PROXY_AUTH_FAILED -> Res.string.error_exit_search_proxy_auth_failed
-        TunnelFailure.VPN_SERVER_BLOCKED -> Res.string.error_exit_search_server_blocked
-        TunnelFailure.VPN_SERVER_UNREACHABLE -> Res.string.error_exit_search_server_unreachable
-        TunnelFailure.ENGINE_UNAVAILABLE -> Res.string.error_exit_search_engine_unavailable
-        TunnelFailure.VPN_PROFILE_INVALID -> Res.string.error_exit_search_invalid_server
+        TunnelFailure.VpnAuthFailed -> Res.string.error_exit_search_vpn_auth_failed
+        TunnelFailure.TailscaleKeyExpired -> Res.string.error_exit_search_key_expired
+        TunnelFailure.ProxyAuthFailed -> Res.string.error_exit_search_proxy_auth_failed
+        TunnelFailure.VpnServerBlocked -> Res.string.error_exit_search_server_blocked
+        TunnelFailure.VpnServerUnreachable -> Res.string.error_exit_search_server_unreachable
+        TunnelFailure.EngineUnavailable -> Res.string.error_exit_search_engine_unavailable
+        TunnelFailure.TailscaleConfigInvalid -> Res.string.error_exit_search_invalid_server
+        TunnelFailure.TailscaleBusy -> Res.string.error_exit_search_busy
         else -> Res.string.error_exit_search_other
     }
 
@@ -141,4 +180,5 @@ internal fun OvpnConfigError.message(): String = when (this) {
     OvpnConfigError.MissingCa -> stringResource(Res.string.error_ovpn_missing_ca)
     OvpnConfigError.MissingTlsCrypt -> stringResource(Res.string.error_ovpn_missing_tls_crypt)
     OvpnConfigError.BadTlsCryptKey -> stringResource(Res.string.error_ovpn_bad_tls_crypt_key)
+    OvpnConfigError.InvalidCa -> stringResource(Res.string.error_ovpn_invalid_ca)
 }

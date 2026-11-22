@@ -205,12 +205,12 @@ class TunnelVpnTest {
 
     @Test
     fun `a failure opening the VPN is reported and no interface is created`() = runTest {
-        result = VpnConnectResult.Failed(TunnelFailure.VPN_AUTH_FAILED)
+        result = VpnConnectResult.Failed(TunnelFailure.VpnAuthFailed)
         val (runner, _) = newRunner()
 
         runner.run(platformTunnel, profile, "x", vpn = start)
 
-        assertEquals(TunnelState.Failed(TunnelFailure.VPN_AUTH_FAILED), stateStore.state.value)
+        assertEquals(TunnelState.Failed(TunnelFailure.VpnAuthFailed), stateStore.state.value)
         assertNull(platformTunnel.config)
     }
 
@@ -221,7 +221,7 @@ class TunnelVpnTest {
 
         runner.run(platformTunnel, profile, "x", vpn = start)
 
-        assertEquals(TunnelState.Failed(TunnelFailure.INTERFACE_UNAVAILABLE), stateStore.state.value)
+        assertEquals(TunnelState.Failed(TunnelFailure.InterfaceUnavailable), stateStore.state.value)
         assertTrue(session().closed)
     }
 
@@ -231,7 +231,7 @@ class TunnelVpnTest {
 
         runner.run(platformTunnel, profile, "x", vpn = start)
 
-        assertEquals(TunnelState.Failed(TunnelFailure.ENGINE_UNAVAILABLE), stateStore.state.value)
+        assertEquals(TunnelState.Failed(TunnelFailure.EngineUnavailable), stateStore.state.value)
     }
 
     @Test
@@ -241,7 +241,7 @@ class TunnelVpnTest {
 
         runner.run(platformTunnel, profile, "x", vpn = start)
 
-        assertEquals(TunnelState.Failed(TunnelFailure.PROXY_HOST_UNRESOLVED), stateStore.state.value)
+        assertEquals(TunnelState.Failed(TunnelFailure.ProxyHostUnresolved(profile.host)), stateStore.state.value)
         assertTrue(exitCalls.isEmpty())
     }
 
@@ -264,7 +264,7 @@ class TunnelVpnTest {
 
         runner.run(platformTunnel, profile.id)
 
-        assertEquals(TunnelState.Failed(TunnelFailure.VPN_PROFILE_INVALID), stateStore.state.value)
+        assertEquals(TunnelState.Failed(TunnelFailure.VpnSecretsMissing), stateStore.state.value)
         assertTrue(exitCalls.isEmpty())
         assertNull(platformTunnel.config, "no debe caer al modo directo en silencio")
     }

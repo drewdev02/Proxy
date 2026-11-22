@@ -77,7 +77,7 @@ class OpenVpnEngineTest {
 
         val result = exit(connector).connect(proxy, "x", start(ovpn(remotes = "remote 192.0.2.10 1194 udp")))
 
-        assertEquals(VpnConnectResult.Failed(TunnelFailure.VPN_PROFILE_INVALID), result)
+        assertEquals(VpnConnectResult.Failed(TunnelFailure.OvpnInvalid(OvpnConfigError.NoTcpServers)), result)
         assertEquals(emptyList(), connector.targets)
     }
 
@@ -88,7 +88,7 @@ class OpenVpnEngineTest {
         val result = exit(connector).connect(proxy, "x", start(ovpn()))
 
         assertEquals(listOf(ProxyTarget("192.0.2.10", 443), ProxyTarget("192.0.2.11", 7770)), connector.targets)
-        assertEquals(VpnConnectResult.Failed(TunnelFailure.VPN_SERVER_BLOCKED), result, "un 403 es la política del proxy")
+        assertEquals(VpnConnectResult.Failed(TunnelFailure.VpnServerBlocked), result, "un 403 es la política del proxy")
     }
 
     @Test
@@ -101,7 +101,7 @@ class OpenVpnEngineTest {
         val result = exit(connector).connect(proxy, "x", start(ovpn()))
 
         assertEquals(2, connector.targets.size)
-        assertEquals(VpnConnectResult.Failed(TunnelFailure.VPN_HANDSHAKE_FAILED), result, "el segundo abrió pero el servidor no habló")
+        assertEquals(VpnConnectResult.Failed(TunnelFailure.VpnHandshakeFailed(VpnHandshakeIssue.CLOSED)), result, "el segundo abrió pero el servidor no habló")
     }
 
     private val publicIp = "149.22.82.28"
@@ -211,7 +211,7 @@ class OpenVpnEngineTest {
 
         val result = exit(connector).connect(proxy, "x", start(ovpn(remotes = publicRemotes)))
 
-        assertEquals(VpnConnectResult.Failed(TunnelFailure.VPN_SERVER_BLOCKED), result)
+        assertEquals(VpnConnectResult.Failed(TunnelFailure.VpnServerBlocked), result)
     }
 
     @Test
@@ -220,7 +220,7 @@ class OpenVpnEngineTest {
 
         val result = exit(connector).connect(proxy, "x", start(ovpn(remotes = publicRemotes)))
 
-        assertEquals(VpnConnectResult.Failed(TunnelFailure.VPN_SERVER_UNREACHABLE), result)
+        assertEquals(VpnConnectResult.Failed(TunnelFailure.VpnServerUnreachable), result)
     }
 
     @Test
@@ -229,7 +229,7 @@ class OpenVpnEngineTest {
 
         val result = exit(connector).connect(proxy, "x", start(ovpn()))
 
-        assertEquals(VpnConnectResult.Failed(TunnelFailure.PROXY_AUTH_FAILED), result)
+        assertEquals(VpnConnectResult.Failed(TunnelFailure.ProxyAuthFailed), result)
         assertEquals(1, connector.targets.size, "no tiene sentido probar otro servidor con las mismas credenciales")
     }
 
@@ -239,7 +239,7 @@ class OpenVpnEngineTest {
 
         val result = exit(connector).connect(proxy, "x", start(ovpn(remotes = "remote 192.0.2.10 443")))
 
-        assertEquals(VpnConnectResult.Failed(TunnelFailure.VPN_HANDSHAKE_FAILED), result)
+        assertEquals(VpnConnectResult.Failed(TunnelFailure.VpnHandshakeFailed(VpnHandshakeIssue.CLOSED)), result)
     }
 
     @Test
@@ -248,7 +248,7 @@ class OpenVpnEngineTest {
 
         val result = exit(connector).connect(proxy, "x", start(ovpn(remotes = "remote 192.0.2.10 443", authority = DAMAGED_AUTHORITY)))
 
-        assertEquals(VpnConnectResult.Failed(TunnelFailure.VPN_PROFILE_INVALID), result)
+        assertEquals(VpnConnectResult.Failed(TunnelFailure.OvpnInvalid(OvpnConfigError.InvalidCa)), result)
     }
 
     @Test
@@ -266,7 +266,7 @@ class OpenVpnEngineTest {
 
         val result = engines.connect(ExitContext(proxy, "x", AppSettings()), start(ovpn()))
 
-        assertEquals(VpnConnectResult.Failed(TunnelFailure.ENGINE_UNAVAILABLE), result)
+        assertEquals(VpnConnectResult.Failed(TunnelFailure.EngineUnavailable), result)
         assertEquals(emptyList(), engines.available)
     }
 
@@ -275,6 +275,6 @@ class OpenVpnEngineTest {
         val result = exit(FakeProxyConnector.failingWith(ProxyFailure.AuthRejected))
             .connect(proxy, "x", CountryExitStart(CountryExit.Tailscale(), CountryExitSecrets.Tailscale("k")))
 
-        assertEquals(VpnConnectResult.Failed(TunnelFailure.VPN_PROFILE_INVALID), result)
+        assertEquals(VpnConnectResult.Failed(TunnelFailure.VpnSecretsMissing), result)
     }
 }

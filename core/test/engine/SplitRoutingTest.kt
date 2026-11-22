@@ -292,7 +292,7 @@ class SplitRoutingTest {
 
     @Test
     fun `if the VPN does not connect the tunnel still starts and its names use the proxy`() = runTest(UnconfinedTestDispatcher()) {
-        results += VpnConnectResult.Failed(TunnelFailure.VPN_SERVER_UNREACHABLE)
+        results += VpnConnectResult.Failed(TunnelFailure.VpnServerUnreachable)
         connect()
 
         assertEquals(TunnelState.Connected("p1", vpnDown = true), stateStore.state.value)
@@ -324,7 +324,7 @@ class SplitRoutingTest {
 
     @Test
     fun `bad VPN credentials are not retried`() = runTest(UnconfinedTestDispatcher()) {
-        results += VpnConnectResult.Failed(TunnelFailure.VPN_AUTH_FAILED)
+        results += VpnConnectResult.Failed(TunnelFailure.VpnAuthFailed)
         connect()
 
         advanceTimeBy(300.seconds)
