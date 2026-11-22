@@ -83,6 +83,22 @@ jobs:
         shell: pwsh
     steps:
       - uses: actions/checkout@v7
+      # La caché del toolchain que deja el CI de master (la del trabajo del .exe), solo para leer: una etiqueta solo ve
+      # la suya y la de master. Mismas rutas que en ci.yml, o no casa; si no hay, se descarga como siempre.
+      - name: Caché del toolchain de Kotlin
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.cache/JetBrains/Kotlin
+            ~/Library/Caches/JetBrains/Kotlin
+            ~/AppData/Local/JetBrains/Kotlin
+            !~/.cache/JetBrains/Kotlin/telemetry
+            !~/Library/Caches/JetBrains/Kotlin/telemetry
+            !~/AppData/Local/JetBrains/Kotlin/telemetry
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: kotlin-${{ runner.os }}-windows-exe-${{ hashFiles('kotlin', 'kotlin.bat', 'project.yaml', 'libs.versions.toml', '*/module.yaml') }}
+          restore-keys: kotlin-${{ runner.os }}-
       # kotlin.bat descarga su toolchain con tar: tiene que ser el de Windows y no el de GNU que trae Git.
       - name: Poner el tar de Windows primero
         run: Add-Content -Path $env:GITHUB_PATH -Value "C:\Windows\System32"
@@ -120,6 +136,21 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
+      # Como en el trabajo de Windows, la de las pruebas de macOS.
+      - name: Caché del toolchain de Kotlin
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.cache/JetBrains/Kotlin
+            ~/Library/Caches/JetBrains/Kotlin
+            ~/AppData/Local/JetBrains/Kotlin
+            !~/.cache/JetBrains/Kotlin/telemetry
+            !~/Library/Caches/JetBrains/Kotlin/telemetry
+            !~/AppData/Local/JetBrains/Kotlin/telemetry
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: kotlin-${{ runner.os }}-tests-${{ hashFiles('kotlin', 'kotlin.bat', 'project.yaml', 'libs.versions.toml', '*/module.yaml') }}
+          restore-keys: kotlin-${{ runner.os }}-
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
@@ -163,6 +194,21 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
+      # Como en el trabajo de Windows, la del trabajo de Tailscale, que también construye el APK.
+      - name: Caché del toolchain de Kotlin
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.cache/JetBrains/Kotlin
+            ~/Library/Caches/JetBrains/Kotlin
+            ~/AppData/Local/JetBrains/Kotlin
+            !~/.cache/JetBrains/Kotlin/telemetry
+            !~/Library/Caches/JetBrains/Kotlin/telemetry
+            !~/AppData/Local/JetBrains/Kotlin/telemetry
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: kotlin-${{ runner.os }}-tsbridge-${{ hashFiles('kotlin', 'kotlin.bat', 'project.yaml', 'libs.versions.toml', '*/module.yaml') }}
+          restore-keys: kotlin-${{ runner.os }}-
       - name: Versión de Android
         run: python3 tools/release/set-android-version.py "${{ needs.version.outputs.version }}"
       # Un APK sin firmar no se instala: sin la keystore, una etiqueta real falla aquí y no publica nada a medias.
