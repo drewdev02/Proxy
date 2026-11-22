@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_status_worked_seconds">Worked a few seconds ago</string>
+    <plurals name="settings_status_worked_minutes">
+        <item quantity="one">Worked %1$d min ago</item>
+        <item quantity="other">Worked %1$d min ago</item>
+    </plurals>
+    <plurals name="settings_status_worked_hours">
+        <item quantity="one">Worked %1$d hr ago</item>
+        <item quantity="other">Worked %1$d hr ago</item>
+    </plurals>
+    <plurals name="settings_status_worked_days">
+        <item quantity="one">Worked %1$d day ago</item>
+        <item quantity="other">Worked %1$d days ago</item>
+    </plurals>
+    <string name="settings_status_refused_seconds">The proxy rejected it a few seconds ago</string>
+    <plurals name="settings_status_refused_minutes">
+        <item quantity="one">The proxy rejected it %1$d min ago</item>
+        <item quantity="other">The proxy rejected it %1$d min ago</item>
+    </plurals>
+    <plurals name="settings_status_refused_hours">
+        <item quantity="one">The proxy rejected it %1$d hr ago</item>
+        <item quantity="other">The proxy rejected it %1$d hr ago</item>
+    </plurals>
+    <plurals name="settings_status_refused_days">
+        <item quantity="one">The proxy rejected it %1$d day ago</item>
+        <item quantity="other">The proxy rejected it %1$d days ago</item>
+    </plurals>
+</resources>

@@ -37,6 +37,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlin.time.Clock
+import org.jetbrains.compose.resources.pluralStringResource
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import org.uci.proxy.core.proxy.NameServiceTestResult
 import org.uci.proxy.core.settings.AppSettings
@@ -45,6 +47,8 @@ import org.uci.proxy.core.settings.NameOutcome
 import org.uci.proxy.core.settings.NameServiceStatus
 import org.uci.proxy.core.settings.ServiceError
 import org.uci.proxy.core.settings.ServiceValidation
+import org.uci.proxy.resources.Res
+import org.uci.proxy.resources.*
 import org.uci.proxy.theme.ProxyUciTheme
 import org.uci.proxy.ui.components.UciBottomSheet
 import org.uci.proxy.ui.components.UciButton
@@ -344,9 +348,23 @@ private fun RowScope.ServiceContent(
     }
 }
 
-private fun NameServiceStatus.message(nowMillis: Long): Pair<String, UciTone> = when (outcome) {
-    NameOutcome.WORKED -> "Funcionó ${timeAgo(atMillis, nowMillis)}" to UciTone.Success
-    NameOutcome.REFUSED -> "El proxy lo rechazó ${timeAgo(atMillis, nowMillis)}" to UciTone.Danger
+@Composable
+private fun NameServiceStatus.message(nowMillis: Long): Pair<String, UciTone> {
+    val ago = timeAgo(atMillis, nowMillis)
+    return when (outcome) {
+        NameOutcome.WORKED -> when (ago) {
+            TimeAgo.Seconds -> stringResource(Res.string.settings_status_worked_seconds)
+            is TimeAgo.Minutes -> pluralStringResource(Res.plurals.settings_status_worked_minutes, ago.count, ago.count)
+            is TimeAgo.Hours -> pluralStringResource(Res.plurals.settings_status_worked_hours, ago.count, ago.count)
+            is TimeAgo.Days -> pluralStringResource(Res.plurals.settings_status_worked_days, ago.count, ago.count)
+        } to UciTone.Success
+        NameOutcome.REFUSED -> when (ago) {
+            TimeAgo.Seconds -> stringResource(Res.string.settings_status_refused_seconds)
+            is TimeAgo.Minutes -> pluralStringResource(Res.plurals.settings_status_refused_minutes, ago.count, ago.count)
+            is TimeAgo.Hours -> pluralStringResource(Res.plurals.settings_status_refused_hours, ago.count, ago.count)
+            is TimeAgo.Days -> pluralStringResource(Res.plurals.settings_status_refused_days, ago.count, ago.count)
+        } to UciTone.Danger
+    }
 }
 
 private fun ServiceTestUi.message(): Pair<String, UciTone> = when (this) {

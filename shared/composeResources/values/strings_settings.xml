@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Los textos de la pantalla de Ajustes. -->
+<resources>
+    <string name="settings_status_worked_seconds">Funcionó hace unos segundos</string>
+    <plurals name="settings_status_worked_minutes">
+        <item quantity="one">Funcionó hace %1$d min</item>
+        <item quantity="other">Funcionó hace %1$d min</item>
+    </plurals>
+    <plurals name="settings_status_worked_hours">
+        <item quantity="one">Funcionó hace %1$d h</item>
+        <item quantity="other">Funcionó hace %1$d h</item>
+    </plurals>
+    <plurals name="settings_status_worked_days">
+        <item quantity="one">Funcionó hace %1$d d</item>
+        <item quantity="other">Funcionó hace %1$d d</item>
+    </plurals>
+    <string name="settings_status_refused_seconds">El proxy lo rechazó hace unos segundos</string>
+    <plurals name="settings_status_refused_minutes">
+        <item quantity="one">El proxy lo rechazó hace %1$d min</item>
+        <item quantity="other">El proxy lo rechazó hace %1$d min</item>
+    </plurals>
+    <plurals name="settings_status_refused_hours">
+        <item quantity="one">El proxy lo rechazó hace %1$d h</item>
+        <item quantity="other">El proxy lo rechazó hace %1$d h</item>
+    </plurals>
+    <plurals name="settings_status_refused_days">
+        <item quantity="one">El proxy lo rechazó hace %1$d d</item>
+        <item quantity="other">El proxy lo rechazó hace %1$d d</item>
+    </plurals>
+</resources>
