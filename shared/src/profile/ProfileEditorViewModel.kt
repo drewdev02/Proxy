@@ -10,7 +10,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.uci.proxy.common.exitSearchReason
 import org.uci.proxy.core.model.CountryEngineKind
-import org.uci.proxy.core.model.CountryExit
 import org.uci.proxy.core.model.CountryExitSecrets
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.RouteExit
@@ -28,8 +27,6 @@ import org.uci.proxy.core.proxy.ProxyTester
 import org.uci.proxy.core.model.AppSettings
 import org.uci.proxy.core.port.SettingsRepository
 import org.uci.proxy.core.vpn.CountryEngineCatalog
-import org.uci.proxy.core.vpn.OvpnConfigException
-import org.uci.proxy.core.vpn.parseOvpn
 import org.uci.proxy.core.vpn.tailscale.ExitNodeListing
 import org.uci.proxy.resources.*
 import org.uci.proxy.resources.Res
@@ -72,7 +69,7 @@ class ProfileEditorViewModel(
         state.value = ProfileEditorUiState(
             isNew = existing == null,
             draft = existing?.toDraft() ?: ProfileDraft(),
-            vpn = existing?.countryExit?.toDraft() ?: VpnDraft(engine = engines.first()),
+            vpn = existing?.countryExit?.let(VpnDraft::from) ?: VpnDraft(engine = engines.first()),
             routing = RoutingDraft(
                 rules = existing?.routing ?: RoutingRules(),
                 // Una regla nueva va por Otro País solo si el perfil lo tiene; si no, esa salida no se puede elegir.
@@ -90,15 +87,7 @@ class ProfileEditorViewModel(
                     state.update {
                         it.copy(
                             password = password,
-                            vpn = when (secrets) {
-                                is CountryExitSecrets.OpenVpn -> it.vpn.copy(
-                                    ovpn = secrets.ovpn,
-                                    password = secrets.password,
-                                    needsCredentials = needsCredentials(secrets.ovpn),
-                                )
-                                is CountryExitSecrets.Tailscale -> it.vpn.copy(tailscale = it.vpn.tailscale.copy(authKey = secrets.authKey))
-                                null -> it.vpn
-                            },
+                            vpn = it.vpn.withSecrets(secrets),
                         )
                     }
                 }
@@ -168,7 +157,7 @@ class ProfileEditorViewModel(
         val current = state.value
         if (current.vpn.tailscale.search == ExitNodeSearch.Running) return
         val tailscale = current.vpn.tailscale
-        val errors = tailscaleErrors(tailscale)
+        val errors = tailscale.errors()
         val validation = validator.validate(editingId ?: TEST_PROFILE_ID, current.draft)
         if (validation is ProfileValidation.Invalid || errors.isNotEmpty()) {
             state.update { it.copy(errors = (validation as? ProfileValidation.Invalid)?.errors.orEmpty() + errors) }
@@ -196,35 +185,13 @@ class ProfileEditorViewModel(
                     null -> ExitNodeSearch.Failed(Res.string.error_exit_search_failed)
                 }
             }
-            state.update {
-                if (it.vpn.tailscale.search != ExitNodeSearch.Running) return@update it
-                val found = (outcome as? ExitNodeSearch.Found)?.nodes
-                val autoPick = if (found?.size == 1 && it.vpn.tailscale.exitNode.isBlank()) found.single().selector else it.vpn.tailscale.exitNode
-                it.copy(vpn = it.vpn.copy(tailscale = it.vpn.tailscale.copy(search = outcome, exitNode = autoPick)))
-            }
+            state.update { it.copy(vpn = it.vpn.copy(tailscale = it.vpn.tailscale.withSearchOutcome(outcome))) }
         }
-    }
-
-    private fun tailscaleErrors(tailscale: TailscaleDraft): Set<ProfileField> = buildSet {
-        val url = tailscale.controlUrl.trim()
-        if (!(url.startsWith("https://") || url.startsWith("http://")) || url.substringAfter("://").isBlank()) add(ProfileField.TAILSCALE_CONTROL_URL)
-        if (tailscale.authKey.isBlank()) add(ProfileField.TAILSCALE_AUTH_KEY)
     }
 
     /** La persona eligió un archivo `.ovpn`: se comprueba enseguida, para avisar antes de guardar y no al conectar. */
     fun loadOvpnFile(fileName: String, text: String) {
-        val vpn = try {
-            val config = parseOvpn(text)
-            state.value.vpn.copy(
-                enabled = true,
-                fileName = fileName,
-                ovpn = text,
-                fileError = null,
-                needsCredentials = config.needsCredentials,
-            )
-        } catch (e: OvpnConfigException) {
-            state.value.vpn.copy(fileName = fileName, ovpn = "", fileError = e.error)
-        }
+        val vpn = state.value.vpn.withOvpnFile(fileName, text)
         state.update {
             it.copy(vpn = vpn, routing = it.routing.withNewRuleExitFor(vpn.enabled), errors = it.errors - ProfileField.VPN_FILE, saveFailure = null)
         }
@@ -311,27 +278,16 @@ class ProfileEditorViewModel(
         if (current.isBusy) return
 
         val validation = validator.validate(editingId ?: idGenerator.newId(), current.draft)
-        val vpn = current.vpn
-        val vpnErrors = when {
-            !vpn.enabled -> emptySet()
-            vpn.engine == CountryEngineKind.TAILSCALE -> tailscaleErrors(vpn.tailscale)
-            else -> buildSet {
-                if (vpn.ovpn.isBlank()) add(ProfileField.VPN_FILE)
-                if (vpn.needsCredentials && vpn.username.isBlank()) add(ProfileField.VPN_USERNAME)
-            }
-        }
+        val vpnErrors = current.vpn.errors()
         when {
             validation is ProfileValidation.Invalid -> state.update { it.copy(errors = validation.errors + vpnErrors) }
             vpnErrors.isNotEmpty() -> state.update { it.copy(errors = vpnErrors) }
             validation is ProfileValidation.Valid -> {
                 state.update { it.copy(errors = emptySet(), isSaving = true, saveFailure = null) }
                 viewModelScope.launch {
-                    val (exit, secrets) = when {
-                        !vpn.enabled -> null to null
-                        vpn.engine == CountryEngineKind.TAILSCALE ->
-                            vpn.tailscale.toExit() to CountryExitSecrets.Tailscale(vpn.tailscale.authKey.trim())
-                        else -> CountryExit.OpenVpn(vpn.fileName, vpn.username.trim()) to CountryExitSecrets.OpenVpn(vpn.ovpn, vpn.password)
-                    }
+                    val exitWithSecrets = current.vpn.toExitAndSecrets()
+                    val exit = exitWithSecrets?.first
+                    val secrets = exitWithSecrets?.second
                     val profile = validation.profile.copy(countryExit = exit, routing = current.routing.rules, uciQuota = current.uciQuota)
                     val failure = try {
                         repository.save(profile, current.password, secrets)
@@ -368,27 +324,6 @@ class ProfileEditorViewModel(
         if (old.host != new.host) add(ProfileField.HOST)
         if (old.port != new.port) add(ProfileField.PORT)
     }
-
-    private fun needsCredentials(ovpn: String): Boolean = try {
-        parseOvpn(ovpn).needsCredentials
-    } catch (_: OvpnConfigException) {
-        true
-    }
-
-    private fun CountryExit.toDraft(): VpnDraft = when (this) {
-        is CountryExit.OpenVpn -> VpnDraft(enabled = true, engine = CountryEngineKind.OPENVPN, fileName = fileName, username = username)
-        is CountryExit.Tailscale -> VpnDraft(
-            enabled = true,
-            engine = CountryEngineKind.TAILSCALE,
-            tailscale = TailscaleDraft(controlUrl = controlUrl, exitNode = exitNode, hostname = hostname),
-        )
-    }
-
-    private fun TailscaleDraft.toExit() = CountryExit.Tailscale(
-        controlUrl = controlUrl.trim().trimEnd('/'),
-        exitNode = exitNode.trim(),
-        hostname = hostname.trim().ifEmpty { CountryExit.Tailscale.DEFAULT_HOSTNAME },
-    )
 
     private fun ProxyProfile.toDraft() = ProfileDraft(
         name = name,
