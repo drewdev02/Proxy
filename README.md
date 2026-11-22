@@ -66,3 +66,23 @@ Para Android e iOS: `./kotlin run -m androidApp` y
 `desktopApp` e `iosApp` son los puntos de entrada.
 El diseño está en [PLAN.md](PLAN.md), el estado por capas en [ROADMAP.md](ROADMAP.md) y cómo se publica una versión en
 [PUBLICAR.md](PUBLICAR.md).
+
+## Idiomas
+
+La app está en español (por defecto) y en inglés; se elige en Ajustes > Idioma o, desde Android 13, en los ajustes del
+sistema. Los textos están en los recursos de Compose Multiplatform, como recomienda
+[la guía de JetBrains](https://kotlinlang.org/docs/multiplatform/compose-localize-strings.html):
+
+- `shared/composeResources/values/strings_<pantalla>.xml` en español y `values-en/` con las mismas claves en inglés. En
+  la interfaz, `stringResource(Res.string.…)`; fuera de Compose, `getString(…)`.
+- `core` no escribe textos para la persona: devuelve tipos (`TunnelFailure`, `OvpnConfigError`…) y
+  `shared/src/common/FailureMessages.kt` elige el texto de cada uno. Los detalles técnicos (una línea HTTP, un error del
+  sistema) y los mensajes del registro no se traducen.
+- Las notificaciones de Android están en `androidApp/res/values*/strings.xml` y el permiso de red local de iOS en
+  `iosApp/src/*.lproj/InfoPlist.strings`.
+- `TranslationsTest` falla si a un idioma le falta una clave o un hueco (`%1$s`). Las capturas de referencia se dibujan
+  siempre en español.
+
+Para añadir un idioma: una carpeta `values-xx` en `shared/composeResources` y en `androidApp/res`, una línea en
+`androidApp/res/xml/locales_config.xml`, otra en `CFBundleLocalizations` de `iosApp/src/Info.plist` con su `xx.lproj`, y
+una entrada en `AppLanguage`.
