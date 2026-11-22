@@ -77,14 +77,16 @@ módulo propio que la extensión no enlaza.
 │   │   ├── engine/            TunnelEngine, TunnelRelay, TunnelRunner, SplitRouting, ConnectivityChecks
 │   │   └── di/                coreModule, tunnelModule y expect val platformModule
 │   ├── src@android/           VpnService, Keystore, dueño de cada conexión + actual platformModule
-│   ├── src@jvm/               utun y Wintun, motor elevado e IPC (desktop/) + actual platformModule
+│   ├── src@jvm/               utun y Wintun, cuentas de Windows + actual platformModule
 │   ├── src@jvmAndAndroid/     JcaOpenVpnCrypto, SslEngineTlsSession
 │   ├── src@ios/               Keychain, NSUserDefaults, NSLog + actual platformModule (túnel aún no disponible)
-│   └── test/                  pruebas comunes con dobles en memoria
+│   └── test/                  pruebas comunes, con los dobles de coreTesting
+├── coreTesting/               kmp/lib con los dobles de prueba de core y el soporte de las pruebas de Windows
 ├── database/                  kmp/lib con Room y SQLite incluido: el registro guardado (databaseModule)
 ├── shared/                    kmp/lib con Compose: interfaz y uiModule, depende de //core y //database
 ├── androidApp/                Activity, ProxyVpnService, catálogo de apps
 ├── desktopApp/                ventana Compose + modo --engine elevado
+├── desktopEngine/             jvm/lib: lanzar el motor con permisos de administrador, su protocolo por socket local y el estado que lleva la ventana
 └── iosApp/                    app (la extensión PacketTunnel llegará con la capa 7)
 ```
 

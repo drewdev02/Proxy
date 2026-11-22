@@ -1,13 +1,10 @@
-package org.uci.proxy.core.windows
+package org.uci.proxy.desktop
 
+import org.uci.proxy.core.windows.WindowsE2E
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
-import org.uci.proxy.core.desktop.DesktopTunnelController
-import org.uci.proxy.core.desktop.EngineArguments
-import org.uci.proxy.core.desktop.EngineLauncher
-import org.uci.proxy.core.desktop.EngineProcess
 import org.uci.proxy.core.fakes.InMemoryKeyValueStore
 import org.uci.proxy.core.fakes.InMemorySecretStore
 import org.uci.proxy.core.port.NameServiceReporter

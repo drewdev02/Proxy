@@ -2,10 +2,10 @@ package org.uci.proxy
 
 import org.koin.dsl.binds
 import org.koin.dsl.module
-import org.uci.proxy.core.desktop.DesktopTunnelController
-import org.uci.proxy.core.desktop.EngineLauncher
-import org.uci.proxy.core.desktop.MacElevatedEngineLauncher
-import org.uci.proxy.core.desktop.WindowsElevatedEngineLauncher
+import org.uci.proxy.desktop.DesktopTunnelController
+import org.uci.proxy.desktop.EngineLauncher
+import org.uci.proxy.desktop.MacElevatedEngineLauncher
+import org.uci.proxy.desktop.WindowsElevatedEngineLauncher
 import org.uci.proxy.core.port.PlatformInfo
 import org.uci.proxy.core.port.PlatformKind
 import org.uci.proxy.core.port.TunnelControl

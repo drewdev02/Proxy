@@ -1,0 +1,18 @@
+product:
+  type: jvm/lib
+
+# Lo que comparten la ventana de escritorio y el motor elevado que lanza: cómo se lanza el motor con permisos de
+# administrador (macOS y Windows), el protocolo que hablan por un socket local y el estado del túnel que lleva la ventana.
+# Va aparte de core porque solo lo usa la app de escritorio.
+dependencies:
+  - //core
+  - $kotlin.serialization.json
+
+test-dependencies:
+  - //coreTesting
+  - $libs.kotlinx.coroutines.test
+
+settings:
+  kotlin:
+    # EngineStart y EngineLog viajan como JSON entre la ventana y el motor.
+    serialization: enabled

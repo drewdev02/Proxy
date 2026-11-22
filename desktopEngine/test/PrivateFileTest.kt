@@ -1,5 +1,6 @@
-package org.uci.proxy.core.desktop
+package org.uci.proxy.desktop
 
+import org.uci.proxy.core.platform.windows.WindowsAccounts
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.attribute.AclEntryType

@@ -1,6 +1,6 @@
 package org.uci.proxy.core.windows
 
-import org.uci.proxy.core.desktop.WindowsAccounts
+import org.uci.proxy.core.platform.windows.WindowsAccounts
 import org.uci.proxy.core.platform.windows.WindowsProtectedDirectory
 import java.nio.file.Files
 import java.nio.file.LinkOption.NOFOLLOW_LINKS

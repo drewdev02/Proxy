@@ -1,4 +1,4 @@
-package org.uci.proxy.core.desktop
+package org.uci.proxy.desktop
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json

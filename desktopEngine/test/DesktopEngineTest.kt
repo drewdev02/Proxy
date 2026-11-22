@@ -1,4 +1,4 @@
-package org.uci.proxy.core.desktop
+package org.uci.proxy.desktop
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
-import org.uci.proxy.core.dns.dnsQuery
+import org.uci.proxy.core.dns.buildDnsQuery
 import org.uci.proxy.core.engine.TunAddressPlanner
 import org.uci.proxy.core.engine.TunnelEngineFactory
 import org.uci.proxy.core.engine.TunnelRunner
@@ -413,7 +413,7 @@ class DesktopTunnelIntegrationTest {
 
         val app = parseIpv4("10.57.0.1")!!
         val dns = parseIpv4("10.57.0.2")!!
-        platformTunnel.tun.inject(buildUdpPacket(app, dns, 41000, 53, dnsQuery("uci.cu")))
+        platformTunnel.tun.inject(buildUdpPacket(app, dns, 41000, 53, buildDnsQuery("uci.cu", 0x1234)))
 
         withTimeout(5.seconds) { while (platformTunnel.tun.written.isEmpty()) kotlinx.coroutines.delay(20) }
         controller.disconnect()

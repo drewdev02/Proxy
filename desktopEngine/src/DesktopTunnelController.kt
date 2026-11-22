@@ -1,4 +1,4 @@
-package org.uci.proxy.core.desktop
+package org.uci.proxy.desktop
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job

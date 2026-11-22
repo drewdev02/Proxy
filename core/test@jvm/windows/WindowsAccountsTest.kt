@@ -1,4 +1,6 @@
-package org.uci.proxy.core.desktop
+package org.uci.proxy.core.windows
+
+import org.uci.proxy.core.platform.windows.WindowsAccounts
 
 import com.sun.jna.platform.win32.Advapi32Util
 import java.nio.file.FileSystems

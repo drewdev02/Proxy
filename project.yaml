@@ -4,5 +4,6 @@ modules:
   - coreTesting
   - database
   - desktopApp
+  - desktopEngine
   - iosApp
   - shared

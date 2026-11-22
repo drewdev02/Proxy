@@ -1,4 +1,4 @@
-package org.uci.proxy.core.desktop
+package org.uci.proxy.desktop
 
 import java.nio.file.Path
 

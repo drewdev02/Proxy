@@ -1,4 +1,4 @@
-package org.uci.proxy.core.desktop
+package org.uci.proxy.desktop
 
 import org.uci.proxy.core.model.NameOutcome
 import org.uci.proxy.core.port.NameServiceReporter

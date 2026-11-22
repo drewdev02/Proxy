@@ -5,7 +5,6 @@ import com.sun.jna.platform.win32.Advapi32
 import com.sun.jna.platform.win32.Kernel32
 import com.sun.jna.platform.win32.WinNT
 import com.sun.jna.ptr.PointerByReference
-import org.uci.proxy.core.desktop.WindowsAccounts
 import java.io.IOException
 import java.nio.file.FileAlreadyExistsException
 import java.nio.file.Files
