@@ -48,7 +48,7 @@ class LocalDnsPolicyTest {
     }
 
     @Test
-    fun `Otro País and block rules keep a name off the local network, a proxy rule does not`() {
+    fun `Otro País and block rules keep a name off the local network but a proxy rule does not`() {
         val policy = LocalDnsPolicy(
             listOf("uci.cu"),
             intranetDirect = true,
@@ -165,7 +165,7 @@ class LocalDnsResolverTest {
     }
 
     @Test
-    fun `a name that is not internal is remembered too, for less time`() = runTest {
+    fun `a name that is not internal is remembered too for less time`() = runTest {
         val transport = FakeDnsTransport(zones)
         val resolver = resolver(transport)
 
