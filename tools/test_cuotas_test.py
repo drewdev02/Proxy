@@ -42,7 +42,8 @@ class QuotaServiceTest(unittest.TestCase):
 
         with self.assertRaises(cuotas.QuotaFault) as caught:
             cuotas.ask(url, "andrey", "otra")
-        self.assertIn("incorrectos", caught.exception.message)
+        self.assertEqual(cuotas.FAULT_CODE, caught.exception.code)
+        self.assertIn("contraseña es incorrecta", caught.exception.message)
 
     def test_the_answer_is_read_by_position_whatever_the_field_names(self):
         url = self.start(fields=("a", "b", "c"))
@@ -55,6 +56,21 @@ class QuotaServiceTest(unittest.TestCase):
         used = [cuotas.ask(url, "andrey", "secreta7")[1] for _ in range(3)]
 
         self.assertEqual([95.0, 98.0, 100.0], used)
+
+    def test_the_answer_has_the_four_fields_of_the_real_service(self):
+        url = self.start()
+
+        *_, raw = cuotas.ask(url, "andrey", "secreta7")
+
+        self.assertIn(b'<ObtenerCuotaReturn xsi:type="ns1:Usuario">', raw)
+        self.assertIn(b'<usuario xsi:type="xsd:string">andrey</usuario>', raw)
+
+    def test_the_action_uciproxy_sent_is_also_accepted(self):
+        url = self.start()
+        request = urllib.request.Request(url, data=cuotas.build_request("andrey", "secreta7"), method="POST",
+                                         headers={"Content-Type": "text/xml", "SOAPAction": f'"{cuotas.LEGACY_SOAP_ACTION}"'})
+        with urllib.request.urlopen(request, timeout=5) as response:
+            self.assertEqual(2000, cuotas.parse_response(response.read())[0])
 
     def test_a_request_without_the_soap_action_is_rejected(self):
         url = self.start()

@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """Servicio de cuotas de la UCI, de mentira, y cliente para preguntar al de verdad.
 
-La UCI da a cada cuenta una cuota de navegación (MB al mes). La app UCIProxy 5.0 (2019) la consulta con un servicio
-SOAP 1.1 de la intranet, sin pasar por el proxy:
+La UCI da a cada cuenta una cuota de navegación en MB; lo consumido baja solo con el tiempo y puede pasar del 100 %. Se
+consulta con un servicio SOAP 1.1 (rpc/encoded, en PHP) de la intranet, sin pasar por el proxy:
 
     POST https://cuotas.uci.cu/servicios/v1/InetCuotasWS.php
-    SOAPAction: "https://cuotas.uci.cu/servicios/v1/InetCuotasWS"
-    método ObtenerCuota (namespace https://cuotas.uci.cu/) con usuario, clave y dominio=uci.cu
+    SOAPAction: "urn:InetCuotasWSAction"
+    ObtenerCuota (namespace urn:InetCuotasWS) con usuario, clave y dominio=uci.cu
+    → ObtenerCuotaReturn: cuota, cuota_usada, nivel_navegacion, usuario
 
-y lee la respuesta POR POSICIÓN: cuota asignada (entero), cuota usada (decimal) y nivel de navegación (texto). Los
-nombres de esos campos no aparecen en la app; los de aquí son supuestos. Por eso el cliente de ProxyUCI debe leerlos por
-posición, como UCIProxy, y este simulador puede cambiarlos (--field-names) para comprobar que no dependen de ellos.
+Así lo describe su WSDL y así contesta (comprobado en la red de la UCI). UCIProxy 5.0 usaba otro namespace y otra acción
+(https://cuotas.uci.cu/…) y el servicio los acepta igual; este simulador también. Los campos se declaran con xsd:all
+(cualquier orden): --field-names cambia sus nombres para probar que el cliente, si no los reconoce, lee por posición.
 
 Servidor de mentira, para las pruebas y el CI:
     python3 tools/test_cuotas.py serve --user andrey --password secreta7 --quota 2000 --used 1420.5
@@ -42,13 +43,18 @@ from xml.sax.saxutils import escape
 
 SERVICE_PATH = "/servicios/v1/InetCuotasWS.php"
 REAL_URL = "https://cuotas.uci.cu" + SERVICE_PATH
-SOAP_ACTION = "https://cuotas.uci.cu/servicios/v1/InetCuotasWS"
-NAMESPACE = "https://cuotas.uci.cu/"
+SOAP_ACTION = "urn:InetCuotasWSAction"
+NAMESPACE = "urn:InetCuotasWS"
+# Lo que mandaba UCIProxy 5.0; el servicio real lo acepta igual.
+LEGACY_SOAP_ACTION = "https://cuotas.uci.cu/servicios/v1/InetCuotasWS"
 METHOD = "ObtenerCuota"
 SOAP_ENV = "http://schemas.xmlsoap.org/soap/envelope/"
 
-# Supuestos: la app original no los usa. Se pueden cambiar con --field-names para probar que el cliente lee por posición.
-DEFAULT_FIELDS = ("cuota", "cuota_usada", "nivel_navegacion")
+# Los del WSDL real, en el orden en que llegan. --field-names los cambia para probar la lectura por posición.
+DEFAULT_FIELDS = ("cuota", "cuota_usada", "nivel_navegacion", "usuario")
+FIELD_TYPES = ("xsd:float", "xsd:float", "xsd:string", "xsd:string")
+FAULT_CODE = "InetCuotas:Cuotas"
+FAULT_MESSAGE = "El usuario no es válido o lo contraseña es incorrecta"  # sic, tal cual lo dice el servicio
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -72,14 +78,19 @@ def build_request(user: str, password: str, domain: str = "uci.cu") -> bytes:
     ).encode("utf-8")
 
 
-def build_response(quota: int, used: float, level: str, fields=DEFAULT_FIELDS) -> bytes:
-    values = (str(quota), repr(float(used)), level)
-    inner = "".join(f"<{name}>{escape(value)}</{name}>" for name, value in zip(fields, values))
+def build_response(quota: float, used: float, level: str, user: str = "", fields=DEFAULT_FIELDS) -> bytes:
+    """Como la del servicio real: rpc/encoded, con xsi:type en cada campo."""
+    values = (f"{quota:g}", repr(float(used)), level, user)
+    inner = "".join(
+        f'<{name} xsi:type="{kind}">{escape(value)}</{name}>' for name, kind, value in zip(fields, FIELD_TYPES, values)
+    )
     return (
-        '<?xml version="1.0" encoding="UTF-8"?>'
-        f'<SOAP-ENV:Envelope xmlns:SOAP-ENV="{SOAP_ENV}" xmlns:ns1="{NAMESPACE}">'
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        f'<SOAP-ENV:Envelope xmlns:SOAP-ENV="{SOAP_ENV}" xmlns:ns1="{NAMESPACE}" xmlns:xsd="http://www.w3.org/2001/XMLSchema" '
+        'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:SOAP-ENC="http://schemas.xmlsoap.org/soap/encoding/" '
+        'SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">'
         "<SOAP-ENV:Body>"
-        f"<ns1:{METHOD}Response><{METHOD}Result>{inner}</{METHOD}Result></ns1:{METHOD}Response>"
+        f'<ns1:{METHOD}Response><{METHOD}Return xsi:type="ns1:Usuario">{inner}</{METHOD}Return></ns1:{METHOD}Response>'
         "</SOAP-ENV:Body>"
         "</SOAP-ENV:Envelope>"
     ).encode("utf-8")
@@ -121,7 +132,7 @@ class QuotaFault(Exception):
 
 
 def parse_response(body: bytes):
-    """(cuota, usada, nivel) leídos por posición, como UCIProxy. Lanza QuotaFault si el servicio devolvió un fallo."""
+    """(cuota, usada, nivel), por nombre o, si no se reconocen, por posición. Lanza QuotaFault si fue un fallo."""
     root = ET.fromstring(body)
     soap_body = next(e for e in root if local(e.tag) == "Body")
     first = next(iter(soap_body))
@@ -129,11 +140,15 @@ def parse_response(body: bytes):
         code = next((c.text or "" for c in first if local(c.tag) == "faultcode"), "")
         message = next((c.text or "" for c in first if local(c.tag) == "faultstring"), "")
         raise QuotaFault(code, message)
-    result = next(iter(first))  # <ObtenerCuotaResult>
-    values = [child.text or "" for child in result]
+    result = next(iter(first))  # <ObtenerCuotaReturn>
+    by_name = {local(child.tag): (child.text or "") for child in result}
+    if "cuota" in by_name and "cuota_usada" in by_name:
+        values = [by_name["cuota"], by_name["cuota_usada"], by_name.get("nivel_navegacion", "")]
+    else:
+        values = [child.text or "" for child in result]
     if len(values) < 3:
         raise ValueError(f"respuesta con {len(values)} campos, se esperaban 3: {[local(c.tag) for c in result]}")
-    return int(float(values[0])), float(values[1]), values[2]
+    return float(values[0]), float(values[1]), values[2]
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -154,24 +169,57 @@ class QuotaState:
         self.lock = threading.Lock()
 
 
-WSDL = f"""<?xml version="1.0" encoding="UTF-8"?>
-<!-- WSDL de mentira: el real hay que pedirlo en la red de la UCI (python3 tools/test_cuotas.py wsdl). -->
-<definitions xmlns="http://schemas.xmlsoap.org/wsdl/" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
-    xmlns:tns="{NAMESPACE}" xmlns:xsd="http://www.w3.org/2001/XMLSchema" targetNamespace="{NAMESPACE}" name="InetCuotasWS">
-  <message name="{METHOD}Request">
-    <part name="usuario" type="xsd:string"/><part name="clave" type="xsd:string"/><part name="dominio" type="xsd:string"/>
-  </message>
-  <message name="{METHOD}Response"><part name="{METHOD}Result" type="tns:Cuota"/></message>
-  <portType name="InetCuotasWSPort">
-    <operation name="{METHOD}"><input message="tns:{METHOD}Request"/><output message="tns:{METHOD}Response"/></operation>
-  </portType>
-  <binding name="InetCuotasWSBinding" type="tns:InetCuotasWSPort">
-    <soap:binding style="rpc" transport="http://schemas.xmlsoap.org/soap/http"/>
-    <operation name="{METHOD}"><soap:operation soapAction="{SOAP_ACTION}"/></operation>
-  </binding>
-  <service name="InetCuotasWS">
-    <port name="InetCuotasWSPort" binding="tns:InetCuotasWSBinding"><soap:address location="{REAL_URL}"/></port>
-  </service>
+WSDL = """<?xml version='1.0' encoding='UTF-8'?>
+
+<!-- WSDL file generated by Zend Studio. -->
+
+<definitions name="InetCuotasWS" targetNamespace="urn:InetCuotasWS" xmlns:typens="urn:InetCuotasWS" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:soapenc="http://schemas.xmlsoap.org/soap/encoding/" xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/" xmlns="http://schemas.xmlsoap.org/wsdl/">
+	<types>
+		<xsd:schema xmlns="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:InetCuotasWS">
+			<xsd:complexType name="Usuario">
+				<xsd:all>
+					<xsd:element name="cuota" type="xsd:float"/>
+					<xsd:element name="cuota_usada" type="xsd:anyType"/>
+					<xsd:element name="nivel_navegacion" type="xsd:string"/>
+					<xsd:element name="usuario" type="xsd:string"/>
+				</xsd:all>
+			</xsd:complexType>
+		</xsd:schema>
+	</types>
+	<message name="ObtenerCuota">
+		<part name="usuario" type="xsd:string"/>
+		<part name="clave" type="xsd:string"/>
+		<part name="dominio" type="xsd:string"/>
+	</message>
+	<message name="ObtenerCuotaResponse">
+		<part name="ObtenerCuotaReturn" type="typens:Usuario"/>
+	</message>
+	<portType name="InetCuotasWSPortType">
+		<operation name="ObtenerCuota">
+			<documentation>
+				Obtener el estado de la cuota de un usuario dado su usuario y clave.
+			</documentation>
+			<input message="typens:ObtenerCuota"/>
+			<output message="typens:ObtenerCuotaResponse"/>
+		</operation>
+	</portType>
+	<binding name="InetCuotasWSBinding" type="typens:InetCuotasWSPortType">
+		<soap:binding style="rpc" transport="http://schemas.xmlsoap.org/soap/http"/>
+		<operation name="ObtenerCuota">
+			<soap:operation soapAction="urn:InetCuotasWSAction"/>
+			<input>
+				<soap:body namespace="urn:InetCuotasWS" use="encoded" encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"/>
+			</input>
+			<output>
+				<soap:body namespace="urn:InetCuotasWS" use="encoded" encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"/>
+			</output>
+		</operation>
+	</binding>
+	<service name="InetCuotasWSService">
+		<port name="InetCuotasWSPort" binding="typens:InetCuotasWSBinding">
+			<soap:address location="https://cuotas.uci.cu/servicios/v1/InetCuotasWS.php"/>
+		</port>
+	</service>
 </definitions>
 """
 
@@ -205,7 +253,7 @@ def make_handler(state: QuotaState):
             body = self.rfile.read(int(self.headers.get("Content-Length") or 0))
             action = (self.headers.get("SOAPAction") or "").strip('"')
             params = parse_request(body)
-            if params is None or action != SOAP_ACTION:
+            if params is None or action not in (SOAP_ACTION, LEGACY_SOAP_ACTION):
                 self.send(500, build_fault("SOAP-ENV:Client", f"Petición no válida (SOAPAction «{action}»)"))
                 return
             user, password, domain = params.get("usuario", ""), params.get("clave", ""), params.get("dominio", "")
@@ -213,12 +261,12 @@ def make_handler(state: QuotaState):
                 state.requests += 1
                 if domain != "uci.cu" or state.accounts.get(user) != password:
                     print(f"[cuotas] {user}@{domain}: credenciales incorrectas", flush=True)
-                    self.send(500, build_fault("SOAP-ENV:Server", "Usuario o contraseña incorrectos"))
+                    self.send(500, build_fault(FAULT_CODE, FAULT_MESSAGE))
                     return
                 used = state.used
                 state.used = min(state.quota, state.used + state.grow)
             print(f"[cuotas] {user}: {used:.2f} de {state.quota} MB ({state.level})", flush=True)
-            self.send(200, build_response(state.quota, used, state.level, state.fields))
+            self.send(200, build_response(state.quota, used, state.level, user, state.fields))
 
     return Handler
 
@@ -298,10 +346,10 @@ def main():
     serve.add_argument("--password", default="secreta7")
     serve.add_argument("--quota", type=int, default=2000, help="cuota asignada, en MB")
     serve.add_argument("--used", type=float, default=1420.53, help="cuota usada al empezar, en MB")
-    serve.add_argument("--level", default="Profesores", help="nivel de navegación")
+    serve.add_argument("--level", default="Navegación plena", help="nivel de navegación")
     serve.add_argument("--grow", type=float, default=0.0, help="MB que se suman al consumo en cada consulta")
     serve.add_argument("--field-names", default=",".join(DEFAULT_FIELDS),
-                       help="nombres de los tres campos de la respuesta, separados por comas (el cliente no debe depender de ellos)")
+                       help="nombres de los campos de la respuesta (3 o 4), separados por comas, para probar la lectura por posición")
 
     client = commands.add_parser("ask", help="pregunta la cuota a un servicio (por defecto, el real)")
     client.add_argument("--url", default=REAL_URL)
@@ -318,8 +366,8 @@ def main():
 
     if args.command == "serve":
         fields = tuple(name.strip() for name in args.field_names.split(","))
-        if len(fields) != 3:
-            sys.exit("--field-names necesita exactamente tres nombres")
+        if len(fields) not in (3, 4):
+            sys.exit("--field-names necesita tres o cuatro nombres")
         state = QuotaState(args.user, args.password, args.quota, args.used, args.level, args.grow, fields)
         server, url = start_server(state, args.host, args.port, args.tls)
         print(f"Servicio de cuotas de pruebas en {url} (usuario {args.user}, {args.used} de {args.quota} MB)", flush=True)
@@ -340,7 +388,7 @@ def main():
         if args.raw:
             print(raw.decode("utf-8", "replace"))
         percent = 100 * used / quota if quota else 0
-        print(f"Cuota: {quota} MB · usada: {used:.2f} MB ({percent:.0f} %) · nivel: {level}")
+        print(f"Cuota: {quota:g} MB · usada: {used:.2f} MB ({percent:.0f} %) · nivel: {level}")
     else:
         url = args.url if "?" in args.url else args.url + "?wsdl"
         with no_proxy_opener(args.insecure).open(url, timeout=15) as response:
