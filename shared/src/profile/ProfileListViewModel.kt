@@ -23,8 +23,10 @@ data class ProfileListUiState(
     /** Si falló el último borrado; se muestra hasta que la persona cierra el aviso. */
     val deleteFailed: Boolean = false,
     val tunnel: TunnelUiModel = TunnelUiModel(isAvailable = false, state = TunnelState.Disconnected),
-    /** «ProxyUCI en Android 16», al pie de la lista. */
-    val platformLabel: String = "",
+    /** La plataforma («Android», «iOS»…; es un nombre propio, no se traduce), para el pie de la lista. */
+    val platformName: String = "",
+    /** La versión del sistema, tal como la da la plataforma. */
+    val osVersion: String = "",
 )
 
 /**
@@ -39,14 +41,16 @@ class ProfileListViewModel(
     private val logger: Logger,
 ) : ViewModel() {
     private val deleteFailed = MutableStateFlow(false)
-    private val platformLabel = "ProxyUCI en ${platformInfo.kind.displayName} ${platformInfo.osVersion}"
+    private val platformName = platformInfo.kind.displayName
+    private val osVersion = platformInfo.osVersion
 
     val uiState: StateFlow<ProfileListUiState> = combine(repository.profiles, deleteFailed, monitor.state) { profiles, failed, tunnel ->
         ProfileListUiState(
             profiles = profiles,
             deleteFailed = failed,
             tunnel = TunnelUiModel(isAvailable = control.isAvailable, state = tunnel),
-            platformLabel = platformLabel,
+            platformName = platformName,
+            osVersion = osVersion,
         )
     }.stateIn(
         viewModelScope,
@@ -55,7 +59,8 @@ class ProfileListViewModel(
         ProfileListUiState(
             profiles = repository.profiles.value,
             tunnel = TunnelUiModel(isAvailable = control.isAvailable, state = monitor.state.value),
-            platformLabel = platformLabel,
+            platformName = platformName,
+            osVersion = osVersion,
         ),
     )
 

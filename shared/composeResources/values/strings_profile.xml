@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Los textos de la lista de perfiles, del editor de perfil y de sus reglas de salida. -->
+<resources>
+    <!-- Lista de perfiles. -->
+    <!-- Al pie de la lista: la plataforma (Android, iOS, Windows…) y la versión del sistema. -->
+    <string name="profile_list_platform">ProxyUCI en %1$s %2$s</string>
+</resources>

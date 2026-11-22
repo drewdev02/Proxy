@@ -36,7 +36,8 @@ class ProfileListViewModelTest : MainDispatcherTest() {
     @Test
     fun `shows the stored profiles and the platform`() {
         assertEquals(listOf(uci, home), state.profiles)
-        assertEquals("ProxyUCI en iOS 18.1", state.platformLabel)
+        assertEquals("iOS", state.platformName)
+        assertEquals("18.1", state.osVersion)
     }
 
     @Test

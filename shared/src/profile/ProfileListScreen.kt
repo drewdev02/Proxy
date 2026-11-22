@@ -27,12 +27,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import org.uci.proxy.common.message
 import org.uci.proxy.connection.address
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.ProxyProtocol
 import org.uci.proxy.core.port.TunnelState
+import org.uci.proxy.resources.*
+import org.uci.proxy.resources.Res
 import org.uci.proxy.theme.ProxyUciTheme
 import org.uci.proxy.ui.components.UciButton
 import org.uci.proxy.ui.components.UciConfirmDialog
@@ -72,7 +75,7 @@ internal fun ProfileListScreen(
 
     ProfileListScreen(
         profiles = state.profiles,
-        platformLabel = state.platformLabel,
+        platformLabel = stringResource(Res.string.profile_list_platform, state.platformName, state.osVersion),
         deleteFailed = state.deleteFailed,
         tunnel = state.tunnel,
         onAdd = onAdd,
