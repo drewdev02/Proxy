@@ -1,10 +1,23 @@
 name: CI
 
 on:
+  # Solo master: las ramas pasan por su PR, y las etiquetas por release.yml, que ya llama a este flujo.
   push:
+    branches: [master]
   pull_request:
+  # Para una rama sin PR: Actions > CI > Run workflow (o `gh workflow run ci.yml --ref <rama>`).
+  workflow_dispatch:
   # El flujo de publicación lo ejecuta antes de construir nada: si falla, no se publica.
   workflow_call:
+
+permissions:
+  contents: read
+
+# Un push nuevo cancela el anterior de la misma ref. Llamado desde release.yml, `github.workflow` es el del que llama
+# («Publicar versión»): otro grupo que el suyo y que el de un CI directo, y sin cancelar.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.workflow == 'CI' }}
 
 # En Windows se usa PowerShell y no el bash de Git: el wrapper `kotlin.bat` descarga su toolchain con `tar`, y el
 # `tar` de GNU que trae Git interpreta «C:\ruta» como «máquina:ruta» y falla. Además se pone System32 el primero
@@ -28,6 +41,26 @@ jobs:
           - { name: Windows, os: windows-latest, shell: pwsh, kotlin: ./kotlin.bat }
     steps:
       - uses: actions/checkout@v4
+      # Todo lo que descarga ./kotlin (su distribución, los JDK, los SDK y Maven) vive en JetBrains/Kotlin, en la
+      # carpeta de cachés de cada sistema; las rutas de los otros dos se ignoran. ~/.gradle es del APK, que Amper
+      # construye con Gradle. Una por trabajo: cada uno baja cosas distintas.
+      - &cache-kotlin
+        name: Caché del toolchain de Kotlin
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cache/JetBrains/Kotlin
+            ~/Library/Caches/JetBrains/Kotlin
+            ~/AppData/Local/JetBrains/Kotlin
+            !~/.cache/JetBrains/Kotlin/telemetry
+            !~/Library/Caches/JetBrains/Kotlin/telemetry
+            !~/AppData/Local/JetBrains/Kotlin/telemetry
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: kotlin-${{ runner.os }}-${{ github.job }}-${{ hashFiles('kotlin', 'kotlin.bat', 'project.yaml', 'libs.versions.toml', '*/module.yaml') }}
+          restore-keys: |
+            kotlin-${{ runner.os }}-${{ github.job }}-
+            kotlin-${{ runner.os }}-
       - name: Poner el tar de Windows primero
         if: runner.os == 'Windows'
         run: Add-Content -Path $env:GITHUB_PATH -Value "C:\Windows\System32"
@@ -81,6 +114,7 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+      - *cache-kotlin
       - uses: actions/setup-go@v5
         with:
           go-version-file: tools/tsbridge/go.mod
@@ -116,6 +150,7 @@ jobs:
         shell: pwsh
     steps:
       - uses: actions/checkout@v4
+      - *cache-kotlin
       - name: Poner el tar de Windows primero
         run: Add-Content -Path $env:GITHUB_PATH -Value "C:\Windows\System32"
       - name: Administrador
@@ -184,6 +219,7 @@ jobs:
   # El ProxyUCI.exe de un solo archivo: la app y una Java recortada dentro (ver tools/windows-exe/). Se prueba
   # ejecutándolo con --self-test, que arranca el mismo grafo del motor, carga JNA y extrae y verifica wintun.dll con
   # la Java recortada: un módulo de Java que falte aparece aquí y no cuando el usuario pulsa «Conectar».
+  # build-exe.ps1 empieza con `kotlin.bat run -m desktopApp`: también prueba que el escritorio compila en Windows.
   windows-exe:
     name: ProxyUCI.exe (Windows)
     runs-on: windows-latest
@@ -193,6 +229,7 @@ jobs:
         shell: pwsh
     steps:
       - uses: actions/checkout@v4
+      - *cache-kotlin
       - name: Poner el tar de Windows primero
         run: Add-Content -Path $env:GITHUB_PATH -Value "C:\Windows\System32"
       # El bytecode de la app es de Java 25, y jdeps y jlink tienen que ser de esa misma versión.
@@ -249,17 +286,3 @@ jobs:
           name: ProxyUCI-windows-x64
           path: build/exe/ProxyUCI.exe
           retention-days: 14
-
-  # Que la app de escritorio compile en Windows, con las librerías nativas de Compose de ese sistema.
-  desktop-build-windows:
-    name: Compilar escritorio (Windows)
-    runs-on: windows-latest
-    timeout-minutes: 45
-    defaults:
-      run:
-        shell: pwsh
-    steps:
-      - uses: actions/checkout@v4
-      - name: Poner el tar de Windows primero
-        run: Add-Content -Path $env:GITHUB_PATH -Value "C:\Windows\System32"
-      - run: ./kotlin.bat build -m desktopApp
