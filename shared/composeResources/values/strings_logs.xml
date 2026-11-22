@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- La pantalla Registro. Los mensajes del registro no se traducen: son diagnóstico. -->
+<resources>
+    <string name="logs_title">Registro</string>
+    <!-- Los filtros por nivel. -->
+    <string name="logs_filter_all">Todo</string>
+    <string name="logs_filter_info">Info</string>
+    <string name="logs_filter_warnings">Avisos</string>
+    <string name="logs_filter_errors">Errores</string>
+
+    <!-- El subtítulo: si sigue llegando, y cuántos mensajes se ven (%1$d) de cuántos hay (%2$d). -->
+    <plurals name="logs_summary_live">
+        <item quantity="one">En vivo · %1$d mensaje</item>
+        <item quantity="other">En vivo · %1$d mensajes</item>
+    </plurals>
+    <plurals name="logs_summary_live_filtered">
+        <item quantity="one">En vivo · %1$d de %2$d mensaje</item>
+        <item quantity="other">En vivo · %1$d de %2$d mensajes</item>
+    </plurals>
+    <plurals name="logs_summary_paused">
+        <item quantity="one">En pausa · %1$d mensaje</item>
+        <item quantity="other">En pausa · %1$d mensajes</item>
+    </plurals>
+    <plurals name="logs_summary_paused_filtered">
+        <item quantity="one">En pausa · %1$d de %2$d mensaje</item>
+        <item quantity="other">En pausa · %1$d de %2$d mensajes</item>
+    </plurals>
+
+    <string name="logs_resume">Reanudar</string>
+    <string name="logs_pause">Pausar</string>
+    <string name="logs_copy">Copiar lo que se ve</string>
+    <string name="logs_clear_log">Limpiar el registro</string>
+
+    <string name="logs_empty_title">Todavía no hay mensajes</string>
+    <string name="logs_empty_message">Aquí aparece lo que hace el túnel mientras está conectado.</string>
+    <string name="logs_filtered_empty_title">Ningún mensaje con este filtro</string>
+    <plurals name="logs_filtered_empty_message">
+        <item quantity="one">Elige «Todo» para ver el mensaje.</item>
+        <item quantity="other">Elige «Todo» para ver los %1$d mensajes.</item>
+    </plurals>
+
+    <string name="logs_clear_title">¿Limpiar el registro?</string>
+    <plurals name="logs_clear_message">
+        <item quantity="one">Se borra el mensaje, también si está guardado en el equipo. No se puede deshacer.</item>
+        <item quantity="other">Se borran los %1$d mensajes, también los guardados en el equipo. No se puede deshacer.</item>
+    </plurals>
+    <string name="logs_clear_confirm">Limpiar</string>
+</resources>
