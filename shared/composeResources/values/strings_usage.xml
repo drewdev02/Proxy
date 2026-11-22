@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- La pantalla Consumo. Las cantidades (%1$s) llegan ya escritas: «1,42 GB». -->
+<resources>
+    <string name="usage_title">Consumo</string>
+    <string name="usage_subtitle">Lo que pasó por el túnel en este equipo</string>
+    <!-- Los filtros de periodo. -->
+    <string name="usage_period_today">Hoy</string>
+    <string name="usage_period_week">7 días</string>
+    <string name="usage_period_month">30 días</string>
+
+    <string name="usage_empty_today">Hoy aún no hay consumo</string>
+    <string name="usage_empty">Aún no hay consumo</string>
+    <string name="usage_empty_message">Conecta y navega: aquí verás cada día lo que pasa por el proxy y por Otro País.</string>
+    <string name="usage_on_this_device">En este equipo</string>
+
+    <!-- El resumen. -->
+    <string name="usage_summary_today">HOY</string>
+    <string name="usage_summary_week">ÚLTIMOS 7 DÍAS</string>
+    <string name="usage_summary_month">ÚLTIMOS 30 DÍAS</string>
+    <string name="usage_down_up">↓ %1$s recibidos · ↑ %2$s enviados</string>
+
+    <!-- Por día. -->
+    <string name="usage_daily_title">Por día</string>
+    <string name="usage_daily_description">Consumo de cada día del periodo; hoy, %1$s</string>
+    <string name="usage_daily_today">Hoy: %1$s</string>
+    <!-- Los días de la semana en la gráfica, en dos letras. -->
+    <string name="usage_weekday_monday">Lu</string>
+    <string name="usage_weekday_tuesday">Ma</string>
+    <string name="usage_weekday_wednesday">Mi</string>
+    <string name="usage_weekday_thursday">Ju</string>
+    <string name="usage_weekday_friday">Vi</string>
+    <string name="usage_weekday_saturday">Sá</string>
+    <string name="usage_weekday_sunday">Do</string>
+
+    <!-- Destinos y apps. -->
+    <string name="usage_hosts_title">Destinos</string>
+    <string name="usage_hosts_subtitle">Los sitios que más consumieron</string>
+    <string name="usage_hosts_unknown">Sin detalle (todo por Otro País)</string>
+    <string name="usage_apps_title">Apps</string>
+    <string name="usage_apps_subtitle">Lo que abrieron por el proxy</string>
+
+    <string name="usage_footnote">Se cuenta lo que pasa por el túnel en este equipo: lo que va por el proxy y por Otro País. Lo que sale directo (la red local, las reglas «Directo») no pasa por él y no se cuenta. Se guardan los últimos 90 días.</string>
+</resources>

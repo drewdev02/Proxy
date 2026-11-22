@@ -29,15 +29,21 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import org.uci.proxy.apps.LocalAppCatalog
 import org.uci.proxy.common.bytesText
+import org.uci.proxy.common.decimalSeparator
 import org.uci.proxy.common.formatBytes
+import org.uci.proxy.common.percentText
 import org.uci.proxy.core.model.RouteExit
 import org.uci.proxy.core.traffic.NamedTraffic
 import org.uci.proxy.profile.label
 import org.uci.proxy.profile.tone
 import org.uci.proxy.quota.QuotaCard
+import org.uci.proxy.resources.Res
+import org.uci.proxy.resources.*
 import org.uci.proxy.theme.ProxyUciTheme
 import org.uci.proxy.ui.components.UciBar
 import org.uci.proxy.ui.components.UciBarChart
@@ -83,12 +89,12 @@ internal fun UsageScreen(
 ) {
     val spacing = ProxyUciTheme.spacing
     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))) {
-        UciTopBar(title = "Consumo", subtitle = "Lo que pasó por el túnel en este equipo", onBack = onBack)
+        UciTopBar(title = stringResource(Res.string.usage_title), subtitle = stringResource(Res.string.usage_subtitle), onBack = onBack)
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = spacing.screenMargin, vertical = spacing.xs),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            UsagePeriod.entries.forEach { UciFilterChip(it.label, state.period == it, { onPeriodChange(it) }) }
+            UsagePeriod.entries.forEach { UciFilterChip(stringResource(it.label), state.period == it, { onPeriodChange(it) }) }
         }
 
         val quotaCard: @Composable () -> Unit = {
@@ -99,9 +105,9 @@ internal fun UsageScreen(
                 Column(Modifier.padding(horizontal = spacing.screenMargin, vertical = spacing.sm).widthIn(max = 720.dp)) { quotaCard() }
             }
             UciEmptyState(
-                title = if (state.period == UsagePeriod.TODAY) "Hoy aún no hay consumo" else "Aún no hay consumo",
+                title = stringResource(if (state.period == UsagePeriod.TODAY) Res.string.usage_empty_today else Res.string.usage_empty),
                 icon = UciIcons.DataUsage,
-                message = "Conecta y navega: aquí verás cada día lo que pasa por el proxy y por Otro País.",
+                message = stringResource(Res.string.usage_empty_message),
                 modifier = Modifier.padding(top = spacing.lg),
             )
             return@Column
@@ -111,13 +117,19 @@ internal fun UsageScreen(
             val twoColumns = wide ?: (maxWidth >= 840.dp)
             val summary: @Composable ColumnScope.() -> Unit = {
                 quotaCard()
-                if (state.quota.status.enabled) UciSectionHeader("En este equipo")
+                if (state.quota.status.enabled) UciSectionHeader(stringResource(Res.string.usage_on_this_device))
                 SummaryCard(state)
                 if (state.period != UsagePeriod.TODAY) DailyCard(state)
                 Footnote()
             }
             val ranking: @Composable ColumnScope.() -> Unit = {
-                RankingCard("Destinos", "Los sitios que más consumieron", state.hosts, nameOf = { it.ifEmpty { "Sin detalle (todo por Otro País)" } })
+                val unknownHost = stringResource(Res.string.usage_hosts_unknown)
+                RankingCard(
+                    stringResource(Res.string.usage_hosts_title),
+                    stringResource(Res.string.usage_hosts_subtitle),
+                    state.hosts,
+                    nameOf = { it.ifEmpty { unknownHost } },
+                )
                 if (state.apps.isNotEmpty()) AppsCard(state.apps)
             }
             if (twoColumns) {
@@ -150,22 +162,25 @@ private fun ScrollColumn(modifier: Modifier, content: @Composable ColumnScope.()
 @Composable
 private fun SummaryCard(state: UsageUiState) {
     val c = ProxyUciTheme.colors
+    val separator = decimalSeparator()
     UciCard(Modifier.fillMaxWidth()) {
         Text(
-            when (state.period) {
-                UsagePeriod.TODAY -> "HOY"
-                UsagePeriod.WEEK -> "ÚLTIMOS 7 DÍAS"
-                UsagePeriod.MONTH -> "ÚLTIMOS 30 DÍAS"
-            },
+            stringResource(
+                when (state.period) {
+                    UsagePeriod.TODAY -> Res.string.usage_summary_today
+                    UsagePeriod.WEEK -> Res.string.usage_summary_week
+                    UsagePeriod.MONTH -> Res.string.usage_summary_month
+                },
+            ),
             style = ProxyUciTheme.mono.badge,
             color = c.onSurfaceFaint,
         )
-        val (value, unit) = formatBytes(state.total)
+        val (value, unit) = formatBytes(state.total, separator)
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(value, style = ProxyUciTheme.mono.metricLarge)
             Text(unit, style = ProxyUciTheme.mono.badge, color = c.onSurfaceMuted, modifier = Modifier.padding(bottom = 6.dp))
         }
-        Text("↓ ${bytesText(state.down)} recibidos · ↑ ${bytesText(state.up)} enviados", style = MaterialTheme.typography.bodySmall, color = c.onSurfaceMuted)
+        Text(stringResource(Res.string.usage_down_up, bytesText(state.down, separator), bytesText(state.up, separator)), style = MaterialTheme.typography.bodySmall, color = c.onSurfaceMuted)
         UciDivider()
         ExitShare(RouteExit.PROXY, state.proxy, state.total)
         if (state.country > 0) ExitShare(RouteExit.VPN, state.country, state.total)
@@ -179,8 +194,8 @@ private fun ExitShare(exit: RouteExit, bytes: Long, total: Long) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             UciStatusDot(exit.tone)
             Text(exit.label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-            Text(bytesText(bytes), style = ProxyUciTheme.mono.metricSmall)
-            Text(percent(bytes, total), style = ProxyUciTheme.mono.badge, color = color)
+            Text(bytesText(bytes, decimalSeparator()), style = ProxyUciTheme.mono.metricSmall)
+            Text(percentText(percent(bytes, total)), style = ProxyUciTheme.mono.badge, color = color)
         }
         UciProportionBar(if (total > 0) bytes.toFloat() / total else 0f, color = color)
     }
@@ -191,25 +206,26 @@ private fun DailyCard(state: UsageUiState) {
     val c = ProxyUciTheme.colors
     val proxyColor = RouteExit.PROXY.tone.colors().content
     val countryColor = RouteExit.VPN.tone.colors().content
-    UciSectionHeader("Por día")
+    val todayText = bytesText(state.days.lastOrNull()?.total ?: 0, decimalSeparator())
+    UciSectionHeader(stringResource(Res.string.usage_daily_title))
     UciCard(Modifier.fillMaxWidth()) {
         val many = state.days.size > 7
         UciBarChart(
             bars = state.days.mapIndexed { index, day ->
                 UciBar(
                     // Con 30 días no caben todas las etiquetas: una por semana, contando hacia atrás desde hoy.
-                    label = if (!many) weekdayOf(day.day) else if ((state.days.lastIndex - index) % 7 == 0) dayOfMonth(day.day) else "",
+                    label = if (!many) stringResource(weekdayOf(day.day)) else if ((state.days.lastIndex - index) % 7 == 0) dayOfMonth(day.day) else "",
                     segments = listOf(UciBarSegment(day.proxy.toFloat(), proxyColor), UciBarSegment(day.country.toFloat(), countryColor)),
                     highlighted = day.day == state.today,
                 )
             },
-            description = "Consumo de cada día del periodo; hoy, ${bytesText(state.days.lastOrNull()?.total ?: 0)}",
+            description = stringResource(Res.string.usage_daily_description, todayText),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Legend(RouteExit.PROXY)
             if (state.country > 0) Legend(RouteExit.VPN)
             Text(
-                "Hoy: ${bytesText(state.days.lastOrNull()?.total ?: 0)}",
+                stringResource(Res.string.usage_daily_today, todayText),
                 style = ProxyUciTheme.mono.badge,
                 color = c.onSurfaceMuted,
                 modifier = Modifier.weight(1f),
@@ -234,12 +250,13 @@ private fun AppsCard(apps: List<NamedTraffic>) {
     val labels by produceState(emptyMap<String, String>(), catalog) {
         value = catalog?.installedApps()?.associate { it.packageName to it.label }.orEmpty()
     }
-    RankingCard("Apps", "Lo que abrieron por el proxy", apps, nameOf = { labels[it] ?: it })
+    RankingCard(stringResource(Res.string.usage_apps_title), stringResource(Res.string.usage_apps_subtitle), apps, nameOf = { labels[it] ?: it })
 }
 
 @Composable
 private fun RankingCard(title: String, subtitle: String, items: List<NamedTraffic>, nameOf: (String) -> String) {
     val c = ProxyUciTheme.colors
+    val separator = decimalSeparator()
     UciSectionHeader(title)
     UciCard(Modifier.fillMaxWidth()) {
         Text(subtitle, style = MaterialTheme.typography.bodySmall, color = c.onSurfaceMuted)
@@ -249,7 +266,7 @@ private fun RankingCard(title: String, subtitle: String, items: List<NamedTraffi
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(nameOf(item.name), style = ProxyUciTheme.mono.code, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                    Text(bytesText(item.total), style = ProxyUciTheme.mono.metricSmall)
+                    Text(bytesText(item.total, separator), style = ProxyUciTheme.mono.metricSmall)
                 }
                 // La barra compara con el primero, para que se vea la diferencia aunque haya muchos destinos pequeños.
                 UciProportionBar(if (top > 0) item.total.toFloat() / top else 0f)
@@ -261,24 +278,32 @@ private fun RankingCard(title: String, subtitle: String, items: List<NamedTraffi
 @Composable
 private fun Footnote() {
     Text(
-        "Se cuenta lo que pasa por el túnel en este equipo: lo que va por el proxy y por Otro País. Lo que sale directo " +
-            "(la red local, las reglas «Directo») no pasa por él y no se cuenta. Se guardan los últimos 90 días.",
+        stringResource(Res.string.usage_footnote),
         style = MaterialTheme.typography.bodySmall,
         color = ProxyUciTheme.colors.onSurfaceFaint,
     )
 }
 
-private fun percent(part: Long, total: Long): String = if (total <= 0) "0 %" else "${(part * 100 + total / 2) / total} %"
+/** El porcentaje entero, redondeado, de [part] sobre [total]. */
+private fun percent(part: Long, total: Long): Int = if (total <= 0) 0 else ((part * 100 + total / 2) / total).toInt()
+
+/** El nombre del filtro de cada periodo. */
+private val UsagePeriod.label: StringResource
+    get() = when (this) {
+        UsagePeriod.TODAY -> Res.string.usage_period_today
+        UsagePeriod.WEEK -> Res.string.usage_period_week
+        UsagePeriod.MONTH -> Res.string.usage_period_month
+    }
 
 /** «Lu», «Ma»… del día [epochDay]. */
-internal fun weekdayOf(epochDay: Int): String = when (LocalDate.fromEpochDays(epochDay).dayOfWeek) {
-    DayOfWeek.MONDAY -> "Lu"
-    DayOfWeek.TUESDAY -> "Ma"
-    DayOfWeek.WEDNESDAY -> "Mi"
-    DayOfWeek.THURSDAY -> "Ju"
-    DayOfWeek.FRIDAY -> "Vi"
-    DayOfWeek.SATURDAY -> "Sá"
-    DayOfWeek.SUNDAY -> "Do"
+internal fun weekdayOf(epochDay: Int): StringResource = when (LocalDate.fromEpochDays(epochDay).dayOfWeek) {
+    DayOfWeek.MONDAY -> Res.string.usage_weekday_monday
+    DayOfWeek.TUESDAY -> Res.string.usage_weekday_tuesday
+    DayOfWeek.WEDNESDAY -> Res.string.usage_weekday_wednesday
+    DayOfWeek.THURSDAY -> Res.string.usage_weekday_thursday
+    DayOfWeek.FRIDAY -> Res.string.usage_weekday_friday
+    DayOfWeek.SATURDAY -> Res.string.usage_weekday_saturday
+    DayOfWeek.SUNDAY -> Res.string.usage_weekday_sunday
 }
 
 private fun dayOfMonth(epochDay: Int): String = LocalDate.fromEpochDays(epochDay).day.toString()
