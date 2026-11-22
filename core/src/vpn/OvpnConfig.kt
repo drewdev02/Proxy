@@ -22,7 +22,44 @@ class OvpnConfig(
     val tunMtu: Int?,
 )
 
-class OvpnConfigException(message: String) : Exception(message)
+/**
+ * Por qué un `.ovpn` no sirve para este cliente. Sin textos: la interfaz decide cómo contarlo en cada idioma.
+ */
+sealed interface OvpnConfigError {
+    /** Un bloque como `<ca>` se abre y no se cierra. */
+    data class UnclosedBlock(val block: String) : OvpnConfigError
+
+    /** Falta `client` o `tls-client`: es un perfil de servidor u otra cosa. */
+    data object NotAClient : OvpnConfigError
+
+    /** `dev tap`: solo se admite `tun`. */
+    data object TapNotSupported : OvpnConfigError
+
+    /** Ningún `remote` es TCP; por un proxy solo pasa OpenVPN sobre TCP. */
+    data object NoTcpServers : OvpnConfigError
+
+    data object TlsAuthNotSupported : OvpnConfigError
+
+    data object TlsCryptV2NotSupported : OvpnConfigError
+
+    /** El perfil pide certificado de cliente; solo se admite usuario y contraseña. */
+    data object ClientCertificateNotSupported : OvpnConfigError
+
+    /** `compress` o `comp-lzo` activos; [algorithm] es el que pide el archivo (`lz4-v2`, `LZO`…). */
+    data class CompressionNotSupported(val algorithm: String) : OvpnConfigError
+
+    /** No trae el certificado de la autoridad (`<ca>`). */
+    data object MissingCa : OvpnConfigError
+
+    /** No trae `<tls-crypt>`, que es lo único que se admite. */
+    data object MissingTlsCrypt : OvpnConfigError
+
+    /** La clave de `<tls-crypt>` no son 256 bytes en hexadecimal. */
+    data object BadTlsCryptKey : OvpnConfigError
+}
+
+/** El mensaje es para el registro; para la persona, se traduce [error]. */
+class OvpnConfigException(val error: OvpnConfigError) : Exception(error.toString())
 
 /** Lee el texto de un `.ovpn`. @throws OvpnConfigException si no sirve para este cliente. */
 fun parseOvpn(text: String): OvpnConfig {
@@ -51,14 +88,14 @@ fun parseOvpn(text: String): OvpnConfig {
         }
         directives += line.split(Regex("\\s+"))
     }
-    if (openBlock != null) throw OvpnConfigException("El archivo está incompleto: falta cerrar <$openBlock>.")
+    if (openBlock != null) throw OvpnConfigException(OvpnConfigError.UnclosedBlock(openBlock))
 
     fun values(name: String) = directives.filter { it[0] == name }
     fun has(name: String) = directives.any { it[0] == name }
 
-    if (!has("client") && !has("tls-client")) throw OvpnConfigException("El archivo no es un perfil de cliente OpenVPN.")
+    if (!has("client") && !has("tls-client")) throw OvpnConfigException(OvpnConfigError.NotAClient)
     if (values("dev").lastOrNull()?.getOrNull(1)?.startsWith("tun") == false) {
-        throw OvpnConfigException("Solo se admiten perfiles de tipo tun, no tap.")
+        throw OvpnConfigException(OvpnConfigError.TapNotSupported)
     }
 
     val defaultProto = values("proto").lastOrNull()?.getOrNull(1) ?: "udp"
@@ -69,26 +106,24 @@ fun parseOvpn(text: String): OvpnConfig {
         if (proto.startsWith("tcp")) OvpnRemote(host, port) else null
     }
     if (remotes.isEmpty()) {
-        throw OvpnConfigException(
-            "El perfil no tiene servidores TCP. A través de un proxy solo funciona OpenVPN sobre TCP: descarga la variante TCP del perfil.",
-        )
+        throw OvpnConfigException(OvpnConfigError.NoTcpServers)
     }
 
-    if (has("tls-auth")) throw OvpnConfigException("El perfil usa tls-auth, que todavía no se admite (sí tls-crypt).")
-    if (has("tls-crypt-v2")) throw OvpnConfigException("El perfil usa tls-crypt-v2, que todavía no se admite (sí tls-crypt).")
+    if (has("tls-auth")) throw OvpnConfigException(OvpnConfigError.TlsAuthNotSupported)
+    if (has("tls-crypt-v2")) throw OvpnConfigException(OvpnConfigError.TlsCryptV2NotSupported)
     if (blocks.containsKey("cert") || blocks.containsKey("key") || has("cert") || has("pkcs12")) {
-        throw OvpnConfigException("El perfil usa certificado de cliente, que todavía no se admite. Solo usuario y contraseña.")
+        throw OvpnConfigException(OvpnConfigError.ClientCertificateNotSupported)
     }
     values("compress").firstOrNull { it.getOrNull(1) != null && it[1] != "stub-v2" }?.let {
-        throw OvpnConfigException("El perfil usa compresión (${it[1]}), que no se admite.")
+        throw OvpnConfigException(OvpnConfigError.CompressionNotSupported(it[1]))
     }
     if (has("comp-lzo") && values("comp-lzo").any { it.getOrNull(1) != "no" }) {
-        throw OvpnConfigException("El perfil usa compresión LZO, que no se admite.")
+        throw OvpnConfigException(OvpnConfigError.CompressionNotSupported("LZO"))
     }
 
     val ca = blocks["ca"]?.takeIf { it.contains("BEGIN CERTIFICATE") }
-        ?: throw OvpnConfigException("El perfil no incluye el certificado de la autoridad (<ca>).")
-    val tlsCrypt = blocks["tls-crypt"] ?: throw OvpnConfigException("El perfil no incluye <tls-crypt>, que es lo único que se admite.")
+        ?: throw OvpnConfigException(OvpnConfigError.MissingCa)
+    val tlsCrypt = blocks["tls-crypt"] ?: throw OvpnConfigException(OvpnConfigError.MissingTlsCrypt)
     val key = parseStaticKey(tlsCrypt)
 
     return OvpnConfig(
@@ -108,7 +143,7 @@ private const val STATIC_KEY_BYTES = 256
 private fun parseStaticKey(block: String): ByteArray {
     val hex = block.lines().filter { !it.startsWith("-----") && !it.startsWith("#") && it.isNotBlank() }.joinToString("") { it.trim() }
     if (hex.length != STATIC_KEY_BYTES * 2 || !hex.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }) {
-        throw OvpnConfigException("La clave de <tls-crypt> no tiene el formato esperado.")
+        throw OvpnConfigException(OvpnConfigError.BadTlsCryptKey)
     }
     return ByteArray(STATIC_KEY_BYTES) { hex.substring(it * 2, it * 2 + 2).toInt(16).toByte() }
 }

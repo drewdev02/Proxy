@@ -43,7 +43,7 @@ class OvpnConfigTest {
     fun `a profile with only UDP servers is rejected with a clear message`() {
         val error = assertFailsWith<OvpnConfigException> { parseOvpn(profile(proto = "proto udp", remotes = "remote 192.0.2.10 1194")) }
 
-        assertTrue("TCP" in error.message!!)
+        assertEquals(OvpnConfigError.NoTcpServers, error.error)
     }
 
     @Test

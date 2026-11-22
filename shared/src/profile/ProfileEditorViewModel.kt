@@ -34,6 +34,7 @@ import org.uci.proxy.core.profile.ProfileValidation
 import org.uci.proxy.core.profile.ProfileValidator
 import org.uci.proxy.core.proxy.ProxyTestResult
 import org.uci.proxy.core.proxy.ProxyTester
+import org.uci.proxy.core.vpn.OvpnConfigError
 import org.uci.proxy.core.vpn.OvpnConfigException
 import org.uci.proxy.core.vpn.parseOvpn
 
@@ -59,7 +60,7 @@ data class VpnDraft(
     val username: String = "",
     val password: String = "",
     /** Por qué no sirve el archivo elegido, para mostrarlo. */
-    val fileError: String? = null,
+    val fileError: OvpnConfigError? = null,
     /** Si el servidor VPN pide usuario y contraseña (casi todos los comerciales sí). */
     val needsCredentials: Boolean = true,
     val tailscale: TailscaleDraft = TailscaleDraft(),
@@ -316,7 +317,7 @@ class ProfileEditorViewModel(
                 needsCredentials = config.needsCredentials,
             )
         } catch (e: OvpnConfigException) {
-            state.value.vpn.copy(fileName = fileName, ovpn = "", fileError = e.message)
+            state.value.vpn.copy(fileName = fileName, ovpn = "", fileError = e.error)
         }
         state.update {
             it.copy(vpn = vpn, routing = it.routing.withNewRuleExitFor(vpn.enabled), errors = it.errors - ProfileField.VPN_FILE, saveFailed = false)

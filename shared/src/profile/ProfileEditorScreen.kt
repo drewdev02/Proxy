@@ -359,7 +359,7 @@ private fun OpenVpnFields(state: ProfileEditorUiState, actions: CountryExitActio
         chooseLabel = "Elegir .ovpn",
         enabled = !state.isBusy,
     )
-    val fileError = vpn.fileError ?: "Elige un archivo .ovpn (OpenVPN sobre TCP).".takeIf { ProfileField.VPN_FILE in state.errors }
+    val fileError = vpn.fileError?.message() ?: "Elige un archivo .ovpn (OpenVPN sobre TCP).".takeIf { ProfileField.VPN_FILE in state.errors }
     fileError?.let { UciInlineAlert(it, tone = UciTone.Danger) }
     if (vpn.needsCredentials) {
         UciTextField(

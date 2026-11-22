@@ -3,6 +3,7 @@ package org.uci.proxy.common
 import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.proxy.ProxyFailure
 import org.uci.proxy.core.proxy.ProxyTestResult
+import org.uci.proxy.core.vpn.OvpnConfigError
 
 /*
  * Los textos de los fallos, en un solo sitio para que todas las pantallas digan lo mismo.
@@ -66,3 +67,20 @@ internal fun ProxyTestResult.message(): String = when (this) {
 /** El texto de la app cuando le falta el permiso de red local para la prueba. */
 internal const val LOCAL_NETWORK_DENIED_FOR_TEST =
     "La app necesita permiso para acceder a la red local y así poder conectar con el proxy."
+
+/** Por qué no sirve el archivo `.ovpn` elegido. */
+internal fun OvpnConfigError.message(): String = when (this) {
+    is OvpnConfigError.UnclosedBlock -> "El archivo está incompleto: falta cerrar <$block>."
+    OvpnConfigError.NotAClient -> "El archivo no es un perfil de cliente OpenVPN."
+    OvpnConfigError.TapNotSupported -> "Solo se admiten perfiles de tipo tun, no tap."
+    OvpnConfigError.NoTcpServers ->
+        "El perfil no tiene servidores TCP. A través de un proxy solo funciona OpenVPN sobre TCP: descarga la variante TCP del perfil."
+    OvpnConfigError.TlsAuthNotSupported -> "El perfil usa tls-auth, que todavía no se admite (sí tls-crypt)."
+    OvpnConfigError.TlsCryptV2NotSupported -> "El perfil usa tls-crypt-v2, que todavía no se admite (sí tls-crypt)."
+    OvpnConfigError.ClientCertificateNotSupported ->
+        "El perfil usa certificado de cliente, que todavía no se admite. Solo usuario y contraseña."
+    is OvpnConfigError.CompressionNotSupported -> "El perfil usa compresión ($algorithm), que no se admite."
+    OvpnConfigError.MissingCa -> "El perfil no incluye el certificado de la autoridad (<ca>)."
+    OvpnConfigError.MissingTlsCrypt -> "El perfil no incluye <tls-crypt>, que es lo único que se admite."
+    OvpnConfigError.BadTlsCryptKey -> "La clave de <tls-crypt> no tiene el formato esperado."
+}
