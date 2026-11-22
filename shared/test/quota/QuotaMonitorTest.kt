@@ -44,7 +44,7 @@ class QuotaMonitorTest {
     }
 
     private val service = FakeService()
-    private val notifications = mutableListOf<Pair<String, String>>()
+    private val notifications = mutableListOf<QuotaAlert>()
     private val keyValues = InMemoryKeyValueStore()
     private val settings = StoredSettingsRepository(InMemoryKeyValueStore())
     private val tunnel = FakeTunnel()
@@ -57,7 +57,12 @@ class QuotaMonitorTest {
             override fun now() = Instant.fromEpochMilliseconds(1_795_348_800_000 + testScheduler.currentTime)
         }
         return QuotaMonitor(
-            profiles, active, tunnel, tunnel, settings, service, QuotaStore(keyValues), { title, message -> notifications += title to message },
+            profiles, active, tunnel, tunnel, settings, service, QuotaStore(keyValues),
+            object : QuotaNotifier {
+                override suspend fun notify(alert: QuotaAlert) {
+                    notifications += alert
+                }
+            },
             clock, AppDispatchers(StandardTestDispatcher(testScheduler)), RecordingLogger(),
         )
     }
@@ -143,7 +148,7 @@ class QuotaMonitorTest {
         service.next = { QuotaFetch.Success(1000, used, "x") }
         tunnel.emit(TunnelState.Connected("p1"))
         val monitor = started()
-        assertEquals(listOf("Cuota de la UCI al 90 %"), notifications.map { it.first }, "solo el más alto")
+        assertEquals(listOf(90), notifications.map { (it as QuotaAlert.Threshold).threshold }, "solo el más alto")
 
         // Sigue por encima, o baja poco (al 88 %): no se repite.
         used = 880.0
@@ -169,7 +174,7 @@ class QuotaMonitorTest {
 
         assertEquals(115.0, monitor.status.value.quota?.percent)
         assertEquals(0.0, monitor.status.value.quota?.remainingMb)
-        assertTrue(notifications.single().second.contains("Te pasaste 300 MB"))
+        assertEquals(2300.0, (notifications.single() as QuotaAlert.Threshold).quota.usedMb)
         monitor.stop()
     }
 
@@ -183,7 +188,7 @@ class QuotaMonitorTest {
 
         assertEquals(TunnelState.Disconnected, tunnel.state.value)
         assertTrue(monitor.status.value.paused)
-        assertTrue(notifications.any { it.first == "Túnel en pausa por la cuota" })
+        assertTrue(notifications.any { it is QuotaAlert.Paused })
 
         // «Conectar igual»: mientras siga por encima, no vuelve a pausar.
         monitor.allowOverLimit()

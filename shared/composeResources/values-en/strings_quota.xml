@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="quota_card_title">UCI QUOTA</string>
+    <string name="quota_checking_now">Checking the quota</string>
+    <string name="quota_check_now">Check the quota now</string>
+    <string name="quota_ring_description">%1$s of the quota used; %2$s left</string>
+    <string name="quota_available">available</string>
+    <string name="quota_used_of">%1$s of %2$d MB used · %3$s</string>
+    <string name="quota_over">You went %1$s over your quota.</string>
+    <string name="quota_checking">Checking the quota…</string>
+    <string name="quota_paused_message">You reached %1$d% and the tunnel was disconnected. You can still connect from Connection.</string>
+    <string name="quota_paused_title">Tunnel paused for the quota</string>
+    <string name="quota_problem_title_first">Could not check the quota</string>
+    <string name="quota_problem_title_update">Could not update</string>
+    <string name="quota_edit_profile">Edit profile</string>
+    <string name="quota_footnote">This is the quota for your whole account: it counts what you browse from any device. Usage goes down on its own over time, according to the UCI.</string>
+    <string name="quota_checked_now">Checked just now.</string>
+    <plurals name="quota_checked_minutes">
+        <item quantity="one">Checked %1$d min ago.</item>
+        <item quantity="other">Checked %1$d min ago.</item>
+    </plurals>
+    <plurals name="quota_checked_hours">
+        <item quantity="one">Checked %1$d hour ago.</item>
+        <item quantity="other">Checked %1$d hours ago.</item>
+    </plurals>
+    <plurals name="quota_checked_days">
+        <item quantity="one">Checked %1$d day ago.</item>
+        <item quantity="other">Checked %1$d days ago.</item>
+    </plurals>
+
+    <string name="quota_problem_wrong_credentials">The quota service did not accept the profile's username or password.</string>
+    <string name="quota_problem_unreachable">Could not reach the quota service. It only answers from the UCI network; it will retry on its own.</string>
+    <string name="quota_problem_untrusted_certificate">The service certificate could not be verified: it is signed by a UCI authority the system does not recognize. Turn off “Verify the service certificate” in Settings.</string>
+    <string name="quota_problem_service_changed">The quota service answered something this version does not understand.</string>
+
+    <string name="quota_notification_threshold_title">UCI quota at %1$s</string>
+    <string name="quota_notification_threshold">You have used %1$s of your quota: %2$s of %3$d MB.</string>
+    <string name="quota_notification_threshold_over">You have used %1$s of your quota: %2$s of %3$d MB. You went %4$s over.</string>
+    <string name="quota_notification_threshold_left">You have used %1$s of your quota: %2$s of %3$d MB. You have %4$s left.</string>
+    <string name="quota_notification_paused_title">Tunnel paused for the quota</string>
+    <string name="quota_notification_paused">You reached %1$s of your quota: the tunnel was disconnected so it doesn't run out. You can still connect from Connection.</string>
+</resources>
