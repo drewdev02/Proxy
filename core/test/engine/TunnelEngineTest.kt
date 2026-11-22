@@ -27,7 +27,13 @@ import org.uci.proxy.core.packet.formatIpv4
 import org.uci.proxy.core.packet.parseIpv4
 import org.uci.proxy.core.packet.readInt
 import org.uci.proxy.core.packet.readU16
+import org.uci.proxy.core.port.LocalAddresses
+import org.uci.proxy.core.port.NetFailure
 import org.uci.proxy.core.port.TunnelFailure
+import org.uci.proxy.core.proxy.ProxyFailure
+import org.uci.proxy.core.proxy.ProxyTestResult
+import org.uci.proxy.core.proxy.ProxyTester
+import org.uci.proxy.core.proxy.RefusalReason
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.profile.AppDispatchers
 import org.uci.proxy.core.profile.StoredProfileRepository
@@ -226,7 +232,10 @@ class TunnelRunnerTest {
     /** Lo que "resuelve" el DNS real en estas pruebas. */
     private val resolvedHosts = mutableMapOf("proxy.uci.cu" to "10.8.0.20")
 
-    private fun TestScope.newRunner(): Pair<TunnelRunner, StoredProfileRepository> {
+    private fun TestScope.newRunner(
+        probe: ProxyTester? = null,
+        localAddresses: LocalAddresses? = null,
+    ): Pair<TunnelRunner, StoredProfileRepository> {
         val dispatchers = AppDispatchers(background = UnconfinedTestDispatcher(testScheduler))
         val repository = StoredProfileRepository(InMemoryKeyValueStore(), InMemorySecretStore(), dispatchers, logger)
         val runner = TunnelRunner(
@@ -237,6 +246,8 @@ class TunnelRunnerTest {
             stateStore = stateStore,
             dispatchers = dispatchers,
             logger = logger,
+            proxyProbe = probe,
+            localAddresses = localAddresses,
         )
         return runner to repository
     }
@@ -253,6 +264,61 @@ class TunnelRunnerTest {
         assertEquals("10.57.0.2", config.dnsServer)
         assertEquals(1500, config.mtu)
         assertEquals("10.8.0.20", config.proxyAddress, "la dirección real del proxy, resuelta antes de levantar el túnel")
+        assertEquals(TunnelState.Connected("p1"), stateStore.state.value)
+        job.cancel()
+    }
+
+    @Test
+    fun `without any network address an unresolved proxy is reported as no network`() = runTest {
+        val loopback = (127 shl 24) or 1
+        val (runner, repository) = newRunner(localAddresses = { listOf(loopback) })
+        repository.save(PROFILE, "")
+        resolvedHosts.clear()
+
+        runner.run(platformTunnel, PROFILE.id)
+
+        assertEquals(TunnelState.Failed(TunnelFailure.NoNetwork), stateStore.state.value)
+    }
+
+    @Test
+    fun `a proxy that rejects the password fails before creating the interface`() = runTest {
+        val probe = object : ProxyTester {
+            override suspend fun test(profile: ProxyProfile, password: String) = ProxyTestResult.Failure(ProxyFailure.AuthRejected)
+        }
+        val (runner, repository) = newRunner(probe = probe)
+        repository.save(PROFILE, "mala")
+
+        runner.run(platformTunnel, PROFILE.id)
+
+        assertEquals(TunnelState.Failed(TunnelFailure.ProxyAuthFailed), stateStore.state.value)
+        assertEquals(null, platformTunnel.config, "no se dice «Conectado» con un proxy que no deja pasar")
+    }
+
+    @Test
+    fun `a proxy that cannot be reached fails with the reason`() = runTest {
+        val probe = object : ProxyTester {
+            override suspend fun test(profile: ProxyProfile, password: String) =
+                ProxyTestResult.Failure(ProxyFailure.Unreachable(NetFailure.REFUSED, "Connection refused"))
+        }
+        val (runner, repository) = newRunner(probe = probe)
+        repository.save(PROFILE, "")
+
+        runner.run(platformTunnel, PROFILE.id)
+
+        assertEquals(TunnelState.Failed(TunnelFailure.ProxyUnreachable(NetFailure.REFUSED)), stateStore.state.value)
+    }
+
+    @Test
+    fun `a proxy that only blocks the test destination still connects`() = runTest(UnconfinedTestDispatcher()) {
+        val probe = object : ProxyTester {
+            override suspend fun test(profile: ProxyProfile, password: String) =
+                ProxyTestResult.Failure(ProxyFailure.Refused(RefusalReason.FORBIDDEN, "HTTP/1.1 403 Forbidden"))
+        }
+        val (runner, repository) = newRunner(probe = probe)
+        repository.save(PROFILE, "")
+
+        val job = launch { runner.run(platformTunnel, PROFILE.id) }
+
         assertEquals(TunnelState.Connected("p1"), stateStore.state.value)
         job.cancel()
     }

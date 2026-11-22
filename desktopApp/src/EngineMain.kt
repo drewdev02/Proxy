@@ -91,6 +91,8 @@ fun runEngine(args: List<String>) {
             engines = koin.get(),
             localDnsSource = koin.getOrNull() ?: LocalDnsSource.None,
             dnsTransport = koin.get(),
+            proxyProbe = koin.get(),
+            localAddresses = koin.get(),
         )
     }
     val tunnel = when (val kind = koin.get<PlatformInfo>().kind) {

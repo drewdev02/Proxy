@@ -107,4 +107,9 @@
     <string name="connection_live_connections">Conexiones</string>
     <string name="connection_live_connections_caption">abiertas por el proxy</string>
     <string name="connection_live_session">Sesión</string>
+    <string name="connection_pill_proxy_failing">Túnel · el proxy falla</string>
+    <string name="connection_proxy_failing_title">El proxy está fallando</string>
+    <string name="connection_proxy_auth_rejected_message">El proxy rechaza el usuario o la contraseña del perfil, así que no carga nada de lo que pasa por él. ¿Cambió la contraseña?</string>
+    <string name="connection_proxy_unreachable_message">El proxy no responde, así que no carga nada de lo que pasa por él. Revisa tu conexión a la red.</string>
+    <string name="connection_test_proxy_action">Probar el proxy</string>
 </resources>

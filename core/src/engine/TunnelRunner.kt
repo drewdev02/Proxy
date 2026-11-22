@@ -24,13 +24,19 @@ import org.uci.proxy.core.packet.NON_PUBLIC_RANGES
 import org.uci.proxy.core.packet.routesExcluding
 import org.uci.proxy.core.port.DnsTransport
 import org.uci.proxy.core.port.HostResolver
+import org.uci.proxy.core.port.LocalAddresses
 import org.uci.proxy.core.port.LocalDnsConfig
 import org.uci.proxy.core.port.LocalDnsSource
 import org.uci.proxy.core.port.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.PlatformTunnel
 import org.uci.proxy.core.port.TunConfig
+import org.uci.proxy.core.port.NetFailure
 import org.uci.proxy.core.port.TunnelFailure
+import org.uci.proxy.core.port.code
+import org.uci.proxy.core.proxy.ProxyFailure
+import org.uci.proxy.core.proxy.ProxyTestResult
+import org.uci.proxy.core.proxy.ProxyTester
 import org.uci.proxy.core.port.TunnelMonitor
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.port.TunnelUnavailableException
@@ -91,19 +97,26 @@ class TunnelRunner(
     /** Donde se publica cada segundo el tráfico que pasó. */
     private val traffic: TrafficStore = TrafficStore(),
     private val timeSource: TimeSource = TimeSource.Monotonic,
+    /**
+     * Prueba el proxy antes de levantar el túnel, para no decir «Conectado» con la contraseña mal o el proxy caído.
+     * Null: no se prueba.
+     */
+    private val proxyProbe: ProxyTester? = null,
+    /** Las direcciones del equipo, para distinguir «sin red» de «el nombre del proxy no existe». */
+    private val localAddresses: LocalAddresses? = null,
 ) {
     /** Carga el perfil y su contraseña del almacén y ejecuta el túnel. */
     suspend fun run(platformTunnel: PlatformTunnel, profileId: String, settings: AppSettings = AppSettings()) {
         val profile = profiles.profiles.value.firstOrNull { it.id == profileId }
         if (profile == null) {
-            stateStore.set(TunnelState.Failed(TunnelFailure.ProfileNotFound))
+            fail(TunnelFailure.ProfileNotFound)
             return
         }
         val exit = profile.countryExit
         val start = if (exit == null) null else profiles.exitSecrets(profileId)?.let { CountryExitStart(exit, it, stateDirectories.forProfile(profileId)) }
         if (exit != null && start == null) {
             logger.log(LogLevel.ERROR, TAG, "El perfil sale por Otro País pero no se pudieron leer sus secretos")
-            stateStore.set(TunnelState.Failed(TunnelFailure.VpnSecretsMissing))
+            fail(TunnelFailure.VpnSecretsMissing)
             return
         }
         run(platformTunnel, profile, profiles.password(profileId), settings, start)
@@ -125,10 +138,14 @@ class TunnelRunner(
         val proxyAddress = hostResolver.resolveIpv4(profile.host)
         if (proxyAddress == null) {
             logger.log(LogLevel.ERROR, TAG, "No se pudo resolver el proxy ${profile.host}")
-            stateStore.set(TunnelState.Failed(TunnelFailure.ProxyHostUnresolved(profile.host)))
+            fail(if (hasNetwork()) TunnelFailure.ProxyHostUnresolved(profile.host) else TunnelFailure.NoNetwork)
             return
         }
         val resolvedProfile = profile.copy(host = proxyAddress)
+        checkProxy(resolvedProfile, password)?.let {
+            fail(it)
+            return
+        }
         val routing = profile.routing
         // También antes de tocar la red: el DNS de la red real deja de verse en cuanto el túnel captura el DNS.
         val localDnsConfig = readLocalDns()
@@ -166,7 +183,7 @@ class TunnelRunner(
         } catch (e: TunnelUnavailableException) {
             logger.log(LogLevel.ERROR, TAG, "No se pudo crear la interfaz: ${e.message}")
             firstSession?.close()
-            stateStore.set(TunnelState.Failed(TunnelFailure.InterfaceUnavailable))
+            fail(TunnelFailure.InterfaceUnavailable)
             return
         }
 
@@ -182,12 +199,14 @@ class TunnelRunner(
         try {
             coroutineScope {
                 // En este ámbito viven también el temporizador TCP y los relés de cada conexión.
+                val health = ProxyHealth(timeSource)
                 val engine = engineFactory.create(
                     plan, output = tun, scope = this, profile = resolvedProfile, password = password, settings = settings,
-                    split = split, localDns = localDns, meter = meter,
+                    split = split, localDns = localDns, meter = meter, health = health,
                 )
                 val loop = launch(dispatchers.background) { engine.run(tun) }
                 launch { sampleTraffic(meter) }
+                launch { watchProxy(health) }
                 if (retry != null && firstAttempt != null) {
                     launch { superviseVpn(firstAttempt, link, tun, profile.id, retry) }
                 }
@@ -208,6 +227,61 @@ class TunnelRunner(
             link.closeSession()
             stateStore.set(TunnelState.Disconnected)
             logger.log(LogLevel.INFO, TAG, "Túnel detenido")
+        }
+    }
+
+    /** Pone el estado en fallo y lo deja en el registro con su código, el mismo que muestra la interfaz. */
+    private fun fail(failure: TunnelFailure) {
+        logger.log(LogLevel.ERROR, TAG, "No se pudo conectar [${failure.code}]: $failure")
+        stateStore.set(TunnelState.Failed(failure))
+    }
+
+    /** Sin ninguna dirección que no sea de bucle local ni autoasignada, el equipo no tiene red. */
+    private fun hasNetwork(): Boolean {
+        val addresses = localAddresses?.ipv4() ?: return true
+        return addresses.any { address ->
+            val first = address ushr 24 and 0xFF
+            val second = address ushr 16 and 0xFF
+            first != 127 && !(first == 169 && second == 254)
+        }
+    }
+
+    /**
+     * Abre un túnel de prueba con el proxy. Devuelve el fallo si el proxy no sirve; null si funciona o si solo rechazó el
+     * destino de prueba (su política puede bloquearlo y aun así el proxy funciona).
+     */
+    private suspend fun checkProxy(profile: ProxyProfile, password: String): TunnelFailure? {
+        val probe = proxyProbe ?: return null
+        val result = probe.test(profile, password)
+        logger.log(LogLevel.DEBUG, TAG, "Prueba del proxy antes de conectar: $result")
+        return when (result) {
+            ProxyTestResult.Success -> null
+            ProxyTestResult.Timeout -> TunnelFailure.ProxyUnreachable(NetFailure.TIMEOUT)
+            is ProxyTestResult.Failure -> when (val failure = result.failure) {
+                ProxyFailure.AuthRequired -> TunnelFailure.ProxyAuthRequired
+                ProxyFailure.AuthRejected -> TunnelFailure.ProxyAuthFailed
+                is ProxyFailure.UnsupportedAuth -> TunnelFailure.ProxyAuthUnsupported(failure.schemes)
+                is ProxyFailure.Refused -> null
+                is ProxyFailure.Unreachable ->
+                    if (failure.kind == NetFailure.NO_NETWORK) TunnelFailure.NoNetwork else TunnelFailure.ProxyUnreachable(failure.kind)
+                is ProxyFailure.ProtocolError -> TunnelFailure.ProxyProtocolMismatch(failure.issue)
+            }
+        }
+    }
+
+    /** Mientras el túnel está en pie, lleva al estado lo que le pase al proxy, para que la interfaz avise. */
+    private suspend fun watchProxy(health: ProxyHealth) {
+        while (true) {
+            delay(TRAFFIC_INTERVAL)
+            val problem = health.problem
+            stateStore.update { state ->
+                if (state is TunnelState.Connected && state.proxyProblem != problem) {
+                    if (problem != null) logger.log(LogLevel.WARN, TAG, "El proxy está fallando con el túnel conectado: $problem")
+                    state.copy(proxyProblem = problem)
+                } else {
+                    state
+                }
+            }
         }
     }
 
@@ -295,7 +369,7 @@ class TunnelRunner(
         val session = when (val result = engines.connect(ExitContext(resolvedProfile, password, settings), vpn)) {
             is VpnConnectResult.Connected -> result.session
             is VpnConnectResult.Failed -> {
-                stateStore.set(TunnelState.Failed(result.failure))
+                fail(result.failure)
                 return
             }
         }
@@ -316,7 +390,7 @@ class TunnelRunner(
         } catch (e: TunnelUnavailableException) {
             logger.log(LogLevel.ERROR, TAG, "No se pudo crear la interfaz: ${e.message}")
             session.close()
-            stateStore.set(TunnelState.Failed(TunnelFailure.InterfaceUnavailable))
+            fail(TunnelFailure.InterfaceUnavailable)
             return
         }
 

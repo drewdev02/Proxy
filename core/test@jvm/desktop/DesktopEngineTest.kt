@@ -37,6 +37,7 @@ import org.uci.proxy.core.model.CountryExit
 import org.uci.proxy.core.model.CountryExitSecrets
 import org.uci.proxy.core.packet.buildUdpPacket
 import org.uci.proxy.core.packet.parseIpv4
+import org.uci.proxy.core.port.ProxyProblem
 import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.profile.AppDispatchers
@@ -162,6 +163,8 @@ class EngineProtocolTest {
         assertEquals(TunnelState.Connected("p1", vpnDown = true), roundTrip(TunnelState.Connected("p1", vpnDown = true)))
         val viaProxy = TunnelState.Connected("p1", viaProxy = listOf("example.com", "www.google.com"))
         assertEquals(viaProxy, roundTrip(viaProxy))
+        val failing = TunnelState.Connected("p1", proxyProblem = ProxyProblem.AUTH_REJECTED)
+        assertEquals(failing, roundTrip(failing))
         assertEquals(TunnelState.Disconnected, roundTrip(TunnelState.Disconnected))
         listOf(
             TunnelFailure.ProxyAuthFailed,

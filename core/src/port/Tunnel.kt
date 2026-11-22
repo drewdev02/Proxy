@@ -204,6 +204,15 @@ val TunnelFailure.code: String
         TunnelFailure.EngineInternal -> "VPN-INTERNAL"
     }
 
+/** Lo que le pasa al proxy con el túnel ya conectado, según cómo le va a cada conexión. */
+enum class ProxyProblem {
+    /** El proxy rechaza el usuario o la contraseña (por ejemplo, porque se cambió la contraseña). */
+    AUTH_REJECTED,
+
+    /** El proxy no responde o no se llega a él. */
+    UNREACHABLE,
+}
+
 sealed interface TunnelState {
     data object Disconnected : TunnelState
 
@@ -219,6 +228,8 @@ sealed interface TunnelState {
         val profileId: String,
         val vpnDown: Boolean = false,
         val viaProxy: List<String> = emptyList(),
+        /** El túnel sigue en pie, pero el proxy está fallando: lo que pasa por él no carga. */
+        val proxyProblem: ProxyProblem? = null,
     ) : TunnelState
 
     data class Failed(val failure: TunnelFailure) : TunnelState

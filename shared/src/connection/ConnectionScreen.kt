@@ -56,6 +56,7 @@ import org.uci.proxy.core.model.RouteRule
 import org.uci.proxy.core.model.RoutingRules
 import org.uci.proxy.core.model.RuleKind
 import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.port.ProxyProblem
 import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.proxy.ProxyTestResult
@@ -227,9 +228,11 @@ private fun Header(state: ConnectionUiState, onOpenUsage: () -> Unit, modifier: 
             val (text, tone) = when (val tunnel = state.tunnel) {
                 TunnelState.Disconnected -> Res.string.connection_pill_disconnected to UciTone.Neutral
                 is TunnelState.Connecting -> Res.string.connection_pill_connecting to UciTone.Active
-                is TunnelState.Connected ->
-                    (if (tunnel.vpnDown) Res.string.connection_pill_vpn_down else Res.string.connection_pill_connected) to
-                        (if (tunnel.vpnDown) UciTone.Warning else UciTone.Success)
+                is TunnelState.Connected -> when {
+                    tunnel.proxyProblem != null -> Res.string.connection_pill_proxy_failing to UciTone.Danger
+                    tunnel.vpnDown -> Res.string.connection_pill_vpn_down to UciTone.Warning
+                    else -> Res.string.connection_pill_connected to UciTone.Success
+                }
                 is TunnelState.Failed -> Res.string.connection_pill_failed to UciTone.Danger
             }
             UciStatusPill(stringResource(text), tone = tone)
@@ -393,20 +396,41 @@ private fun StatusAlerts(state: ConnectionUiState, actions: ConnectionActions, o
                 }
             },
         )
-        is TunnelState.Connected -> when {
-            tunnel.vpnDown -> UciInlineAlert(
-                stringResource(Res.string.connection_vpn_down_message),
-                title = stringResource(Res.string.connection_vpn_down_title),
-                tone = UciTone.Warning,
+        is TunnelState.Connected -> when (tunnel.proxyProblem) {
+            // Lo más grave primero: con el proxy fallando, no carga nada de lo que pasa por él.
+            ProxyProblem.AUTH_REJECTED -> UciInlineAlert(
+                stringResource(Res.string.connection_proxy_auth_rejected_message),
+                title = stringResource(Res.string.connection_proxy_failing_title),
+                tone = UciTone.Danger,
+                action = { UciButton(stringResource(Res.string.connection_edit_profile), onEdit, variant = UciButtonVariant.Text) },
             )
-            // Otro País está, pero su DNS no resolvió algunos nombres: esos salen por el proxy y hay que decirlo.
-            tunnel.viaProxy.isNotEmpty() -> UciInlineAlert(
-                viaProxyMessage(tunnel.viaProxy),
-                title = stringResource(Res.string.connection_via_proxy_title),
-                tone = UciTone.Warning,
+            ProxyProblem.UNREACHABLE -> UciInlineAlert(
+                stringResource(Res.string.connection_proxy_unreachable_message),
+                title = stringResource(Res.string.connection_proxy_failing_title),
+                tone = UciTone.Danger,
+                action = { UciButton(stringResource(Res.string.connection_test_proxy_action), actions.onTestProxy, variant = UciButtonVariant.Text) },
             )
+            null -> ConnectedAlerts(tunnel)
         }
         else -> Unit
+    }
+}
+
+/** Los avisos de un túnel conectado con el proxy funcionando. */
+@Composable
+private fun ConnectedAlerts(tunnel: TunnelState.Connected) {
+    when {
+        tunnel.vpnDown -> UciInlineAlert(
+            stringResource(Res.string.connection_vpn_down_message),
+            title = stringResource(Res.string.connection_vpn_down_title),
+            tone = UciTone.Warning,
+        )
+        // Otro País está, pero su DNS no resolvió algunos nombres: esos salen por el proxy y hay que decirlo.
+        tunnel.viaProxy.isNotEmpty() -> UciInlineAlert(
+            viaProxyMessage(tunnel.viaProxy),
+            title = stringResource(Res.string.connection_via_proxy_title),
+            tone = UciTone.Warning,
+        )
     }
 }
 

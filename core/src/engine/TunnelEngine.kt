@@ -145,10 +145,11 @@ class TunnelEngineFactory(
         localDns: LocalDns? = null,
         /** Dónde se cuentan los bytes que pasan; null si no se mide. */
         meter: TrafficMeter? = null,
+        /** Cómo le va al proxy; quien la pasa puede vigilarla para avisar si falla con el túnel en pie. */
+        health: ProxyHealth = ProxyHealth(timeSource),
     ): TunnelEngine {
         val fakeDns = FakeDnsTable(plan.subnetBase)
         val connector = connectors.first { it.protocol == profile.protocol }
-        val health = ProxyHealth(timeSource)
         val checks = ConnectivityChecks(settings.answerConnectivityChecks, health)
         val relay = TunnelRelay(
             connector, profile, password, logger, health, checks, IpNamer(settings, nameReporter, timeSource),

@@ -111,6 +111,8 @@ val tunnelModule = module {
             dnsTransport = get(),
             traffic = get(),
             timeSource = get(),
+            proxyProbe = get(),
+            localAddresses = get(),
         )
     }
 }
