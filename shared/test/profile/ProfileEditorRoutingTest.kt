@@ -1,5 +1,6 @@
 package org.uci.proxy.profile
 
+import org.uci.proxy.core.model.CountryExit
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.ProxyProtocol
 import org.uci.proxy.core.model.RouteExit
@@ -29,8 +30,8 @@ class ProfileEditorRoutingTest : MainDispatcherTest() {
     private val ProfileEditorViewModel.rules get() = uiState.value.routing.rules
 
     private fun ProfileEditorViewModel.add(text: String, exit: RouteExit) {
-        onNewRuleChange(text)
-        onNewRuleExitChange(exit)
+        updateNewRule(text)
+        setNewRuleExit(exit)
         addRule()
     }
 
@@ -61,24 +62,24 @@ class ProfileEditorRoutingTest : MainDispatcherTest() {
 
         assertTrue(viewModel.uiState.value.routing.newRuleInvalid)
         assertTrue(viewModel.rules.rules.isEmpty())
-        viewModel.onNewRuleChange("hola.com")
+        viewModel.updateNewRule("hola.com")
         assertFalse(viewModel.uiState.value.routing.newRuleInvalid, "al corregir se retira el aviso")
     }
 
     @Test
-    fun `a domain cannot go direct yet so it goes through the proxy`() {
+    fun `a domain can go direct`() {
         val viewModel = newViewModel()
 
-        viewModel.add("etecsa.cu", RouteExit.DIRECT)
+        viewModel.add("*.uci.cu", RouteExit.DIRECT)
 
-        assertEquals(RouteExit.PROXY, viewModel.rules.rules.single().exit)
+        assertEquals(RouteRule(RuleKind.DOMAIN, "*.uci.cu", RouteExit.DIRECT), viewModel.rules.rules.single())
     }
 
     @Test
     fun `a chosen app gets the exit picked for the new rule and keeps the typed text`() {
         val viewModel = newViewModel()
-        viewModel.onNewRuleChange("a medio escribir")
-        viewModel.onNewRuleExitChange(RouteExit.DIRECT)
+        viewModel.updateNewRule("a medio escribir")
+        viewModel.setNewRuleExit(RouteExit.DIRECT)
 
         viewModel.addAppRule("cu.uci.correo")
 
@@ -89,9 +90,9 @@ class ProfileEditorRoutingTest : MainDispatcherTest() {
     @Test
     fun `choosing the same app again replaces its rule`() {
         val viewModel = newViewModel()
-        viewModel.onNewRuleExitChange(RouteExit.VPN)
+        viewModel.setNewRuleExit(RouteExit.VPN)
         viewModel.addAppRule("com.netflix.mediaclient")
-        viewModel.onNewRuleExitChange(RouteExit.BLOCK)
+        viewModel.setNewRuleExit(RouteExit.BLOCK)
 
         viewModel.addAppRule("com.netflix.mediaclient")
 
@@ -118,7 +119,7 @@ class ProfileEditorRoutingTest : MainDispatcherTest() {
 
         viewModel.moveRule(2, -1)
         viewModel.moveRule(0, -1) // ya está arriba: no cambia nada
-        viewModel.onRuleExitChange(0, RouteExit.BLOCK)
+        viewModel.setRuleExit(0, RouteExit.BLOCK)
         viewModel.removeRule(2)
 
         assertEquals(listOf("a.com" to RouteExit.BLOCK, "c.com" to RouteExit.VPN), viewModel.rules.rules.map { it.value to it.exit })
@@ -127,9 +128,9 @@ class ProfileEditorRoutingTest : MainDispatcherTest() {
     @Test
     fun `the rules are saved with the profile`() {
         val viewModel = newViewModel()
-        viewModel.onDraftChange(ProfileDraft("UCI", "proxy.uci.cu", "3128", ProxyProtocol.HTTP, "andrey"))
-        viewModel.onRoutingEnabledChange(true)
-        viewModel.onDefaultExitChange(RouteExit.VPN)
+        viewModel.updateDraft(ProfileDraft("UCI", "proxy.uci.cu", "3128", ProxyProtocol.HTTP, "andrey"))
+        viewModel.setRoutingEnabled(true)
+        viewModel.setDefaultExit(RouteExit.VPN)
         viewModel.add("uci.cu", RouteExit.PROXY)
 
         viewModel.save()
@@ -149,5 +150,46 @@ class ProfileEditorRoutingTest : MainDispatcherTest() {
         ).also { it.start("p1") }
 
         assertEquals(routing, viewModel.rules)
+    }
+
+    private val ProfileEditorViewModel.newRuleExit get() = uiState.value.routing.newRuleExit
+
+    @Test
+    fun `without Otro País a new rule goes through the proxy`() {
+        assertEquals(RouteExit.PROXY, newViewModel().newRuleExit)
+    }
+
+    @Test
+    fun `the new rule exit follows Otro País on and off`() {
+        val viewModel = newViewModel()
+
+        viewModel.setCountryExitEnabled(true)
+        assertEquals(RouteExit.VPN, viewModel.newRuleExit)
+
+        viewModel.setCountryExitEnabled(false)
+        assertEquals(RouteExit.PROXY, viewModel.newRuleExit)
+    }
+
+    @Test
+    fun `an exit chosen by hand is kept when Otro País changes`() {
+        val viewModel = newViewModel()
+        viewModel.setNewRuleExit(RouteExit.BLOCK)
+
+        viewModel.setCountryExitEnabled(true)
+        viewModel.setCountryExitEnabled(false)
+
+        assertEquals(RouteExit.BLOCK, viewModel.newRuleExit)
+    }
+
+    @Test
+    fun `a profile with Otro País starts new rules on it`() {
+        val seeded = FakeProfileRepository(
+            listOf(ProxyProfile("p1", "UCI", "proxy.uci.cu", 3128, ProxyProtocol.HTTP, "", countryExit = CountryExit.OpenVpn("ca.ovpn", "u"))),
+        )
+        val viewModel = ProfileEditorViewModel(
+            seeded, ProfileValidator(), idGenerator = { "nuevo" }, FakeProxyTester(), FakeLocalNetworkPermission(), RecordingLogger(),
+        ).also { it.start("p1") }
+
+        assertEquals(RouteExit.VPN, viewModel.newRuleExit)
     }
 }

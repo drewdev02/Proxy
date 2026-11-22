@@ -35,25 +35,32 @@ class LogsViewModel(
     /** La foto de la lista en el momento de pausar, o null si no está en pausa. */
     private val frozen = MutableStateFlow<List<LogEntry>?>(null)
 
-    val uiState: StateFlow<LogsUiState> = combine(buffer.entries, minLevel, frozen) { live, level, snapshot ->
+    val uiState: StateFlow<LogsUiState> = combine(buffer.entries, minLevel, frozen, ::buildState).stateIn(
+        viewModelScope,
+        // Solo mientras alguien lo mira, y 5 s más para no reiniciar al girar la pantalla (recomendación de Google).
+        SharingStarted.WhileSubscribed(5_000),
+        buildState(buffer.entries.value, minLevel.value, frozen.value),
+    )
+
+    private fun buildState(live: List<LogEntry>, level: LogLevel, snapshot: List<LogEntry>?): LogsUiState {
         val source = snapshot ?: live
-        LogsUiState(
+        return LogsUiState(
             entries = source.filter { it.level >= level },
             minLevel = level,
             paused = snapshot != null,
             total = source.size,
         )
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, LogsUiState())
+    }
 
-    fun onLevelChange(level: LogLevel) {
+    fun setMinLevel(level: LogLevel) {
         minLevel.value = level
     }
 
-    fun onTogglePause() {
+    fun togglePause() {
         frozen.value = if (frozen.value == null) buffer.entries.value else null
     }
 
-    fun onClear() {
+    fun clear() {
         // También lo guardado en disco: si no, volvería a aparecer al abrir la app otra vez.
         recorder.clear()
         // En pausa, la foto es lo que se ve: si no se vaciara también, «Limpiar» no haría nada a la vista.
@@ -61,5 +68,5 @@ class LogsViewModel(
     }
 
     /** Lo que hay en pantalla, como texto, para copiarlo. */
-    fun textToCopy(): String = uiState.value.entries.toText()
+    fun textToCopy(): String = buildState(buffer.entries.value, minLevel.value, frozen.value).entries.toText()
 }

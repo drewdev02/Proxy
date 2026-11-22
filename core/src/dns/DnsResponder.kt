@@ -24,28 +24,9 @@ class DnsResponder(
      * @return el mensaje de respuesta, o null si [query] no es una consulta válida.
      */
     fun respond(query: ByteArray): ByteArray? {
-        val question = parseQuestion(query) ?: return null
-        val questionLength = question.second
-        val includeAnswer = question.first.type == TYPE_A
-
-        val response = ByteArray(HEADER_SIZE + questionLength + if (includeAnswer) ANSWER_SIZE else 0)
-        query.copyInto(response, 0, 0, 2) // identificador de la transacción
-        // Respuesta, sin error, recursión disponible; se conserva el bit "recursión deseada" de la consulta.
-        response.writeU16(2, FLAG_RESPONSE or FLAG_RECURSION_AVAILABLE or (query.readU16(2) and FLAG_RECURSION_DESIRED))
-        response.writeU16(4, 1) // una pregunta
-        response.writeU16(6, if (includeAnswer) 1 else 0)
-        query.copyInto(response, HEADER_SIZE, HEADER_SIZE, HEADER_SIZE + questionLength)
-
-        if (includeAnswer) {
-            val answer = HEADER_SIZE + questionLength
-            response.writeU16(answer, POINTER_TO_QUESTION_NAME)
-            response.writeU16(answer + 2, TYPE_A)
-            response.writeU16(answer + 4, CLASS_IN)
-            response.writeInt(answer + 6, TTL_SECONDS)
-            response.writeU16(answer + 10, 4)
-            response.writeInt(answer + 12, addressOverride(question.first.name) ?: table.addressFor(question.first.name))
-        }
-        return response
+        val question = parseQuestion(query)?.first ?: return null
+        val address = if (question.type == TYPE_A) addressOverride(question.name) ?: table.addressFor(question.name) else null
+        return reply(query, address)
     }
 
     /** Devuelve la primera pregunta y cuántos bytes ocupa, o null si el mensaje no es una consulta válida. */
@@ -53,6 +34,46 @@ class DnsResponder(
 
     companion object {
         const val TYPE_A = 1
+
+        /**
+         * La respuesta a [query]: con [address] si es una consulta A y la hay; si no, vacía y sin error, para que el
+         * sistema no lo dé por inexistente y use el registro A.
+         *
+         * @return null si [query] no es una consulta válida.
+         */
+        fun reply(query: ByteArray, address: Int?, ttlSeconds: Int = TTL_SECONDS): ByteArray? {
+            val (question, questionLength) = readQuestion(query, response = false) ?: return null
+            val includeAnswer = question.type == TYPE_A && address != null
+            val response = header(query, questionLength, answers = if (includeAnswer) 1 else 0, extra = if (includeAnswer) ANSWER_SIZE else 0)
+            if (includeAnswer) {
+                val answer = HEADER_SIZE + questionLength
+                response.writeU16(answer, POINTER_TO_QUESTION_NAME)
+                response.writeU16(answer + 2, TYPE_A)
+                response.writeU16(answer + 4, CLASS_IN)
+                response.writeInt(answer + 6, ttlSeconds)
+                response.writeU16(answer + 10, 4)
+                response.writeInt(answer + 12, address)
+            }
+            return response
+        }
+
+        /** «Ese nombre no existe» (NXDOMAIN) para [query], o null si no es una consulta válida. */
+        fun nameError(query: ByteArray): ByteArray? {
+            val questionLength = readQuestion(query, response = false)?.second ?: return null
+            return header(query, questionLength, answers = 0, extra = 0, responseCode = RCODE_NAME_ERROR)
+        }
+
+        /** Cabecera y pregunta de la respuesta, con sitio para [extra] bytes de respuestas detrás. */
+        private fun header(query: ByteArray, questionLength: Int, answers: Int, extra: Int, responseCode: Int = 0): ByteArray {
+            val response = ByteArray(HEADER_SIZE + questionLength + extra)
+            query.copyInto(response, 0, 0, 2) // identificador de la transacción
+            // Respuesta, recursión disponible; se conserva el bit "recursión deseada" de la consulta.
+            response.writeU16(2, FLAG_RESPONSE or FLAG_RECURSION_AVAILABLE or (query.readU16(2) and FLAG_RECURSION_DESIRED) or responseCode)
+            response.writeU16(4, 1) // una pregunta
+            response.writeU16(6, answers)
+            query.copyInto(response, HEADER_SIZE, HEADER_SIZE, HEADER_SIZE + questionLength)
+            return response
+        }
 
         /** La primera pregunta de una consulta, o null si no es una consulta válida. */
         fun parseQuestionOf(query: ByteArray): DnsQuestion? = readQuestion(query, response = false)?.first
@@ -89,6 +110,7 @@ class DnsResponder(
         private const val FLAG_RESPONSE = 0x8000
         private const val FLAG_RECURSION_DESIRED = 0x0100
         private const val FLAG_RECURSION_AVAILABLE = 0x0080
+        private const val RCODE_NAME_ERROR = 3
 
         // 0xC00C: puntero de compresión al nombre de la pregunta, que empieza en el byte 12.
         private const val POINTER_TO_QUESTION_NAME = 0xC00C

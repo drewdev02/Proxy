@@ -8,6 +8,7 @@ import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.settings.AppSettings
 import org.uci.proxy.core.settings.NameOutcome
+import org.uci.proxy.core.traffic.TrafficDelta
 import org.uci.proxy.core.vpn.CountryExitStart
 
 /*
@@ -19,6 +20,7 @@ import org.uci.proxy.core.vpn.CountryExitStart
  *   motor   -> ventana : STATE connected [vpn-down] | STATE disconnected | STATE failed <TunnelFailure>
  *   motor   -> ventana : LOG <json de EngineLog>    un mensaje de registro, para la pantalla «Registro» de la ventana
  *   motor   -> ventana : NAMESTAT <id del servicio> WORKED | REFUSED   cómo le fue a un servicio de nombres para IP
+ *   motor   -> ventana : TRAFFIC <json de TrafficDelta>   el tráfico del último segundo
  *   ventana -> motor   : STOP
  *
  * Si cualquiera de los dos cierra el socket, el otro da el túnel por terminado. Así el motor nunca
@@ -48,8 +50,24 @@ object EngineProtocol {
 
     /** Tras «connected»: Otro País no está y su tráfico sale por el proxy. */
     private const val VPN_DOWN = "vpn-down"
+    private const val VIA_PROXY = "via-proxy="
 
     private const val NAMESTAT_PREFIX = "NAMESTAT "
+    private const val TRAFFIC_PREFIX = "TRAFFIC "
+
+    fun encodeTraffic(delta: TrafficDelta): String = TRAFFIC_PREFIX + json.encodeToString(TrafficDelta.serializer(), delta)
+
+    /** @return null si [line] no es un TRAFFIC válido. */
+    fun decodeTraffic(line: String): TrafficDelta? {
+        if (!line.startsWith(TRAFFIC_PREFIX)) return null
+        return try {
+            json.decodeFromString(TrafficDelta.serializer(), line.removePrefix(TRAFFIC_PREFIX))
+        } catch (_: kotlinx.serialization.SerializationException) {
+            null
+        } catch (_: IllegalArgumentException) {
+            null
+        }
+    }
 
     fun encodeNameStat(serviceId: String, outcome: NameOutcome): String = "$NAMESTAT_PREFIX$serviceId ${outcome.name}"
 
@@ -92,7 +110,10 @@ object EngineProtocol {
 
     /** Solo se transmiten los estados que produce el motor; "conectando" lo pone la propia ventana. */
     fun encodeState(state: TunnelState): String? = when (state) {
-        is TunnelState.Connected -> STATE_PREFIX + "connected" + if (state.vpnDown) " $VPN_DOWN" else ""
+        is TunnelState.Connected -> STATE_PREFIX + "connected" +
+            (if (state.vpnDown) " $VPN_DOWN" else "") +
+            // Los nombres no llevan espacios ni comas: van en una sola palabra.
+            (if (state.viaProxy.isNotEmpty()) " $VIA_PROXY" + state.viaProxy.joinToString(",") else "")
         TunnelState.Disconnected -> STATE_PREFIX + "disconnected"
         is TunnelState.Failed -> STATE_PREFIX + "failed " + state.failure.name
         is TunnelState.Connecting -> null
@@ -103,7 +124,11 @@ object EngineProtocol {
         if (!line.startsWith(STATE_PREFIX)) return null
         val parts = line.removePrefix(STATE_PREFIX).split(' ')
         return when (parts[0]) {
-            "connected" -> TunnelState.Connected(profileId, vpnDown = parts.getOrNull(1) == VPN_DOWN)
+            "connected" -> TunnelState.Connected(
+                profileId,
+                vpnDown = VPN_DOWN in parts,
+                viaProxy = parts.firstOrNull { it.startsWith(VIA_PROXY) }?.removePrefix(VIA_PROXY)?.split(',')?.filter { it.isNotEmpty() }.orEmpty(),
+            )
             "disconnected" -> TunnelState.Disconnected
             "failed" -> TunnelFailure.entries.firstOrNull { it.name == parts.getOrNull(1) }?.let(TunnelState::Failed)
             else -> null

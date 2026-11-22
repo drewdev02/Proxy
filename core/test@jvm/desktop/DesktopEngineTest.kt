@@ -48,6 +48,9 @@ import java.nio.file.Path
 import kotlin.io.path.exists
 import kotlin.test.AfterTest
 import kotlin.test.Test
+import org.uci.proxy.core.model.RouteExit
+import org.uci.proxy.core.traffic.TrafficDelta
+import org.uci.proxy.core.traffic.TrafficUsage
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -109,6 +112,22 @@ class EngineProtocolTest {
     }
 
     @Test
+    fun `a traffic measure survives the round trip and bad lines are rejected`() {
+        val delta = TrafficDelta(
+            millis = 1_002,
+            up = 40,
+            down = 900,
+            connections = 3,
+            usage = listOf(TrafficUsage(RouteExit.PROXY, "github.com", null, 40, 100), TrafficUsage(RouteExit.VPN, null, null, 0, 800)),
+        )
+
+        assertEquals(delta, EngineProtocol.decodeTraffic(EngineProtocol.encodeTraffic(delta)))
+        assertNull(EngineProtocol.decodeTraffic("TRAFFIC {no es json"))
+        assertNull(EngineProtocol.decodeTraffic("""TRAFFIC {"millis":1,"up":0,"down":0,"connections":0,"usage":[{"exit":"NUEVA","host":null,"app":null,"up":0,"down":0}]}"""))
+        assertNull(EngineProtocol.decodeTraffic("STATE connected"))
+    }
+
+    @Test
     fun `lines that are not a valid start are rejected`() {
         assertNull(EngineProtocol.decodeStart("STOP"))
         assertNull(EngineProtocol.decodeStart("START {no es json"))
@@ -138,6 +157,8 @@ class EngineProtocolTest {
 
         assertEquals(TunnelState.Connected("p1"), roundTrip(TunnelState.Connected("otro-id-del-motor")))
         assertEquals(TunnelState.Connected("p1", vpnDown = true), roundTrip(TunnelState.Connected("p1", vpnDown = true)))
+        val viaProxy = TunnelState.Connected("p1", viaProxy = listOf("example.com", "www.google.com"))
+        assertEquals(viaProxy, roundTrip(viaProxy))
         assertEquals(TunnelState.Disconnected, roundTrip(TunnelState.Disconnected))
         TunnelFailure.entries.forEach { assertEquals(TunnelState.Failed(it), roundTrip(TunnelState.Failed(it))) }
     }

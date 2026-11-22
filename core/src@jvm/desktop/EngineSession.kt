@@ -15,11 +15,13 @@ import org.uci.proxy.core.port.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.PlatformTunnel
 import org.uci.proxy.core.port.TunnelState
+import org.uci.proxy.core.traffic.TrafficMonitor
 import java.io.BufferedReader
 import java.io.IOException
 import java.io.PrintWriter
 import java.net.Socket
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Lado del motor: atiende a la ventana por el socket ya conectado y ejecuta un túnel.
@@ -38,6 +40,8 @@ class EngineSession(
     private val maxDuration: Duration? = null,
     /** Cómo le fue a cada servicio de nombres: se reenvía a la ventana, que lo muestra en Ajustes. */
     private val nameForwarder: EngineNameForwarder? = null,
+    /** El tráfico que mide el motor: se reenvía a la ventana, que lo muestra y lo guarda. */
+    private val traffic: TrafficMonitor? = null,
 ) {
     suspend fun serve(socket: Socket, token: String) = coroutineScope {
         val reader = socket.getInputStream().bufferedReader()
@@ -62,6 +66,9 @@ class EngineSession(
         }
         val logForwarder = launch { logBuffer.entries.collect(::forwardNewLogs) }
 
+        val trafficForwarder = traffic?.let { monitor ->
+            launch { monitor.deltas.collect { writer.println(EngineProtocol.encodeTraffic(it)) } }
+        }
         val tunnel = launch { runner.run(platformTunnel, start.profile, start.password, start.settings, start.countryExit) }
         val reporter = launch {
             // El estado de partida es "desconectado": enviarlo haría creer a la ventana que el túnel ya terminó.
@@ -83,6 +90,11 @@ class EngineSession(
         }
 
         tunnel.join()
+        // La última medida (lo que quedaba al parar) ya se publicó: se da un momento a que el reenvío la recoja.
+        trafficForwarder?.let { forwarder ->
+            delay(TRAFFIC_FLUSH)
+            forwarder.cancel()
+        }
         // Lo último que registró el túnel al acabar («Túnel detenido», un fallo…) se envía antes del estado final.
         logForwarder.cancelAndJoin()
         forwardNewLogs(logBuffer.entries.value)
@@ -103,5 +115,6 @@ class EngineSession(
 
     private companion object {
         const val TAG = "Engine"
+        val TRAFFIC_FLUSH = 100.milliseconds
     }
 }

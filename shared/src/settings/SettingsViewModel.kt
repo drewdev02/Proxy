@@ -5,7 +5,9 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.uci.proxy.core.model.ProxyProfile
@@ -37,6 +39,15 @@ sealed interface ServiceTestUi {
     data object LocalNetworkDenied : ServiceTestUi
 }
 
+/** Todo lo que muestra Ajustes, en un solo estado. */
+data class SettingsUiState(
+    val settings: AppSettings = AppSettings(),
+    /** El último resultado de cada servicio de nombres, por id. */
+    val statuses: Map<String, NameServiceStatus> = emptyMap(),
+    /** El resultado de la última prueba de cada servicio, por id. */
+    val tests: Map<String, ServiceTestUi> = emptyMap(),
+)
+
 class SettingsViewModel(
     private val repository: SettingsRepository,
     private val profiles: ProfileRepository,
@@ -47,28 +58,48 @@ class SettingsViewModel(
     private val idGenerator: IdGenerator,
     private val localNetworkPermission: LocalNetworkPermission,
 ) : ViewModel() {
-    val settings: StateFlow<AppSettings> = repository.settings
-
-    /** El último resultado de cada servicio, por id. */
-    val statuses: StateFlow<Map<String, NameServiceStatus>> = statusRepository.statuses
-
     private val mutableTests = MutableStateFlow<Map<String, ServiceTestUi>>(emptyMap())
 
-    /** El resultado de la última prueba de cada servicio, por id. */
-    val tests: StateFlow<Map<String, ServiceTestUi>> = mutableTests.asStateFlow()
+    val uiState: StateFlow<SettingsUiState> =
+        combine(repository.settings, statusRepository.statuses, mutableTests, ::SettingsUiState)
+            .stateIn(
+                viewModelScope,
+                // Solo mientras alguien lo mira, y 5 s más para no reiniciar al girar la pantalla (recomendación de Google).
+                SharingStarted.WhileSubscribed(5_000),
+                SettingsUiState(repository.settings.value, statusRepository.statuses.value, mutableTests.value),
+            )
 
-    fun onAnswerConnectivityChecksChange(enabled: Boolean) = repository.setAnswerConnectivityChecks(enabled)
+    /** Los ajustes tal como están guardados: la fuente de verdad para validar y probar. */
+    private val settings: AppSettings get() = repository.settings.value
 
-    fun onNameByIpChange(enabled: Boolean) = repository.setNameByIp(enabled)
+    fun setAnswerConnectivityChecks(enabled: Boolean) = repository.setAnswerConnectivityChecks(enabled)
 
-    fun onTryRawIpChange(enabled: Boolean) = repository.setTryRawIp(enabled)
+    fun setIntranetDirect(enabled: Boolean) = repository.setIntranetDirect(enabled)
 
-    fun onServiceEnabledChange(id: String, enabled: Boolean) = repository.setNameServiceEnabled(id, enabled)
+    fun setNameByIp(enabled: Boolean) = repository.setNameByIp(enabled)
+
+    fun setTryRawIp(enabled: Boolean) = repository.setTryRawIp(enabled)
+
+    /** Avisar (o no) al llegar al [threshold] % de la cuota de la UCI. */
+    fun setQuotaAlert(threshold: Int, enabled: Boolean) = repository.updateQuota { quota ->
+        quota.copy(alerts = if (enabled) (quota.alerts + threshold).distinct().sorted() else quota.alerts - threshold)
+    }
+
+    fun setQuotaCheckMinutes(minutes: Int) = repository.updateQuota { it.copy(checkMinutes = minutes) }
+
+    fun setQuotaPause(enabled: Boolean) = repository.updateQuota { it.copy(pauseAtLimit = enabled) }
+
+    fun setQuotaVerifyCertificate(enabled: Boolean) = repository.updateQuota { it.copy(verifyCertificate = enabled) }
+
+    /** Solo en modo desarrollo: otra dirección para el servicio (el simulador). Vacío vuelve al de la UCI. */
+    fun setQuotaServiceUrl(url: String) = repository.updateQuota { it.copy(serviceUrl = url.trim().ifEmpty { null }) }
+
+    fun setServiceEnabled(id: String, enabled: Boolean) = repository.setNameServiceEnabled(id, enabled)
 
     /** [delta] negativo sube el servicio en la lista, positivo lo baja. */
-    fun onServiceMove(id: String, delta: Int) = repository.moveNameService(id, delta)
+    fun moveService(id: String, delta: Int) = repository.moveNameService(id, delta)
 
-    fun onResetServices() {
+    fun resetServices() {
         repository.resetNameServices()
         mutableTests.value = emptyMap()
     }
@@ -77,7 +108,7 @@ class SettingsViewModel(
      * Valida y, si está bien, añade un servicio propio. Devuelve el resultado para que el formulario muestre los errores.
      */
     fun addService(name: String, template: String): ServiceValidation {
-        val result = validator.validate(idGenerator.newId(), name, template, settings.value.nameServices)
+        val result = validator.validate(idGenerator.newId(), name, template, settings.nameServices)
         if (result is ServiceValidation.Valid) repository.addNameService(result.service)
         return result
     }
@@ -93,7 +124,7 @@ class SettingsViewModel(
      * hay que desconectar y probar de nuevo.
      */
     fun testService(id: String) {
-        val service = settings.value.nameServices.firstOrNull { it.id == id } ?: return
+        val service = settings.nameServices.firstOrNull { it.id == id } ?: return
         if (mutableTests.value[id] == ServiceTestUi.Running) return
         val profile = profileForTest()
         if (profile == null) {

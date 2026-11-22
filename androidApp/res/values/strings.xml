@@ -4,6 +4,7 @@
     <string name="vpn_notification_title">ProxyUCI conectado</string>
     <string name="vpn_notification_text">El tráfico del dispositivo pasa por el proxy.</string>
     <string name="vpn_alerts_channel_name">Avisos de Otro País</string>
+    <string name="quota_channel_name">Cuota de la UCI</string>
     <string name="vpn_down_title">Otro País no está disponible</string>
     <string name="vpn_down_text">Lo que iba por la VPN sale por el proxy mientras se reintenta.</string>
     <string name="vpn_back_title">Otro País volvió</string>

@@ -28,6 +28,7 @@ import org.uci.proxy.core.port.ConnectionOwner
 import org.uci.proxy.core.port.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.routing.RuleSet
+import org.uci.proxy.core.traffic.TrafficMeter
 import org.uci.proxy.core.vpn.VpnSession
 
 /** Lo que el motor necesita para repartir las conexiones entre el proxy, la VPN y el bloqueo. */
@@ -47,8 +48,16 @@ class SplitRouting(val rules: RuleSet, val link: VpnLink)
  * La usan a la vez el bucle del motor (lo que sale) y el de la VPN (lo que entra), así que su estado va bajo un cerrojo.
  *
  * @param appAddress la dirección de la interfaz, desde la que salen las apps.
+ * @param onViaProxy se llama con cada nombre que el DNS de la VPN no resolvió: sus conexiones salen por el proxy, y la
+ *   interfaz debe poder decirlo en vez de mostrar que todo va por Otro País.
  */
-class VpnLink(private val appAddress: Int, private val logger: Logger) {
+class VpnLink(
+    private val appAddress: Int,
+    private val logger: Logger,
+    private val onViaProxy: (String) -> Unit = {},
+    /** Dónde se cuenta lo que llega por la VPN; lo que sale lo cuenta [ExitRouterHandler]. */
+    private val meter: TrafficMeter? = null,
+) {
     private val lock = Mutex()
     private var session: VpnSession? = null
     private var vpnAddress = 0
@@ -161,10 +170,18 @@ class VpnLink(private val appAddress: Int, private val logger: Logger) {
         logger.log(LogLevel.DEBUG, TAG, "Resolviendo por Otro País: $name")
         current.writePacket(query)
         val answered = withTimeoutOrNull(timeoutMs) { done.await() } != null
-        lock.withLock {
+        val failed = lock.withLock {
             resolvingHosts.remove(name)
             resolving.entries.removeAll { it.value.first == name }
-            if (!answered || name !in addressByHost) unresolvable += name
+            val failed = !answered || name !in addressByHost
+            if (failed) unresolvable += name
+            failed
+        }
+        // A la vista en el registro: sin esto, la conexión sale por el proxy en silencio y parece que va por Otro País.
+        if (failed) {
+            val why = if (answered) "no tiene dirección para" else "no contestó por"
+            logger.log(LogLevel.WARN, TAG, "El DNS de Otro País $why $name: sus conexiones salen por el proxy")
+            onViaProxy(name)
         }
     }
 
@@ -175,7 +192,8 @@ class VpnLink(private val appAddress: Int, private val logger: Logger) {
      */
     suspend fun inbound(bytes: ByteArray): ByteArray? {
         val packet = Ipv4Packet.parse(bytes) ?: return null
-        return lock.withLock {
+        var from: String? = null
+        val reply = lock.withLock {
             if (session == null || packet.destination != vpnAddress) return@withLock null
             val datagram = if (packet.source == vpnDns) UdpDatagram.parse(packet)?.takeIf { it.sourcePort == DNS_PORT } else null
             if (datagram != null && datagram.destinationPort == RESOLVER_PORT) {
@@ -195,8 +213,11 @@ class VpnLink(private val appAddress: Int, private val logger: Logger) {
             val invented = portsOf(packet)?.let { (remotePort, appPort) ->
                 inventedFor[Translated(packet.protocol, appPort, packet.source, remotePort)]
             }
+            from = hostByAddress[packet.source] ?: formatIpv4(packet.source)
             rewriteAddresses(packet, askedServer ?: invented ?: packet.source, appAddress)
         }
+        if (reply != null) meter?.count(RouteExit.VPN, from, app = null, up = 0, down = packet.totalLength.toLong())
+        return reply
     }
 
     /** Apunta el nombre de cada IP de la respuesta, y la primera IP de cada nombre. Se llama con el cerrojo tomado. */
@@ -283,6 +304,8 @@ class ExitRouterHandler(
     private val logger: Logger,
     private val owner: ConnectionOwner = ConnectionOwner.Unknown,
     private val scope: CoroutineScope? = null,
+    /** Dónde se cuenta lo que sale por la VPN; lo que vuelve lo cuenta [VpnLink]. */
+    private val meter: TrafficMeter? = null,
 ) : PacketHandler {
     private data class Flow(val protocol: Int, val sourcePort: Int, val destination: Int, val destinationPort: Int)
 
@@ -309,8 +332,13 @@ class ExitRouterHandler(
                 if (opening) logger.log(LogLevel.DEBUG, TAG, "Bloqueado: $target")
                 listOfNotNull(if (segment != null) reset(packet, segment) else buildIcmpPortUnreachable(packet))
             }
-            // Directo solo existe para rangos de IP y apps, que ni entran en la interfaz; un dominio con esa salida va por el proxy.
-            RouteExit.PROXY, RouteExit.DIRECT -> null
+            RouteExit.PROXY -> null
+            // Lo directo de verdad (rangos, apps, y dominios con dirección interna) ni entra en la interfaz. Llega aquí un
+            // dominio «Directo» que el DNS de la red no dio como interno: no hay otro camino que el proxy.
+            RouteExit.DIRECT -> {
+                if (opening) logger.log(LogLevel.DEBUG, TAG, "Directo sin dirección interna, por el proxy: $target")
+                null
+            }
         }
     }
 
@@ -320,6 +348,7 @@ class ExitRouterHandler(
         if (!link.isUp) return null
         if (!fake) {
             if (!link.send(packet)) return null
+            countSent(packet, host)
             if (opening) logger.log(LogLevel.DEBUG, TAG, "Otro País: $target")
             return emptyList()
         }
@@ -328,12 +357,17 @@ class ExitRouterHandler(
         val real = link.addressFor(name)
         if (real != null) {
             if (!link.send(packet, destination = real)) return null
+            countSent(packet, name)
             if (opening) logger.log(LogLevel.DEBUG, TAG, "Otro País: $target (${formatIpv4(real)})")
             return emptyList()
         }
         if (link.isUnresolvable(name) || scope == null) return null
         scope.launch { link.resolve(name) }
         return emptyList()
+    }
+
+    private suspend fun countSent(packet: Ipv4Packet, host: String?) {
+        meter?.count(RouteExit.VPN, host ?: formatIpv4(packet.destination), app = null, up = packet.totalLength.toLong(), down = 0)
     }
 
     private fun decide(flow: Flow, packet: Ipv4Packet, host: String?, fake: Boolean, opening: Boolean): RouteExit {

@@ -14,6 +14,10 @@ import kotlinx.serialization.modules.subclassesOfSealed
  */
 @Serializable
 internal sealed interface Route : NavKey {
+    /** La pantalla principal: perfil activo, conectar, prueba del proxy y actividad. */
+    @Serializable
+    data object Connection : Route
+
     @Serializable
     data object ProfileList : Route
 
@@ -28,6 +32,14 @@ internal sealed interface Route : NavKey {
     /** El registro en vivo. */
     @Serializable
     data object Logs : Route
+
+    /** El consumo guardado: por día, por salida, por destino y por app. */
+    @Serializable
+    data object Usage : Route
+
+    /** El catálogo de componentes; solo en modo desarrollo. */
+    @Serializable
+    data object Catalog : Route
 }
 
 /**

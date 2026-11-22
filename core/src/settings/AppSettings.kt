@@ -49,18 +49,51 @@ data class AppSettings(
      * bloquear y hacen que el sistema muestre «sin internet» aunque lo haya. Solo contesta si el proxy funciona.
      */
     val answerConnectivityChecks: Boolean = true,
+    /**
+     * Los nombres de la red local (los de sus dominios de búsqueda, como `uci.cu`) se resuelven con el DNS de la red y,
+     * si su dirección es interna, van directos, sin proxy ni Otro País: el proxy institucional no suele abrirlos.
+     */
+    val intranetDirect: Boolean = true,
     /** Pedir al proxy las IP públicas por un nombre de [nameServices], en vez de por la IP tal cual. */
     val nameByIp: Boolean = true,
     /** Si ningún nombre sirve, probar por último la IP tal cual. */
     val tryRawIp: Boolean = true,
     /** En el orden en que se prueban; los desactivados se saltan. */
     val nameServices: List<IpNameService> = IpNameService.BUILT_IN,
+    /** La cuota de la UCI: avisos, consulta y pausa. */
+    val quota: QuotaSettings = QuotaSettings(),
 )
+
+/** Cómo se sigue la cuota de navegación de la UCI. */
+@Serializable
+data class QuotaSettings(
+    /** Los porcentajes de la cuota a los que se avisa. Cada uno avisa una vez, hasta que el consumo vuelve a bajar. */
+    val alerts: List<Int> = ALERT_THRESHOLDS,
+    /** Cada cuántos minutos se consulta mientras el túnel está conectado. */
+    val checkMinutes: Int = 5,
+    /** Desconectar el túnel al llegar al [PAUSE_THRESHOLD] % de la cuota, para no agotarla sin querer. */
+    val pauseAtLimit: Boolean = false,
+    /**
+     * Verificar el certificado del servicio. Apagado, como en UCIProxy: el de `cuotas.uci.cu` lo firma una autoridad de
+     * la UCI («ROOT AC UCI», bajo la raíz del Estado) que ningún sistema trae, y con la verificación la consulta falla.
+     */
+    val verifyCertificate: Boolean = false,
+    /** Otra dirección para el servicio, solo en modo desarrollo (para el simulador `tools/test_cuotas.py`). */
+    val serviceUrl: String? = null,
+) {
+    companion object {
+        val ALERT_THRESHOLDS = listOf(50, 75, 90)
+        val CHECK_INTERVALS = listOf(5, 15, 30)
+        const val PAUSE_THRESHOLD = 90
+    }
+}
 
 interface SettingsRepository {
     val settings: StateFlow<AppSettings>
 
     fun setAnswerConnectivityChecks(enabled: Boolean)
+
+    fun setIntranetDirect(enabled: Boolean)
 
     fun setNameByIp(enabled: Boolean)
 
@@ -79,6 +112,9 @@ interface SettingsRepository {
 
     /** Deja los servicios como vienen de fábrica y activos, y borra los propios. */
     fun resetNameServices()
+
+    /** Cambia los ajustes de la cuota a partir de los actuales. */
+    fun updateQuota(change: (QuotaSettings) -> QuotaSettings)
 }
 
 /** Guarda cada ajuste como una clave del [KeyValueStore]; lo que falte o no se entienda toma el valor por defecto. */
@@ -91,6 +127,11 @@ class StoredSettingsRepository(private val keyValueStore: KeyValueStore) : Setti
     override fun setAnswerConnectivityChecks(enabled: Boolean) {
         keyValueStore.putString(ANSWER_CONNECTIVITY_CHECKS_KEY, enabled.toString())
         state.value = state.value.copy(answerConnectivityChecks = enabled)
+    }
+
+    override fun setIntranetDirect(enabled: Boolean) {
+        keyValueStore.putString(INTRANET_DIRECT_KEY, enabled.toString())
+        state.value = state.value.copy(intranetDirect = enabled)
     }
 
     override fun setNameByIp(enabled: Boolean) {
@@ -123,6 +164,12 @@ class StoredSettingsRepository(private val keyValueStore: KeyValueStore) : Setti
 
     override fun resetNameServices() = updateServices { IpNameService.BUILT_IN }
 
+    override fun updateQuota(change: (QuotaSettings) -> QuotaSettings) {
+        val updated = change(state.value.quota)
+        keyValueStore.putString(QUOTA_KEY, json.encodeToString(updated))
+        state.value = state.value.copy(quota = updated)
+    }
+
     private fun updateServices(transform: (List<IpNameService>) -> List<IpNameService>) {
         val updated = transform(state.value.nameServices)
         keyValueStore.putString(NAME_SERVICES_KEY, json.encodeToString(updated))
@@ -134,10 +181,23 @@ class StoredSettingsRepository(private val keyValueStore: KeyValueStore) : Setti
         fun flag(key: String, default: Boolean) = keyValueStore.getString(key)?.toBooleanStrictOrNull() ?: default
         return AppSettings(
             answerConnectivityChecks = flag(ANSWER_CONNECTIVITY_CHECKS_KEY, defaults.answerConnectivityChecks),
+            intranetDirect = flag(INTRANET_DIRECT_KEY, defaults.intranetDirect),
             nameByIp = flag(NAME_BY_IP_KEY, defaults.nameByIp),
             tryRawIp = flag(TRY_RAW_IP_KEY, defaults.tryRawIp),
             nameServices = loadServices() ?: defaults.nameServices,
+            quota = loadQuota() ?: defaults.quota,
         )
+    }
+
+    private fun loadQuota(): QuotaSettings? {
+        val stored = keyValueStore.getString(QUOTA_KEY) ?: return null
+        return try {
+            json.decodeFromString<QuotaSettings>(stored)
+        } catch (_: SerializationException) {
+            null
+        } catch (_: IllegalArgumentException) {
+            null
+        }
     }
 
     /** Los guardados; si falta alguno de fábrica (porque una versión nueva lo añade) se pone al final, activo. */
@@ -154,8 +214,10 @@ class StoredSettingsRepository(private val keyValueStore: KeyValueStore) : Setti
 
     internal companion object {
         const val ANSWER_CONNECTIVITY_CHECKS_KEY = "settings.answer_connectivity_checks"
+        const val INTRANET_DIRECT_KEY = "settings.intranet_direct"
         const val NAME_BY_IP_KEY = "settings.name_by_ip"
         const val TRY_RAW_IP_KEY = "settings.try_raw_ip"
         const val NAME_SERVICES_KEY = "settings.name_services"
+        const val QUOTA_KEY = "settings.quota"
     }
 }

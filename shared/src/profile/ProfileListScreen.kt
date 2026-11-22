@@ -4,23 +4,18 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -31,10 +26,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.koin.compose.viewmodel.koinViewModel
+import org.uci.proxy.common.message
+import org.uci.proxy.connection.address
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.ProxyProtocol
-import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.port.TunnelState
+import org.uci.proxy.theme.ProxyUciTheme
+import org.uci.proxy.ui.components.UciButton
+import org.uci.proxy.ui.components.UciConfirmDialog
+import org.uci.proxy.ui.components.UciEmptyState
+import org.uci.proxy.ui.components.UciIconButton
+import org.uci.proxy.ui.components.UciInlineAlert
+import org.uci.proxy.ui.components.UciProfileRow
+import org.uci.proxy.ui.components.UciStatusPill
+import org.uci.proxy.ui.components.UciTone
+import org.uci.proxy.ui.components.UciTopBar
+import org.uci.proxy.ui.icons.UciIcons
 
 /** Lo que la lista necesita saber del túnel. */
 data class TunnelUiModel(
@@ -51,8 +60,35 @@ data class TunnelUiModel(
         }
 }
 
-/** Sin estado propio salvo el diálogo de confirmación: recibe los datos y avisa de las acciones. */
-@OptIn(ExperimentalMaterial3Api::class)
+/** La lista de perfiles a nivel de pantalla: obtiene su ViewModel y pasa solo estado y acciones a la versión sin estado. */
+@Composable
+internal fun ProfileListScreen(
+    onAdd: () -> Unit,
+    onEdit: (String) -> Unit,
+    onOpenCatalog: (() -> Unit)?,
+    viewModel: ProfileListViewModel = koinViewModel(),
+) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    ProfileListScreen(
+        profiles = state.profiles,
+        platformLabel = state.platformLabel,
+        deleteFailed = state.deleteFailed,
+        tunnel = state.tunnel,
+        onAdd = onAdd,
+        onEdit = onEdit,
+        onOpenCatalog = onOpenCatalog,
+        onDelete = viewModel::delete,
+        onDismissDeleteError = viewModel::dismissDeleteError,
+        onConnect = viewModel::connect,
+        onDisconnect = viewModel::disconnect,
+    )
+}
+
+/**
+ * La lista de perfiles sin estado (salvo la confirmación de borrado): una tarjeta por perfil con su estado, y desde
+ * ella editar, conectar o borrar. El perfil en uso no se edita ni se borra hasta desconectar.
+ */
 @Composable
 fun ProfileListScreen(
     profiles: List<ProxyProfile>,
@@ -61,98 +97,94 @@ fun ProfileListScreen(
     tunnel: TunnelUiModel,
     onAdd: () -> Unit,
     onEdit: (String) -> Unit,
-    onOpenLogs: () -> Unit,
-    onOpenSettings: () -> Unit,
     onDelete: (String) -> Unit,
     onDismissDeleteError: () -> Unit,
     onConnect: (String) -> Unit,
     onDisconnect: () -> Unit,
+    /** Si no es null, se ofrece abrir el catálogo de componentes (solo en modo desarrollo). */
+    onOpenCatalog: (() -> Unit)? = null,
 ) {
     var pendingDelete by remember { mutableStateOf<ProxyProfile?>(null) }
+    val spacing = ProxyUciTheme.spacing
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Perfiles de proxy") },
-                actions = {
-                    TextButton(onClick = onOpenSettings) { Text("Ajustes") }
-                    TextButton(onClick = onOpenLogs) { Text("Registro") }
-                },
-            )
-        },
-        floatingActionButton = {
-            ExtendedFloatingActionButton(onClick = onAdd) { Text("Nuevo perfil") }
-        },
-        bottomBar = {
-            Text(
-                platformLabel,
-                modifier = Modifier.fillMaxWidth().padding(12.dp),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-        },
-    ) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize()) {
-            (tunnel.state as? TunnelState.Failed)?.let { failed ->
-                Text(
-                    failed.failure.message(),
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-
-            if (profiles.isEmpty()) {
-                Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-                    Text(
-                        "Todavía no hay perfiles. Crea uno con «Nuevo perfil».",
-                        style = MaterialTheme.typography.bodyLarge,
-                        textAlign = TextAlign.Center,
-                    )
+    Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))) {
+        UciTopBar(
+            title = "Perfiles",
+            subtitle = when (profiles.size) {
+                0 -> "Ninguno guardado"
+                1 -> "1 perfil guardado"
+                else -> "${profiles.size} perfiles guardados"
+            },
+            actions = {
+                if (onOpenCatalog != null) UciIconButton(UciIcons.Widgets, "Catálogo de componentes", onOpenCatalog, bordered = false)
+                UciButton("Nuevo", onAdd, icon = UciIcons.Add)
+            },
+        )
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+            LazyColumn(
+                modifier = Modifier.widthIn(max = 720.dp).fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = spacing.screenMargin, vertical = spacing.sm),
+                verticalArrangement = Arrangement.spacedBy(spacing.gutterSmall),
+            ) {
+                (tunnel.state as? TunnelState.Failed)?.let { failed ->
+                    item(key = "tunnel-failed") {
+                        UciInlineAlert(failed.failure.message(), tone = UciTone.Danger)
+                    }
                 }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(profiles, key = { it.id }) { profile ->
-                        ProfileCard(
-                            profile = profile,
-                            tunnel = tunnel,
-                            onEdit = { onEdit(profile.id) },
-                            onDelete = { pendingDelete = profile },
-                            onConnect = { onConnect(profile.id) },
-                            onDisconnect = onDisconnect,
+                if (deleteFailed) {
+                    item(key = "delete-failed") {
+                        UciInlineAlert(
+                            "El perfil no se pudo eliminar. Inténtalo de nuevo.",
+                            title = "No se pudo eliminar",
+                            tone = UciTone.Danger,
+                            onDismiss = onDismissDeleteError,
                         )
                     }
+                }
+                if (profiles.isEmpty()) {
+                    item(key = "empty") {
+                        UciEmptyState(
+                            title = "Aún no hay perfiles",
+                            icon = UciIcons.Badge,
+                            message = "Un perfil guarda los datos de un proxy: servidor, usuario y, si quieres, Otro País y reglas de salida.",
+                            action = { UciButton("Añadir perfil", onAdd, icon = UciIcons.Add) },
+                        )
+                    }
+                }
+                items(profiles, key = { it.id }) { profile ->
+                    ProfileCard(
+                        profile = profile,
+                        tunnel = tunnel,
+                        onEdit = { onEdit(profile.id) },
+                        onDelete = { pendingDelete = profile },
+                        onConnect = { onConnect(profile.id) },
+                        onDisconnect = onDisconnect,
+                    )
+                }
+                item(key = "platform") {
+                    Text(
+                        platformLabel,
+                        style = ProxyUciTheme.mono.badge,
+                        color = ProxyUciTheme.colors.onSurfaceFaint,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = spacing.md),
+                    )
                 }
             }
         }
     }
 
     pendingDelete?.let { profile ->
-        AlertDialog(
-            onDismissRequest = { pendingDelete = null },
-            title = { Text("Eliminar perfil") },
-            text = { Text("Se eliminará «${profile.name}» junto con su contraseña guardada.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    pendingDelete = null
-                    onDelete(profile.id)
-                }) { Text("Eliminar") }
+        UciConfirmDialog(
+            title = "¿Eliminar «${profile.name}»?",
+            message = "Se eliminan también su contraseña y lo guardado de Otro País. No se puede deshacer.",
+            confirmLabel = "Eliminar",
+            destructive = true,
+            onConfirm = {
+                pendingDelete = null
+                onDelete(profile.id)
             },
-            dismissButton = { TextButton(onClick = { pendingDelete = null }) { Text("Cancelar") } },
-        )
-    }
-
-    if (deleteFailed) {
-        AlertDialog(
-            onDismissRequest = onDismissDeleteError,
-            title = { Text("No se pudo eliminar") },
-            text = { Text("El perfil no se pudo eliminar. Inténtalo de nuevo.") },
-            confirmButton = { TextButton(onClick = onDismissDeleteError) { Text("Aceptar") } },
+            onDismiss = { pendingDelete = null },
         )
     }
 }
@@ -167,66 +199,42 @@ private fun ProfileCard(
     onDisconnect: () -> Unit,
 ) {
     val isActive = tunnel.activeProfileId == profile.id
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 4.dp)) {
-            Text(profile.name, style = MaterialTheme.typography.titleMedium)
-            Text(profile.summary(), style = MaterialTheme.typography.bodyMedium)
-            val connected = tunnel.state as? TunnelState.Connected
-            if (isActive && connected != null) {
-                Text("Conectado", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                if (connected.vpnDown) {
-                    Text(
-                        "Otro País no está disponible: su tráfico sale por el proxy mientras se reintenta.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
+    val connected = (tunnel.state as? TunnelState.Connected)?.takeIf { isActive }
+    val connecting = isActive && tunnel.state is TunnelState.Connecting
+    UciProfileRow(
+        name = profile.name,
+        address = profile.address(),
+        status = when {
+            connected != null -> UciTone.Success
+            connecting -> UciTone.Active
+            else -> UciTone.Neutral
+        },
+        statusPulsing = connecting,
+        tone = if (connected != null) UciTone.Success else UciTone.Neutral,
+        // El perfil en uso no se edita hasta desconectar.
+        onClick = onEdit.takeIf { !isActive },
+        tags = {
+            UciStatusPill(profile.protocol.label)
+            profile.countryExit?.let { UciStatusPill("Otro País · ${it.kind.label}", tone = UciTone.Routing) }
+            if (profile.routing.enabled) UciStatusPill("Reglas", tone = UciTone.Routing)
+            when {
+                connected?.vpnDown == true -> UciStatusPill("Sin Otro País", tone = UciTone.Warning)
+                connected != null -> UciStatusPill("Conectado", tone = UciTone.Success)
+                connecting -> UciStatusPill("Conectando", tone = UciTone.Active)
+            }
+        },
+        trailing = {
+            if (tunnel.isAvailable) {
+                when {
+                    connected != null -> UciIconButton(UciIcons.Power, "Desconectar ${profile.name}", onDisconnect, tone = UciTone.Success)
+                    connecting -> UciIconButton(UciIcons.Power, "Conectando ${profile.name}", {}, tone = UciTone.Active, enabled = false)
+                    // Mientras otro perfil está en uso, primero hay que desconectarlo.
+                    else -> UciIconButton(UciIcons.Power, "Conectar ${profile.name}", onConnect, enabled = tunnel.activeProfileId == null)
                 }
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
-                // El perfil en uso no se edita ni se borra hasta desconectar.
-                TextButton(onClick = onEdit, enabled = !isActive) { Text("Editar") }
-                TextButton(onClick = onDelete, enabled = !isActive) { Text("Eliminar") }
-                if (tunnel.isAvailable) {
-                    when {
-                        isActive && tunnel.state is TunnelState.Connected ->
-                            OutlinedButton(onClick = onDisconnect) { Text("Desconectar") }
-                        isActive -> Button(onClick = {}, enabled = false) { Text("Conectando…") }
-                        // Mientras otro perfil está en uso, primero hay que desconectarlo.
-                        else -> Button(onClick = onConnect, enabled = tunnel.activeProfileId == null) { Text("Conectar") }
-                    }
-                }
-            }
-        }
-    }
-}
-
-private fun TunnelFailure.message(): String = when (this) {
-    TunnelFailure.VPN_PERMISSION_DENIED -> "No se pudo conectar: hace falta autorizar la conexión VPN."
-    TunnelFailure.LOCAL_NETWORK_DENIED ->
-        "No se pudo conectar: la app necesita permiso para acceder a la red local y alcanzar el proxy."
-    TunnelFailure.PROFILE_NOT_FOUND -> "No se pudo conectar: el perfil ya no existe."
-    TunnelFailure.INTERFACE_UNAVAILABLE -> "No se pudo conectar: el sistema no permitió crear la conexión VPN."
-    TunnelFailure.PROXY_HOST_UNRESOLVED -> "No se pudo conectar: no se encuentra el servidor del perfil."
-    TunnelFailure.PROXY_AUTH_FAILED -> "No se pudo conectar: el proxy rechazó el usuario o la contraseña."
-    TunnelFailure.VPN_PROFILE_INVALID ->
-        "No se pudo conectar: la configuración de Otro País no sirve (el archivo .ovpn debe ser OpenVPN sobre TCP; " +
-            "la dirección del servidor de Tailscale debe ser válida). Revísala en el perfil."
-    TunnelFailure.VPN_SERVER_UNREACHABLE -> "No se pudo conectar: el proxy no dejó llegar al servidor de Otro País."
-    TunnelFailure.VPN_SERVER_BLOCKED ->
-        "No se pudo conectar: la política del proxy bloqueó el acceso a los servidores de Otro País. " +
-            "Con OpenVPN, prueba con otro servidor, uno con puerto 443."
-    TunnelFailure.VPN_AUTH_FAILED ->
-        "No se pudo conectar: Otro País rechazó las credenciales (usuario y contraseña de la VPN, o clave de Tailscale)."
-    TunnelFailure.VPN_HANDSHAKE_FAILED -> "No se pudo conectar: el servidor de Otro País no completó la conexión."
-    TunnelFailure.EXIT_NODE_NOT_FOUND ->
-        "No se pudo conectar: el nodo de salida de Tailscale no existe en la red, o hay varios y no se eligió ninguno."
-    TunnelFailure.ENGINE_UNAVAILABLE -> "No se pudo conectar: el motor de Otro País del perfil no está disponible en este equipo."
-}
-
-private fun ProxyProfile.summary(): String {
-    val user = if (username.isEmpty()) "" else " · $username"
-    val exit = countryExit?.let { " · ${it.kind.label} ${it.summary}" }.orEmpty()
-    return "${protocol.label} · $host:$port$user$exit"
+            UciIconButton(UciIcons.Delete, "Eliminar ${profile.name}", onDelete, bordered = false, tone = UciTone.Danger, enabled = !isActive)
+        },
+    )
 }
 
 internal val ProxyProtocol.label: String
@@ -235,19 +243,20 @@ internal val ProxyProtocol.label: String
         ProxyProtocol.SOCKS5 -> "SOCKS5"
     }
 
-@Preview
+@Preview(widthDp = 412, heightDp = 800)
 @Composable
 private fun ProfileListScreenPreview() {
-    MaterialTheme {
+    ProxyUciTheme {
         ProfileListScreen(
-            profiles = listOf(ProxyProfile("1", "UCI", "proxy.uci.cu", 3128, ProxyProtocol.HTTP, "andrey")),
+            profiles = listOf(
+                ProxyProfile("1", "UCI Docente", "proxy.uci.cu", 3128, ProxyProtocol.HTTP, "andrey"),
+                ProxyProfile("2", "Residencia", "10.0.0.1", 1080, ProxyProtocol.SOCKS5, ""),
+            ),
             platformLabel = "ProxyUCI en Android 17",
             deleteFailed = false,
             tunnel = TunnelUiModel(isAvailable = true, state = TunnelState.Connected("1")),
             onAdd = {},
             onEdit = {},
-            onOpenLogs = {},
-            onOpenSettings = {},
             onDelete = {},
             onDismissDeleteError = {},
             onConnect = {},

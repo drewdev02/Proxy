@@ -1,6 +1,8 @@
 package org.uci.proxy.di
 
 import org.koin.dsl.module
+import org.uci.proxy.quota.AndroidQuotaNotifier
+import org.uci.proxy.quota.QuotaNotifier
 import org.uci.proxy.core.platform.AndroidTunnelController
 import org.uci.proxy.core.port.TunnelControl
 import org.uci.proxy.vpn.ProxyVpnService
@@ -16,4 +18,5 @@ val androidAppModule = module {
             stateStore = get(),
         )
     }
+    single<QuotaNotifier> { AndroidQuotaNotifier(get()) }
 }

@@ -7,7 +7,12 @@ import org.koin.dsl.KoinAppDeclaration
 import org.uci.proxy.core.di.coreModule
 import org.uci.proxy.core.di.platformModule
 import org.uci.proxy.core.log.LogRecorder
+import org.uci.proxy.core.traffic.TrafficRecorder
+import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.port.Logger
+import org.uci.proxy.core.port.PlatformInfo
 import org.uci.proxy.database.di.databaseModule
+import org.uci.proxy.quota.QuotaMonitor
 
 /** Módulos del proceso que muestra la interfaz. */
 val appModules: List<Module> = listOf(platformModule, coreModule, databaseModule, uiModule)
@@ -24,4 +29,13 @@ fun initKoin(config: KoinAppDeclaration? = null): KoinApplication = startKoin {
 }.also { app ->
     // El registro se guarda en disco desde el arranque, haya o no alguien mirando la pantalla «Registro».
     app.koin.get<LogRecorder>().start()
+    app.koin.get<TrafficRecorder>().start()
+    // La cuota de la UCI se sigue desde el arranque: los avisos llegan aunque no se mire la pantalla Consumo.
+    app.koin.get<QuotaMonitor>().start()
+    logStartup(app.koin.get(), app.koin.get())
+}
+
+/** Una línea al arrancar con la plataforma, útil al leer un registro que alguien envía. */
+internal fun logStartup(platformInfo: PlatformInfo, logger: Logger) {
+    logger.log(LogLevel.INFO, "ProxyUCI", "ProxyUCI en ${platformInfo.kind.displayName} ${platformInfo.osVersion}")
 }

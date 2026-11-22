@@ -1,10 +1,13 @@
 package org.uci.proxy
 
 import android.app.Activity
+import android.content.pm.ApplicationInfo
+import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -73,7 +76,11 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        enableEdgeToEdge()
+        // La app solo tiene tema oscuro: iconos claros en las barras aunque el sistema esté en modo claro.
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+        )
         super.onCreate(savedInstanceState)
 
         localNetworkPermission.prompt.attach { onResult ->
@@ -91,7 +98,11 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            App(filePicker = filePicker, appCatalog = appCatalog)
+            App(
+                filePicker = filePicker,
+                appCatalog = appCatalog,
+                developerMode = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0,
+            )
         }
     }
 

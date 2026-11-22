@@ -21,7 +21,7 @@ class LogsViewModelTest : MainDispatcherTest() {
 
     // Se crea en el primer uso, ya dentro de la prueba: viewModelScope necesita el despachador principal que instala la
     // clase base, y el orden entre sus @BeforeTest y los de esta clase cambia según la plataforma (en iOS va al revés).
-    private val viewModel by lazy { LogsViewModel(buffer, recorder) }
+    private val viewModel by lazy { LogsViewModel(buffer, recorder).also { it.uiState.keepSubscribed() } }
 
     private fun log(level: LogLevel, message: String) = buffer.append(0, level, "Relay", message)
 
@@ -54,7 +54,7 @@ class LogsViewModelTest : MainDispatcherTest() {
         log(LogLevel.WARN, "no abrió")
         log(LogLevel.ERROR, "falló")
 
-        viewModel.onLevelChange(LogLevel.WARN)
+        viewModel.setMinLevel(LogLevel.WARN)
 
         assertEquals(listOf("no abrió", "falló"), messages())
         assertEquals(4, viewModel.uiState.value.total)
@@ -63,13 +63,13 @@ class LogsViewModelTest : MainDispatcherTest() {
     @Test
     fun `while paused the list stays as it was and resuming shows what arrived meanwhile`() {
         log(LogLevel.INFO, "uno")
-        viewModel.onTogglePause()
+        viewModel.togglePause()
 
         log(LogLevel.INFO, "dos")
         assertTrue(viewModel.uiState.value.paused)
         assertEquals(listOf("uno"), messages())
 
-        viewModel.onTogglePause()
+        viewModel.togglePause()
 
         assertFalse(viewModel.uiState.value.paused)
         assertEquals(listOf("uno", "dos"), messages())
@@ -79,9 +79,9 @@ class LogsViewModelTest : MainDispatcherTest() {
     fun `the filter still applies while paused`() {
         log(LogLevel.DEBUG, "dns")
         log(LogLevel.ERROR, "falló")
-        viewModel.onTogglePause()
+        viewModel.togglePause()
 
-        viewModel.onLevelChange(LogLevel.ERROR)
+        viewModel.setMinLevel(LogLevel.ERROR)
 
         assertEquals(listOf("falló"), messages())
     }
@@ -90,7 +90,7 @@ class LogsViewModelTest : MainDispatcherTest() {
     fun `clearing empties the log`() {
         log(LogLevel.INFO, "uno")
 
-        viewModel.onClear()
+        viewModel.clear()
 
         assertEquals(emptyList(), messages())
         assertEquals(0, buffer.entries.value.size)
@@ -99,9 +99,9 @@ class LogsViewModelTest : MainDispatcherTest() {
     @Test
     fun `clearing while paused also empties what is on screen`() {
         log(LogLevel.INFO, "uno")
-        viewModel.onTogglePause()
+        viewModel.togglePause()
 
-        viewModel.onClear()
+        viewModel.clear()
 
         assertEquals(emptyList(), messages())
         assertTrue(viewModel.uiState.value.paused)
@@ -111,7 +111,7 @@ class LogsViewModelTest : MainDispatcherTest() {
     fun `the text to copy has one line per visible message`() {
         log(LogLevel.DEBUG, "oculto")
         log(LogLevel.WARN, "visible")
-        viewModel.onLevelChange(LogLevel.WARN)
+        viewModel.setMinLevel(LogLevel.WARN)
 
         val lines = viewModel.textToCopy().lines()
 

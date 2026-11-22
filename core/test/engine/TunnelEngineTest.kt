@@ -33,6 +33,9 @@ import org.uci.proxy.core.profile.AppDispatchers
 import org.uci.proxy.core.profile.StoredProfileRepository
 import org.uci.proxy.core.proxy.ProxyTarget
 import kotlin.test.Test
+import org.uci.proxy.core.model.RouteExit
+import org.uci.proxy.core.traffic.TrafficMeter
+import org.uci.proxy.core.traffic.TrafficUsage
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -50,9 +53,9 @@ class TunnelEngineTest {
     private val connector = FakeProxyConnector.connectingTo(tunnel)
 
     /** Arranca el motor sobre la TUN falsa; a partir de ahí la prueba inyecta paquetes con [send]. */
-    private fun TestScope.startEngine() {
+    private fun TestScope.startEngine(meter: TrafficMeter? = null) {
         val engine = TunnelEngineFactory(listOf(connector), { ByteArray(it) { 1 } }, testScheduler.timeSource, RecordingLogger())
-            .create(plan, output = tun, scope = backgroundScope, profile = PROFILE, password = "secreta")
+            .create(plan, output = tun, scope = backgroundScope, profile = PROFILE, password = "secreta", meter = meter)
         backgroundScope.launch { engine.run(tun) }
     }
 
@@ -142,6 +145,25 @@ class TunnelEngineTest {
 
         send(buildTcpPacket(APP, fakeAddress, 40000, 443, 1001, synAck.sequence + 1, TcpFlags.ACK, 65_535, "hola".encodeToByteArray()))
         assertEquals("hola", tunnel.writtenText)
+    }
+
+    @Test
+    fun `the bytes of each connection through the proxy are counted by destination`() = runTest {
+        val meter = TrafficMeter()
+        startEngine(meter)
+        val fakeAddress = dnsAnswerFor("www.uci.cu", this)
+        send(buildTcpPacket(APP, fakeAddress, 40000, 443, sequence = 1000, acknowledgment = 0, TcpFlags.SYN, 65_535))
+        val synAck = assertNotNull(TcpSegment.parse(lastWritten()))
+        send(buildTcpPacket(APP, fakeAddress, 40000, 443, 1001, synAck.sequence + 1, TcpFlags.ACK, 65_535))
+
+        send(buildTcpPacket(APP, fakeAddress, 40000, 443, 1001, synAck.sequence + 1, TcpFlags.ACK, 65_535, "hola".encodeToByteArray()))
+        tunnel.deliver("respuesta")
+        runCurrent()
+
+        val delta = meter.drain(1_000)
+        assertEquals(listOf(TrafficUsage(RouteExit.PROXY, "www.uci.cu", app = null, up = 4, down = 9)), delta.usage)
+        assertEquals(1, delta.connections)
+        assertEquals(0, meter.drain(1_000).up, "lo entregado no se vuelve a contar")
     }
 
     @Test

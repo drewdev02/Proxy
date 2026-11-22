@@ -17,6 +17,7 @@ import org.uci.proxy.core.port.TunnelMonitor
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.profile.AppDispatchers
 import org.uci.proxy.core.profile.ProfileRepository
+import org.uci.proxy.core.traffic.TrafficStore
 import org.uci.proxy.core.settings.NameServiceReporter
 import org.uci.proxy.core.settings.SettingsRepository
 import org.uci.proxy.core.port.EngineStateDirectories
@@ -53,6 +54,8 @@ class DesktopTunnelController(
     private val nameStatus: NameServiceReporter,
     /** Dónde guarda cada perfil el estado de su motor de Otro País; el motor, que corre aparte, recibe la ruta. */
     private val stateDirectories: EngineStateDirectories = EngineStateDirectories.None,
+    /** Donde la ventana anota el tráfico que le cuenta el motor. */
+    private val traffic: TrafficStore = TrafficStore(),
     private val launchTimeout: Duration = 3.minutes,
 ) : TunnelControl, TunnelMonitor {
     override val isAvailable = true
@@ -167,6 +170,7 @@ class DesktopTunnelController(
             return TunnelFailure.INTERFACE_UNAVAILABLE
         }
         writer.println(EngineProtocol.encodeStart(start))
+        traffic.reset()
 
         var failure: TunnelFailure? = null
         while (true) {
@@ -183,6 +187,10 @@ class DesktopTunnelController(
             }
             EngineProtocol.decodeNameStat(line)?.let { (serviceId, outcome) ->
                 nameStatus.report(serviceId, outcome)
+                continue
+            }
+            EngineProtocol.decodeTraffic(line)?.let { delta ->
+                traffic.record(delta)
                 continue
             }
             when (val state = EngineProtocol.decodeState(line, profileId)) {

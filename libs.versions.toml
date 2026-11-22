@@ -42,6 +42,14 @@ kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-t
 ktor-network = { module = "io.ktor:ktor-network", version.ref = "ktor" }
 # Versión 2: proxies HTTPS y SOCKS5 sobre TLS
 ktor-network-tls = { module = "io.ktor:ktor-network-tls", version.ref = "ktor" }
+# shared: la consulta de la cuota de la UCI (SOAP sobre HTTPS), con el TLS de cada sistema: el cliente de Java en
+# escritorio (java.net.http, ya está en el JDK y no añade librerías al .exe), OkHttp en Android y Darwin en iOS. No CIO:
+# su TLS propio es limitado.
+ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
+ktor-client-java = { module = "io.ktor:ktor-client-java", version.ref = "ktor" }
+ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
+ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktor" }
+ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
 
 # core (solo jvm): Wintun en Windows, utun en macOS, DPAPI
 jna = { module = "net.java.dev.jna:jna", version.ref = "jna" }

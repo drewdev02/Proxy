@@ -6,7 +6,6 @@ import org.koin.dsl.module
 import org.uci.proxy.core.port.TunnelControl
 import org.uci.proxy.core.port.TunnelMonitor
 import org.uci.proxy.fakes.FakeTunnel
-import org.uci.proxy.tunnel.TunnelViewModel
 import org.uci.proxy.core.log.InMemoryLogHistory
 import org.uci.proxy.core.port.KeyValueStore
 import org.uci.proxy.core.port.LogHistory
@@ -15,10 +14,13 @@ import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.SecretStore
 import org.uci.proxy.di.appModules
 import org.uci.proxy.fakes.FakeLocalNetworkPermission
+import org.uci.proxy.fakes.FakeTrafficHistory
+import org.uci.proxy.core.traffic.TrafficHistory
+import org.uci.proxy.usage.UsageViewModel
 import org.uci.proxy.fakes.InMemoryKeyValueStore
 import org.uci.proxy.fakes.InMemorySecretStore
 import org.uci.proxy.fakes.RecordingLogger
-import org.uci.proxy.home.HomeViewModel
+import org.uci.proxy.connection.ConnectionViewModel
 import org.uci.proxy.logs.LogsViewModel
 import org.uci.proxy.profile.ProfileEditorViewModel
 import org.uci.proxy.profile.ProfileListViewModel
@@ -37,6 +39,7 @@ class AppModulesTest {
         single<SecretStore> { InMemorySecretStore() }
         // La base de datos real escribiría en el disco del equipo (y en Android pide un Context).
         single<LogHistory> { InMemoryLogHistory() }
+        single<TrafficHistory> { FakeTrafficHistory() }
         single<LocalNetworkPermission> { FakeLocalNetworkPermission() }
         // En Android el túnel lo enlazan módulos de la propia app, que aquí no se cargan.
         single { FakeTunnel() } binds arrayOf(TunnelControl::class, TunnelMonitor::class)
@@ -44,24 +47,24 @@ class AppModulesTest {
     private val koin = koinApplication { modules(appModules + testOverrides) }.koin
 
     @Test
-    fun `HomeViewModel resolves from the app modules`() {
-        assertTrue(koin.get<HomeViewModel>().uiState.platformName.isNotBlank())
-    }
-
-    @Test
     fun `profile view models resolve from the app modules`() {
-        assertNotNull(koin.get<ProfileListViewModel>())
+        assertTrue(koin.get<ProfileListViewModel>().uiState.value.platformLabel.startsWith("ProxyUCI en "))
         assertNotNull(koin.get<ProfileEditorViewModel>())
-    }
-
-    @Test
-    fun `tunnel view model resolves from the app modules`() {
-        assertNotNull(koin.get<TunnelViewModel>())
     }
 
     @Test
     fun `settings view model resolves from the app modules`() {
         assertNotNull(koin.get<SettingsViewModel>())
+    }
+
+    @Test
+    fun `connection view model resolves from the app modules`() {
+        assertNotNull(koin.get<ConnectionViewModel>())
+    }
+
+    @Test
+    fun `usage view model resolves from the app modules`() {
+        assertNotNull(koin.get<UsageViewModel>())
     }
 
     @Test

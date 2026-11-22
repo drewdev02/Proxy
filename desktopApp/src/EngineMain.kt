@@ -7,6 +7,7 @@ import org.uci.proxy.core.desktop.EngineNameForwarder
 import org.koin.dsl.module
 import org.uci.proxy.core.desktop.EngineArguments
 import org.uci.proxy.core.desktop.EngineSession
+import org.uci.proxy.core.traffic.TrafficStore
 import org.uci.proxy.core.desktop.MacElevatedEngineLauncher
 import org.uci.proxy.core.desktop.WindowsElevatedEngineLauncher
 import org.uci.proxy.core.di.coreModule
@@ -18,6 +19,7 @@ import org.uci.proxy.core.platform.JnaProbe
 import org.uci.proxy.core.vpn.tailscale.NativeTailscaleBridge
 import org.uci.proxy.core.vpn.tailscale.TailscaleBridge
 import org.uci.proxy.core.platform.ProcessCommandRunner
+import org.uci.proxy.core.port.LocalDnsSource
 import org.uci.proxy.core.platform.macos.JnaUtunOpener
 import org.uci.proxy.core.platform.macos.MacNetwork
 import org.uci.proxy.core.platform.macos.MacPlatformTunnel
@@ -83,7 +85,13 @@ fun runEngine(args: List<String>) {
     val runner = if (testRoutes == null) {
         koin.get<TunnelRunner>()
     } else {
-        TunnelRunner(koin.get(), koin.get(), koin.get(), koin.get(), koin.get(), dispatchers, logger, publicRoutes = testRoutes, engines = koin.get())
+        TunnelRunner(
+            koin.get(), koin.get(), koin.get(), koin.get(), koin.get(), dispatchers, logger,
+            publicRoutes = testRoutes,
+            engines = koin.get(),
+            localDnsSource = koin.getOrNull() ?: LocalDnsSource.None,
+            dnsTransport = koin.get(),
+        )
     }
     val tunnel = when (val kind = koin.get<PlatformInfo>().kind) {
         PlatformKind.MACOS -> MacPlatformTunnel(
@@ -114,6 +122,7 @@ fun runEngine(args: List<String>) {
         logBuffer = koin.get(),
         maxDuration = EngineArguments.value(args, EngineArguments.MAX_SECONDS)?.toIntOrNull()?.seconds,
         nameForwarder = nameForwarder,
+        traffic = koin.get<TrafficStore>(),
     )
 
     runBlocking {

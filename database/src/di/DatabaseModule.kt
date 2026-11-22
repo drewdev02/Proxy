@@ -6,6 +6,9 @@ import org.uci.proxy.core.log.LogRecorder
 import org.uci.proxy.core.port.LogHistory
 import org.uci.proxy.database.ProxyDatabase
 import org.uci.proxy.database.log.RoomLogHistory
+import org.uci.proxy.database.traffic.RoomTrafficHistory
+import org.uci.proxy.core.traffic.TrafficHistory
+import org.uci.proxy.core.traffic.TrafficRecorder
 
 /** Dónde vive el archivo de la base en cada plataforma; enlaza [ProxyDatabase]. */
 expect val platformDatabaseModule: Module
@@ -15,4 +18,6 @@ val databaseModule = module {
     includes(platformDatabaseModule)
     single<LogHistory> { RoomLogHistory(get<ProxyDatabase>().logDao()) }
     single { LogRecorder(get(), get(), get(), get()) }
+    single<TrafficHistory> { RoomTrafficHistory(get<ProxyDatabase>().trafficDao()) }
+    single { TrafficRecorder(get(), get(), get(), get()) }
 }

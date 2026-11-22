@@ -6,27 +6,20 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,8 +28,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -44,12 +42,32 @@ import androidx.compose.ui.unit.dp
 import org.uci.proxy.apps.AppCatalog
 import org.uci.proxy.apps.InstalledApp
 import org.uci.proxy.core.model.RouteExit
+import org.uci.proxy.core.model.RouteRule
 import org.uci.proxy.core.model.RoutingRules
 import org.uci.proxy.core.model.RuleKind
+import org.uci.proxy.theme.ProxyUciTheme
+import org.uci.proxy.ui.components.UciBottomSheet
+import org.uci.proxy.ui.components.UciButton
+import org.uci.proxy.ui.components.UciButtonVariant
+import org.uci.proxy.ui.components.UciDivider
+import org.uci.proxy.ui.components.UciEmptyState
+import org.uci.proxy.ui.components.UciIconBox
+import org.uci.proxy.ui.components.UciIconButton
+import org.uci.proxy.ui.components.UciInlineAlert
+import org.uci.proxy.ui.components.UciSearchField
+import org.uci.proxy.ui.components.UciSectionCard
+import org.uci.proxy.ui.components.UciSectionHeader
+import org.uci.proxy.ui.components.UciSegmentedControl
+import org.uci.proxy.ui.components.UciSettingRow
+import org.uci.proxy.ui.components.UciStatusPill
+import org.uci.proxy.ui.components.UciSwitch
+import org.uci.proxy.ui.components.UciTextField
+import org.uci.proxy.ui.components.UciTone
+import org.uci.proxy.ui.icons.UciIcons
 
 /**
- * «Reglas de salida»: qué sitios salen por el proxy, por Otro País, directo o se bloquean. La primera regla que coincide
- * gana; lo demás toma la salida por defecto.
+ * «Reglas de salida»: qué sitios y apps salen por el proxy, por Otro País, directo o se bloquean. La primera regla que
+ * coincide gana; lo demás toma la salida por defecto.
  */
 @Composable
 internal fun RoutingSection(
@@ -69,122 +87,80 @@ internal fun RoutingSection(
         if (appCatalog != null && (hasAppRules || pickingApp) && value == null) value = appCatalog.installedApps()
     }
     val appsByPackage = remember(installed) { installed.orEmpty().associateBy { it.packageName } }
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .toggleable(value = rules.enabled, role = Role.Switch, onValueChange = actions::onRoutingEnabledChange),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text("Reglas de salida", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "Elige qué sitios salen por el proxy, por Otro País, directo o se bloquean.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Switch(checked = rules.enabled, onCheckedChange = null)
-        }
-        if (!rules.enabled) return@Column
+
+    UciSectionCard(
+        title = "Reglas de salida",
+        subtitle = "Qué sale por el proxy, por Otro País, directo o se bloquea",
+        icon = UciIcons.Split,
+        tone = if (rules.enabled) UciTone.Routing else UciTone.Neutral,
+        trailing = { UciSwitch(rules.enabled, actions::onRoutingEnabledChange, enabled = enabled, contentDescription = "Activar reglas de salida") },
+    ) {
+        if (!rules.enabled) return@UciSectionCard
 
         if (!vpnEnabled && rules.usesVpn) {
+            UciInlineAlert(
+                "Activa «Otro País» para usar esa salida; mientras tanto, lo suyo sale por el proxy.",
+                tone = UciTone.Warning,
+            )
+        }
+
+        // «Otro País» como salida por defecto solo si está activado (o si ya estaba elegido, para poder quitarlo).
+        val defaults = RoutingRules.DEFAULT_EXITS.filter { it != RouteExit.VPN || vpnEnabled || rules.defaultExit == it }
+        if (defaults.size > 1) {
+            Text("Lo que no coincida con ninguna regla sale por", style = MaterialTheme.typography.labelMedium, color = ProxyUciTheme.colors.onSurfaceMuted)
+            UciSegmentedControl(
+                options = defaults,
+                selected = rules.defaultExit,
+                onSelect = actions::onDefaultExitChange,
+                label = { it.label },
+                enabled = enabled,
+            )
+        } else {
+            // Con una sola salida posible no hay nada que elegir: se dice cuál es y cómo tener más.
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    "Lo que no coincida con ninguna regla sale por",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                UciStatusPill(rules.defaultExit.label, tone = rules.defaultExit.tone)
+            }
             Text(
-                "Activa «Salir por otro país» para usar esa salida; mientras tanto, lo suyo sale por el proxy.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.error,
+                "Activa «Otro País» para poder elegirlo también como salida.",
+                style = MaterialTheme.typography.bodySmall,
+                color = ProxyUciTheme.colors.onSurfaceFaint,
             )
         }
 
-        Text("Lo que no coincida con ninguna regla sale por", style = MaterialTheme.typography.labelLarge)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            RoutingRules.DEFAULT_EXITS.forEach { exit ->
-                FilterChip(
-                    selected = rules.defaultExit == exit,
-                    onClick = { actions.onDefaultExitChange(exit) },
-                    enabled = enabled && (exit != RouteExit.VPN || vpnEnabled || rules.defaultExit == exit),
-                    label = { Text(exit.label) },
-                )
-            }
-        }
-
-        if (rules.rules.isNotEmpty()) {
-            Text("Reglas (gana la primera que coincide)", style = MaterialTheme.typography.labelLarge)
-        }
+        UciSectionHeader(if (rules.rules.isEmpty()) "Sin reglas" else "Reglas · gana la primera que coincide")
         rules.rules.forEachIndexed { index, rule ->
-            val installedApp = if (rule.kind == RuleKind.APP) appsByPackage[rule.value] else null
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                installedApp?.icon?.let { AppIcon(it) }
-                Column(Modifier.weight(1f)) {
-                    Text(installedApp?.label ?: rule.value, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(
-                        if (rule.kind == RuleKind.APP) "App · ${rule.value}" else rule.kind.label,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                ExitPicker(
-                    selected = rule.exit,
-                    options = RoutingRules.exitsFor(rule.kind),
-                    vpnEnabled = vpnEnabled,
-                    enabled = enabled,
-                    onSelect = { actions.onRuleExitChange(index, it) },
-                )
-                TextButton(onClick = { actions.moveRule(index, -1) }, enabled = enabled && index > 0) { Text("↑") }
-                TextButton(onClick = { actions.removeRule(index) }, enabled = enabled) { Text("✕") }
-            }
-            HorizontalDivider()
-        }
-
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            OutlinedTextField(
-                value = routing.newRule,
-                onValueChange = actions::onNewRuleChange,
-                label = { Text("Dominio, IP o rango") },
-                placeholder = { Text("netflix.com, *.google.*, 1.2.3.0/24") },
-                singleLine = true,
-                isError = routing.newRuleInvalid,
-                supportingText = if (routing.newRuleInvalid) {
-                    { Text("Escribe un dominio (ej. netflix.com), una IP o un rango (ej. 1.2.3.0/24).") }
-                } else {
-                    null
-                },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = { actions.addRule() }),
-                modifier = Modifier.weight(1f),
-            )
-            ExitPicker(
-                selected = routing.newRuleExit,
-                options = RouteExit.entries,
+            if (index > 0) UciDivider()
+            RuleRow(
+                rule = rule,
+                app = if (rule.kind == RuleKind.APP) appsByPackage[rule.value] else null,
+                canMoveUp = index > 0,
                 vpnEnabled = vpnEnabled,
                 enabled = enabled,
-                onSelect = actions::onNewRuleExitChange,
+                onExitChange = { actions.onRuleExitChange(index, it) },
+                onMoveUp = { actions.moveRule(index, -1) },
+                onRemove = { actions.removeRule(index) },
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            OutlinedButton(onClick = actions::addRule, enabled = enabled && routing.newRule.isNotBlank(), modifier = Modifier.weight(1f)) {
-                Text("Añadir regla")
-            }
-            if (appCatalog != null) {
-                OutlinedButton(onClick = { pickingApp = true }, enabled = enabled, modifier = Modifier.weight(1f)) {
-                    Text("Elegir app")
-                }
-            }
-        }
+
+        UciDivider()
+        NewRule(routing, vpnEnabled, enabled, actions, canPickApp = appCatalog != null, onPickApp = { pickingApp = true })
         Text(
-            "Un dominio incluye sus subdominios. «Directo» (sin proxy) vale para apps, IP y rangos, no para dominios. " +
+            "Un dominio incluye sus subdominios. «Directo» sale sin proxy: en un dominio, solo si su dirección es de la " +
+                "red local (si es pública, sale por el proxy). " +
                 "Una app que sale por Otro País puede tardar un segundo más en su primera conexión. " +
                 "Si Otro País se cae, su tráfico sale por el proxy hasta que vuelva.",
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = ProxyUciTheme.colors.onSurfaceFaint,
         )
     }
 
     if (pickingApp) {
-        AppPickerDialog(
+        AppPickerSheet(
             apps = installed,
             exit = routing.newRuleExit,
             onPick = { packageName ->
@@ -196,70 +172,82 @@ internal fun RoutingSection(
     }
 }
 
-/** Elige una app instalada; la regla toma la salida elegida para la regla nueva. */
 @Composable
-private fun AppPickerDialog(
-    apps: List<InstalledApp>?,
-    exit: RouteExit,
-    onPick: (String) -> Unit,
-    onDismiss: () -> Unit,
+private fun RuleRow(
+    rule: RouteRule,
+    app: InstalledApp?,
+    canMoveUp: Boolean,
+    vpnEnabled: Boolean,
+    enabled: Boolean,
+    onExitChange: (RouteExit) -> Unit,
+    onMoveUp: () -> Unit,
+    onRemove: () -> Unit,
 ) {
-    var query by remember { mutableStateOf("") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("App que sale por ${exit.label}") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    label = { Text("Buscar") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
+    // Dos líneas: arriba qué es la regla, a lo ancho para que no se corte en móvil; abajo su salida y los controles.
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (app?.icon != null) AppIcon(app.icon) else UciIconBox(rule.kind.icon, size = 36)
+            Column(Modifier.weight(1f)) {
+                Text(
+                    app?.label ?: rule.value,
+                    style = if (app != null) MaterialTheme.typography.bodyLarge else ProxyUciTheme.mono.metricSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                if (apps == null) {
-                    Text("Cargando apps…", style = MaterialTheme.typography.bodyMedium)
-                } else {
-                    val filtered = apps.filter {
-                        query.isBlank() || it.label.contains(query.trim(), ignoreCase = true) || it.packageName.contains(query.trim(), ignoreCase = true)
-                    }
-                    LazyColumn(Modifier.heightIn(max = 420.dp)) {
-                        items(filtered, key = { it.packageName }) { app ->
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { onPick(app.packageName) }
-                                    .padding(vertical = 8.dp),
-                            ) {
-                                app.icon?.let { AppIcon(it) }
-                                Column(Modifier.weight(1f)) {
-                                    Text(app.label, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text(
-                                        app.packageName,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
+                Text(
+                    if (rule.kind == RuleKind.APP) "App · ${rule.value}" else rule.kind.label,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ProxyUciTheme.colors.onSurfaceMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
-        },
-        confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
-    )
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 46.dp)) {
+            ExitPicker(rule.exit, RoutingRules.exitsFor(rule.kind), vpnEnabled, enabled, onExitChange)
+            Spacer(Modifier.weight(1f))
+            UciIconButton(UciIcons.ArrowUp, "Subir regla", onMoveUp, bordered = false, enabled = enabled && canMoveUp)
+            UciIconButton(UciIcons.Delete, "Quitar regla", onRemove, bordered = false, tone = UciTone.Danger, enabled = enabled)
+        }
+    }
 }
 
 @Composable
-private fun AppIcon(icon: ImageBitmap) {
-    Image(bitmap = icon, contentDescription = null, modifier = Modifier.padding(end = 12.dp).size(32.dp))
+private fun NewRule(
+    routing: RoutingDraft,
+    vpnEnabled: Boolean,
+    enabled: Boolean,
+    actions: RoutingActions,
+    canPickApp: Boolean,
+    onPickApp: () -> Unit,
+) {
+    UciTextField(
+        value = routing.newRule,
+        onValueChange = actions::onNewRuleChange,
+        label = "Nueva regla: dominio, IP o rango",
+        placeholder = "netflix.com, *.google.*, 1.2.3.0/24",
+        mono = true,
+        error = "Escribe un dominio (netflix.com), una IP o un rango (1.2.3.0/24).".takeIf { routing.newRuleInvalid },
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
+        keyboardActions = KeyboardActions(onDone = { actions.addRule() }),
+        trailing = { ExitPicker(routing.newRuleExit, RouteExit.entries, vpnEnabled, enabled, actions::onNewRuleExitChange, Modifier.padding(end = 8.dp)) },
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        UciButton(
+            "Añadir regla",
+            actions::addRule,
+            variant = UciButtonVariant.Secondary,
+            icon = UciIcons.Add,
+            enabled = enabled && routing.newRule.isNotBlank(),
+            modifier = Modifier.weight(1f),
+        )
+        if (canPickApp) {
+            UciButton("Elegir app", onPickApp, variant = UciButtonVariant.Secondary, icon = UciIcons.Badge, enabled = enabled, modifier = Modifier.weight(1f))
+        }
+    }
 }
 
-/** Un botón con la salida elegida que abre la lista de las posibles. */
+/** La salida de una regla como etiqueta de color; al pulsarla se elige otra. */
 @Composable
 private fun ExitPicker(
     selected: RouteExit,
@@ -267,11 +255,22 @@ private fun ExitPicker(
     vpnEnabled: Boolean,
     enabled: Boolean,
     onSelect: (RouteExit) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     var open by remember { mutableStateOf(false) }
-    Box {
-        TextButton(onClick = { open = true }, enabled = enabled) { Text(selected.label + " ▾") }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+    Box(modifier) {
+        UciStatusPill(
+            "${selected.label} ▾",
+            tone = selected.tone,
+            modifier = Modifier
+                .clip(CircleShape)
+                .clickable(enabled = enabled) { open = true }
+                .semantics {
+                    role = Role.DropdownList
+                    contentDescription = "Salida: ${selected.label}"
+                },
+        )
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = ProxyUciTheme.colors.card) {
             options.forEach { exit ->
                 DropdownMenuItem(
                     text = { Text(exit.label) },
@@ -286,6 +285,45 @@ private fun ExitPicker(
     }
 }
 
+/** Elige una app instalada; la regla toma la salida elegida para la regla nueva. */
+@Composable
+private fun AppPickerSheet(
+    apps: List<InstalledApp>?,
+    exit: RouteExit,
+    onPick: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var query by remember { mutableStateOf("") }
+    UciBottomSheet("App que sale por ${exit.label}", onDismiss = onDismiss) {
+        UciSearchField(query, { query = it }, "Buscar por nombre o paquete")
+        if (apps == null) {
+            Text("Cargando apps…", style = MaterialTheme.typography.bodyMedium, color = ProxyUciTheme.colors.onSurfaceMuted)
+        } else {
+            val filtered = apps.filter {
+                query.isBlank() || it.label.contains(query.trim(), ignoreCase = true) || it.packageName.contains(query.trim(), ignoreCase = true)
+            }
+            if (filtered.isEmpty()) {
+                UciEmptyState(title = "Ninguna app coincide", icon = UciIcons.Search)
+            }
+            LazyColumn(Modifier.heightIn(max = 420.dp)) {
+                items(filtered, key = { it.packageName }) { app ->
+                    UciSettingRow(
+                        title = app.label,
+                        subtitle = app.packageName,
+                        onClick = { onPick(app.packageName) },
+                        trailing = { app.icon?.let { AppIcon(it) } },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppIcon(icon: ImageBitmap) {
+    Image(bitmap = icon, contentDescription = null, modifier = Modifier.size(36.dp))
+}
+
 internal val RouteExit.label: String
     get() = when (this) {
         RouteExit.PROXY -> "Proxy"
@@ -294,9 +332,25 @@ internal val RouteExit.label: String
         RouteExit.BLOCK -> "Bloquear"
     }
 
+/** El color de cada salida, el mismo en toda la app. */
+internal val RouteExit.tone: UciTone
+    get() = when (this) {
+        RouteExit.PROXY -> UciTone.Active
+        RouteExit.VPN -> UciTone.Routing
+        RouteExit.DIRECT -> UciTone.Neutral
+        RouteExit.BLOCK -> UciTone.Danger
+    }
+
 private val RuleKind.label: String
     get() = when (this) {
-        RuleKind.DOMAIN -> "Dominio"
+        RuleKind.DOMAIN -> "Dominio y subdominios"
         RuleKind.IP -> "IP o rango"
         RuleKind.APP -> "App"
+    }
+
+private val RuleKind.icon: ImageVector
+    @Composable get() = when (this) {
+        RuleKind.DOMAIN -> UciIcons.Globe
+        RuleKind.IP -> UciIcons.Dns
+        RuleKind.APP -> UciIcons.Badge
     }

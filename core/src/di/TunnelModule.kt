@@ -7,7 +7,10 @@ import org.uci.proxy.core.engine.TunAddressPlanner
 import org.uci.proxy.core.engine.TunnelEngineFactory
 import org.uci.proxy.core.engine.TunnelRunner
 import org.uci.proxy.core.engine.TunnelStateStore
+import org.uci.proxy.core.net.KtorDnsTransport
 import org.uci.proxy.core.port.ConnectionOwner
+import org.uci.proxy.core.port.DnsTransport
+import org.uci.proxy.core.port.LocalDnsSource
 import org.uci.proxy.core.port.EngineStateDirectories
 import org.uci.proxy.core.port.TunnelMonitor
 import org.uci.proxy.core.vpn.CountryEngines
@@ -21,13 +24,15 @@ import kotlin.time.TimeSource
  * Lo que necesita un proceso que ejecuta el túnel. Solo lo cargan esos procesos: hoy la app de
  * Android; más adelante la extensión de iOS y el proceso elevado de escritorio.
  * Requiere [coreModule] (de él salen los conectores, el `ProxyDialer` y el `TailscaleEngine`) y que la plataforma
- * enlace `LocalAddresses` y `HostResolver`.
+ * enlace `LocalAddresses` y `HostResolver` (y, si sabe leerlo, `LocalDnsSource`).
  */
 val tunnelModule = module {
     singleOf(::TunnelStateStore) { bind<TunnelMonitor>() }
     singleOf(::TunAddressPlanner)
     // Reloj monótono: los temporizadores TCP no deben verse afectados por cambios de hora del sistema.
     single<TimeSource> { TimeSource.Monotonic }
+    // Las consultas al DNS de la red local, para abrir sin proxy lo interno.
+    single<DnsTransport> { KtorDnsTransport(get(), get()) }
     single {
         TunnelEngineFactory(
             connectors = get(ProxyConnectors),
@@ -69,6 +74,10 @@ val tunnelModule = module {
             logger = get(),
             engines = get(),
             stateDirectories = getOrNull<EngineStateDirectories>() ?: EngineStateDirectories.None,
+            localDnsSource = getOrNull<LocalDnsSource>() ?: LocalDnsSource.None,
+            dnsTransport = get(),
+            traffic = get(),
+            timeSource = get(),
         )
     }
 }

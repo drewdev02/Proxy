@@ -52,28 +52,59 @@ class SettingsViewModelTest : MainDispatcherTest() {
         SettingsViewModel(
             StoredSettingsRepository(store), profiles, tunnel, statusRepository, tester,
             IpNameServiceValidator(), { "custom-${nextId++}" }, localNetwork,
-        )
+        ).also { it.uiState.keepSubscribed() }
+    }
+
+    @Test
+    fun `quota alerts intervals and the pause are stored`() {
+        viewModel.setQuotaAlert(50, false)
+        viewModel.setQuotaAlert(50, true)
+        viewModel.setQuotaAlert(75, false)
+        viewModel.setQuotaCheckMinutes(30)
+        viewModel.setQuotaPause(true)
+        viewModel.setQuotaVerifyCertificate(false)
+        viewModel.setQuotaServiceUrl("  http://10.0.2.2:8443/x  ")
+
+        val quota = viewModel.uiState.value.settings.quota
+        assertEquals(listOf(50, 90), quota.alerts)
+        assertEquals(30, quota.checkMinutes)
+        assertTrue(quota.pauseAtLimit)
+        assertFalse(quota.verifyCertificate)
+        assertEquals("http://10.0.2.2:8443/x", quota.serviceUrl)
+
+        viewModel.setQuotaServiceUrl("")
+        assertEquals(null, viewModel.uiState.value.settings.quota.serviceUrl)
     }
 
     @Test
     fun `the connectivity switch starts on`() {
-        assertTrue(viewModel.settings.value.answerConnectivityChecks)
+        assertTrue(viewModel.uiState.value.settings.answerConnectivityChecks)
     }
 
     @Test
     fun `switching it off and on is reflected and stored`() {
-        viewModel.onAnswerConnectivityChecksChange(false)
+        viewModel.setAnswerConnectivityChecks(false)
 
-        assertFalse(viewModel.settings.value.answerConnectivityChecks)
+        assertFalse(viewModel.uiState.value.settings.answerConnectivityChecks)
         assertFalse(StoredSettingsRepository(store).settings.value.answerConnectivityChecks)
 
-        viewModel.onAnswerConnectivityChecksChange(true)
-        assertTrue(viewModel.settings.value.answerConnectivityChecks)
+        viewModel.setAnswerConnectivityChecks(true)
+        assertTrue(viewModel.uiState.value.settings.answerConnectivityChecks)
+    }
+
+    @Test
+    fun `the local network switch starts on and is stored`() {
+        assertTrue(viewModel.uiState.value.settings.intranetDirect)
+
+        viewModel.setIntranetDirect(false)
+
+        assertFalse(viewModel.uiState.value.settings.intranetDirect)
+        assertFalse(StoredSettingsRepository(store).settings.value.intranetDirect)
     }
 
     @Test
     fun `names for public IPs start on with the two factory services`() {
-        val settings = viewModel.settings.value
+        val settings = viewModel.uiState.value.settings
 
         assertTrue(settings.nameByIp)
         assertTrue(settings.tryRawIp)
@@ -82,32 +113,32 @@ class SettingsViewModelTest : MainDispatcherTest() {
 
     @Test
     fun `the switches are reflected and stored`() {
-        viewModel.onNameByIpChange(false)
-        viewModel.onTryRawIpChange(false)
+        viewModel.setNameByIp(false)
+        viewModel.setTryRawIp(false)
 
-        assertFalse(viewModel.settings.value.nameByIp)
+        assertFalse(viewModel.uiState.value.settings.nameByIp)
         assertFalse(StoredSettingsRepository(store).settings.value.tryRawIp)
     }
 
     @Test
     fun `a service can be switched off and moved`() {
-        viewModel.onServiceEnabledChange("sslip", false)
-        viewModel.onServiceMove("nip", -1)
+        viewModel.setServiceEnabled("sslip", false)
+        viewModel.moveService("nip", -1)
 
-        val services = viewModel.settings.value.nameServices
+        val services = viewModel.uiState.value.settings.nameServices
         assertEquals(listOf("nip", "sslip"), services.map { it.id })
         assertFalse(services.last().enabled)
     }
 
     @Test
     fun `restoring brings the services back`() {
-        viewModel.onServiceMove("nip", -1)
-        viewModel.onServiceEnabledChange("nip", false)
+        viewModel.moveService("nip", -1)
+        viewModel.setServiceEnabled("nip", false)
 
-        viewModel.onResetServices()
+        viewModel.resetServices()
 
-        assertEquals(listOf("sslip", "nip"), viewModel.settings.value.nameServices.map { it.id })
-        assertTrue(viewModel.settings.value.nameServices.all { it.enabled })
+        assertEquals(listOf("sslip", "nip"), viewModel.uiState.value.settings.nameServices.map { it.id })
+        assertTrue(viewModel.uiState.value.settings.nameServices.all { it.enabled })
     }
 
     @Test
@@ -115,7 +146,7 @@ class SettingsViewModelTest : MainDispatcherTest() {
         val result = viewModel.addService("Mío", "{ip-}.mio.com")
 
         assertTrue(result is ServiceValidation.Valid)
-        assertEquals(listOf("sslip", "nip", "custom-0"), viewModel.settings.value.nameServices.map { it.id })
+        assertEquals(listOf("sslip", "nip", "custom-0"), viewModel.uiState.value.settings.nameServices.map { it.id })
     }
 
     @Test
@@ -123,7 +154,7 @@ class SettingsViewModelTest : MainDispatcherTest() {
         val result = viewModel.addService("", "fijo.mio.com")
 
         assertEquals(setOf(ServiceError.NAME_EMPTY, ServiceError.NO_PLACEHOLDER), (result as ServiceValidation.Invalid).errors)
-        assertEquals(2, viewModel.settings.value.nameServices.size)
+        assertEquals(2, viewModel.uiState.value.settings.nameServices.size)
     }
 
     @Test
@@ -142,27 +173,27 @@ class SettingsViewModelTest : MainDispatcherTest() {
 
         viewModel.removeService("custom-0")
 
-        assertEquals(2, viewModel.settings.value.nameServices.size)
-        assertEquals(null, viewModel.tests.value["custom-0"])
+        assertEquals(2, viewModel.uiState.value.settings.nameServices.size)
+        assertEquals(null, viewModel.uiState.value.tests["custom-0"])
     }
 
     @Test
     fun `a factory service cannot be removed`() {
         viewModel.removeService("sslip")
 
-        assertEquals(listOf("sslip", "nip"), viewModel.settings.value.nameServices.map { it.id })
+        assertEquals(listOf("sslip", "nip"), viewModel.uiState.value.settings.nameServices.map { it.id })
     }
 
     @Test
     fun `testing asks the proxy of the first profile with its password and records that it works`() {
         viewModel.testService("sslip")
 
-        assertEquals(ServiceTestUi.Done(NameServiceTestResult.Works), viewModel.tests.value["sslip"])
+        assertEquals(ServiceTestUi.Done(NameServiceTestResult.Works), viewModel.uiState.value.tests["sslip"])
         val (service, profile, password) = testCalls.single()
         assertEquals("sslip", service.id)
         assertEquals(uci, profile)
         assertEquals("clave", password)
-        assertEquals(NameOutcome.WORKED, viewModel.statuses.value["sslip"]?.outcome)
+        assertEquals(NameOutcome.WORKED, viewModel.uiState.value.statuses["sslip"]?.outcome)
     }
 
     @Test
@@ -185,8 +216,8 @@ class SettingsViewModelTest : MainDispatcherTest() {
 
         viewModel.testService("nip")
 
-        assertEquals(ServiceTestUi.Done(testResult), viewModel.tests.value["nip"])
-        assertEquals(NameOutcome.REFUSED, viewModel.statuses.value["nip"]?.outcome)
+        assertEquals(ServiceTestUi.Done(testResult), viewModel.uiState.value.tests["nip"])
+        assertEquals(NameOutcome.REFUSED, viewModel.uiState.value.statuses["nip"]?.outcome)
     }
 
     @Test
@@ -196,19 +227,19 @@ class SettingsViewModelTest : MainDispatcherTest() {
         testResult = NameServiceTestResult.ProxyAuth
         viewModel.testService("nip")
 
-        assertTrue(viewModel.statuses.value.isEmpty())
-        assertEquals(ServiceTestUi.Done(NameServiceTestResult.ProxyAuth), viewModel.tests.value["nip"])
+        assertTrue(viewModel.uiState.value.statuses.isEmpty())
+        assertEquals(ServiceTestUi.Done(NameServiceTestResult.ProxyAuth), viewModel.uiState.value.tests["nip"])
     }
 
     @Test
     fun `without any profile there is nothing to test with`() {
         val model = SettingsViewModel(
             StoredSettingsRepository(store), FakeProfileRepository(), tunnel, statusRepository, tester, IpNameServiceValidator(), { "x" }, localNetwork,
-        )
+        ).also { it.uiState.keepSubscribed() }
 
         model.testService("sslip")
 
-        assertEquals(ServiceTestUi.NoProfile, model.tests.value["sslip"])
+        assertEquals(ServiceTestUi.NoProfile, model.uiState.value.tests["sslip"])
         assertTrue(testCalls.isEmpty())
     }
 
@@ -218,7 +249,7 @@ class SettingsViewModelTest : MainDispatcherTest() {
 
         viewModel.testService("sslip")
 
-        assertEquals(ServiceTestUi.LocalNetworkDenied, viewModel.tests.value["sslip"])
+        assertEquals(ServiceTestUi.LocalNetworkDenied, viewModel.uiState.value.tests["sslip"])
         assertTrue(testCalls.isEmpty())
     }
 
@@ -229,17 +260,17 @@ class SettingsViewModelTest : MainDispatcherTest() {
         viewModel.testService("sslip")
         viewModel.testService("sslip")
 
-        assertEquals(ServiceTestUi.Running, viewModel.tests.value["sslip"])
+        assertEquals(ServiceTestUi.Running, viewModel.uiState.value.tests["sslip"])
         assertEquals(1, testCalls.size)
         gate!!.complete(Unit)
-        assertEquals(ServiceTestUi.Done(NameServiceTestResult.Works), viewModel.tests.value["sslip"])
+        assertEquals(ServiceTestUi.Done(NameServiceTestResult.Works), viewModel.uiState.value.tests["sslip"])
     }
 
     @Test
     fun `testing a service that does not exist does nothing`() {
         viewModel.testService("no-existe")
 
-        assertTrue(viewModel.tests.value.isEmpty())
+        assertTrue(viewModel.uiState.value.tests.isEmpty())
     }
 }
 
