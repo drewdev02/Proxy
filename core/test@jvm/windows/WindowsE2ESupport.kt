@@ -6,7 +6,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.uci.proxy.core.platform.ProcessCommandRunner
 import org.uci.proxy.core.platform.windows.WinPlatformTunnel
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.port.Logger
 import java.io.IOException
 import java.net.InetAddress

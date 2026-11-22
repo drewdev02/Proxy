@@ -22,11 +22,11 @@ import org.uci.proxy.core.fakes.InMemorySecretStore
 import org.uci.proxy.core.fakes.RecordingLogger
 import org.uci.proxy.core.log.BufferedLogger
 import org.uci.proxy.core.log.LogBuffer
-import org.uci.proxy.core.log.LogEntry
+import org.uci.proxy.core.model.LogEntry
 import org.uci.proxy.core.settings.AppSettings
 import org.uci.proxy.core.settings.NameOutcome
 import org.uci.proxy.core.settings.StoredSettingsRepository
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogLevel
 import kotlin.time.Clock
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.ProxyProtocol

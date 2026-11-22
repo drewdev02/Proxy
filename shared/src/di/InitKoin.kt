@@ -8,7 +8,7 @@ import org.uci.proxy.core.di.coreModule
 import org.uci.proxy.core.di.platformModule
 import org.uci.proxy.core.log.LogRecorder
 import org.uci.proxy.core.traffic.TrafficRecorder
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.PlatformInfo
 import org.uci.proxy.database.di.databaseModule

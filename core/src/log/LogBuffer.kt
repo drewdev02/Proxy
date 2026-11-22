@@ -1,24 +1,12 @@
 package org.uci.proxy.core.log
 
+import org.uci.proxy.core.model.LogEntry
+import kotlin.concurrent.Volatile
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import org.uci.proxy.core.port.LogLevel
-import kotlin.concurrent.Volatile
-
-/**
- * Una línea del registro. [id] crece de uno en uno dentro de un [LogBuffer] y sirve para saber qué es nuevo y como clave
- * de la lista en pantalla; no tiene sentido fuera del búfer que lo asignó. Las líneas recuperadas de una sesión anterior
- * ([LogBuffer.restore]) llevan ids negativos.
- */
-data class LogEntry(
-    val id: Long,
-    val epochMillis: Long,
-    val level: LogLevel,
-    val tag: String,
-    val message: String,
-)
+import org.uci.proxy.core.model.LogLevel
 
 /**
  * Los últimos mensajes de registro, en memoria y para verlos en vivo. Al llenarse descarta los más antiguos.

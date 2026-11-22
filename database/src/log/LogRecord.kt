@@ -3,7 +3,7 @@ package org.uci.proxy.database.log
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogLevel
 
 /** Una línea del registro guardada en disco. Room guarda [level] por su nombre. */
 @Entity(tableName = "log_record", indices = [Index("epochMillis")])

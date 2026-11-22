@@ -47,7 +47,7 @@ import org.uci.proxy.core.packet.sumWords
 import org.uci.proxy.core.packet.writeInt
 import org.uci.proxy.core.packet.writeU16
 import org.uci.proxy.core.port.ConnectionOwner
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.common.AppDispatchers

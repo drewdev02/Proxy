@@ -1,12 +1,13 @@
 package org.uci.proxy.core.log
 
+import org.uci.proxy.core.model.LogEntry
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.common.AppDispatchers
 import kotlin.test.AfterTest
 import kotlin.test.Test

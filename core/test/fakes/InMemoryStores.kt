@@ -3,7 +3,7 @@ package org.uci.proxy.core.fakes
 import org.uci.proxy.core.port.DataProtectionException
 import org.uci.proxy.core.port.DataProtector
 import org.uci.proxy.core.port.KeyValueStore
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.SecretStore
 

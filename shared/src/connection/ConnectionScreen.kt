@@ -43,7 +43,7 @@ import org.uci.proxy.common.LOCAL_NETWORK_DENIED_FOR_TEST
 import org.uci.proxy.common.isFixedInProfile
 import org.uci.proxy.common.message
 import org.uci.proxy.common.reason
-import org.uci.proxy.core.log.LogEntry
+import org.uci.proxy.core.model.LogEntry
 import org.uci.proxy.core.model.CountryExit
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.ProxyProtocol
@@ -51,7 +51,7 @@ import org.uci.proxy.core.model.RouteExit
 import org.uci.proxy.core.model.RouteRule
 import org.uci.proxy.core.model.RoutingRules
 import org.uci.proxy.core.model.RuleKind
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.proxy.ProxyTestResult

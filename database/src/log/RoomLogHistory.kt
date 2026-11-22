@@ -1,6 +1,6 @@
 package org.uci.proxy.database.log
 
-import org.uci.proxy.core.log.LogEntry
+import org.uci.proxy.core.model.LogEntry
 import org.uci.proxy.core.port.LogHistory
 
 /** El [LogHistory] de verdad: la tabla `log_record`. */

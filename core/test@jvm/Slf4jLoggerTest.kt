@@ -1,7 +1,7 @@
 package org.uci.proxy.core
 
 import org.uci.proxy.core.platform.Slf4jLogger
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogLevel
 import kotlin.test.Test
 
 class Slf4jLoggerTest {

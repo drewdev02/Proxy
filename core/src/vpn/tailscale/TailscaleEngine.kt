@@ -15,7 +15,7 @@ import kotlinx.serialization.json.Json
 import org.uci.proxy.core.model.CountryEngineKind
 import org.uci.proxy.core.model.CountryExit
 import org.uci.proxy.core.model.CountryExitSecrets
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.RandomBytes
 import org.uci.proxy.core.port.TunnelFailure

@@ -10,8 +10,8 @@ import kotlinx.coroutines.withContext
 import org.uci.proxy.core.engine.TunnelRunner
 import org.uci.proxy.core.engine.TunnelStateStore
 import org.uci.proxy.core.log.LogBuffer
-import org.uci.proxy.core.log.LogEntry
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogEntry
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.PlatformTunnel
 import org.uci.proxy.core.port.TunnelState

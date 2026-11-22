@@ -10,7 +10,7 @@ import org.uci.proxy.core.packet.Ipv4Route
 import org.uci.proxy.core.packet.formatIpv4
 import org.uci.proxy.core.packet.parseIpv4
 import org.uci.proxy.core.port.DnsTransport
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.routing.RuleSet
 import kotlin.time.Duration

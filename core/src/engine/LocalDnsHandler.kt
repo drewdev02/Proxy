@@ -11,7 +11,7 @@ import org.uci.proxy.core.dns.LocalDnsResolver
 import org.uci.proxy.core.packet.Ipv4Packet
 import org.uci.proxy.core.packet.UdpDatagram
 import org.uci.proxy.core.packet.buildUdpPacket
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.PacketWriter
 

@@ -7,8 +7,8 @@ import org.uci.proxy.core.log.LogBuffer
 import org.uci.proxy.core.log.LogRecorder
 import org.uci.proxy.core.common.AppDispatchers
 import kotlin.time.Clock
-import org.uci.proxy.core.log.LogEntry
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogEntry
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.fakes.MainDispatcherTest
 import kotlin.test.Test
 import kotlin.test.assertEquals

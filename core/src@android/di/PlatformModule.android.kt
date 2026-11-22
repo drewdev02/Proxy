@@ -27,7 +27,7 @@ import org.uci.proxy.core.port.HostResolver
 import org.uci.proxy.core.port.KeyValueStore
 import org.uci.proxy.core.port.LocalAddresses
 import org.uci.proxy.core.port.LocalNetworkPermission
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.PlatformInfo
 import org.uci.proxy.core.port.RandomBytes

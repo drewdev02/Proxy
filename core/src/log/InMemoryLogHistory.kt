@@ -1,5 +1,6 @@
 package org.uci.proxy.core.log
 
+import org.uci.proxy.core.model.LogEntry
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.uci.proxy.core.port.LogHistory

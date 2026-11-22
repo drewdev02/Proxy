@@ -35,7 +35,7 @@ import org.uci.proxy.core.packet.buildTcpPacket
 import org.uci.proxy.core.packet.buildUdpPacket
 import org.uci.proxy.core.packet.formatIpv4
 import org.uci.proxy.core.packet.parseIpv4
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.RandomBytes
 import org.uci.proxy.core.port.TunnelState

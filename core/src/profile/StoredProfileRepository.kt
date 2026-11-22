@@ -13,7 +13,7 @@ import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.CountryExit
 import org.uci.proxy.core.model.CountryExitSecrets
 import org.uci.proxy.core.port.KeyValueStore
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.SecretStore
 

@@ -26,7 +26,7 @@ import org.uci.proxy.core.port.DnsTransport
 import org.uci.proxy.core.port.HostResolver
 import org.uci.proxy.core.port.LocalDnsConfig
 import org.uci.proxy.core.port.LocalDnsSource
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.PlatformTunnel
 import org.uci.proxy.core.port.TunConfig

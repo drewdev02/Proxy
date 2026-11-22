@@ -8,9 +8,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import org.uci.proxy.core.log.LogBuffer
-import org.uci.proxy.core.log.LogEntry
+import org.uci.proxy.core.model.LogEntry
 import org.uci.proxy.core.log.LogRecorder
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogLevel
 
 data class LogsUiState(
     /** Los mensajes que se muestran: ya filtrados por [minLevel]. */

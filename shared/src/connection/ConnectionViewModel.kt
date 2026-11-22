@@ -12,12 +12,12 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.uci.proxy.core.log.LogBuffer
-import org.uci.proxy.core.log.LogEntry
+import org.uci.proxy.core.model.LogEntry
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.RouteExit
 import org.uci.proxy.core.model.RuleKind
 import org.uci.proxy.core.port.LocalNetworkPermission
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.port.TunnelControl
 import org.uci.proxy.core.port.TunnelMonitor
 import org.uci.proxy.core.port.TunnelState

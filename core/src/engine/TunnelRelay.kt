@@ -13,7 +13,7 @@ import org.uci.proxy.core.packet.PROTOCOL_TCP
 import org.uci.proxy.core.packet.formatIpv4
 import org.uci.proxy.core.packet.sniffHostname
 import org.uci.proxy.core.port.ConnectionOwner
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.TcpConnection
 import org.uci.proxy.core.port.TcpException

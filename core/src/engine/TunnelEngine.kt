@@ -15,7 +15,7 @@ import org.uci.proxy.core.packet.buildIcmpPortUnreachable
 import org.uci.proxy.core.packet.buildTcpPacket
 import org.uci.proxy.core.packet.buildUdpPacket
 import org.uci.proxy.core.port.ConnectionOwner
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.PacketWriter
 import org.uci.proxy.core.port.RandomBytes

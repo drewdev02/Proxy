@@ -1,6 +1,6 @@
 package org.uci.proxy.core.port
 
-import org.uci.proxy.core.log.LogEntry
+import org.uci.proxy.core.model.LogEntry
 
 /**
  * El registro guardado en disco, para verlo después de cerrar la app. Los [LogEntry.id] que devuelve no son los del

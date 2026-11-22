@@ -1,7 +1,7 @@
 package org.uci.proxy.core.vpn
 
 import kotlinx.coroutines.withTimeoutOrNull
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.TcpConnection
 import org.uci.proxy.core.proxy.IpNamer

@@ -1,8 +1,8 @@
 package org.uci.proxy.database.log
 
 import kotlinx.coroutines.test.runTest
-import org.uci.proxy.core.log.LogEntry
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogEntry
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.database.ProxyDatabase
 import kotlin.test.AfterTest
 import kotlin.test.Test

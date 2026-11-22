@@ -23,7 +23,7 @@ import org.uci.proxy.core.model.RouteExit
 import org.uci.proxy.core.model.RouteRule
 import org.uci.proxy.core.model.RoutingRules
 import org.uci.proxy.core.model.RuleKind
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.profile.StoredActiveProfileStore

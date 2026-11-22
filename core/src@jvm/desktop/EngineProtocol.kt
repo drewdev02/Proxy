@@ -2,7 +2,7 @@ package org.uci.proxy.core.desktop
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import org.uci.proxy.core.log.LogEntry
+import org.uci.proxy.core.model.LogEntry
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.port.TunnelState

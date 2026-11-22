@@ -36,8 +36,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.koin.compose.viewmodel.koinViewModel
-import org.uci.proxy.core.log.LogEntry
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogEntry
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.theme.ProxyUciTheme
 import org.uci.proxy.ui.components.UciCard
 import org.uci.proxy.ui.components.UciConfirmDialog

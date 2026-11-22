@@ -23,7 +23,7 @@ import org.uci.proxy.core.vpn.CountryEngineCatalog
 import org.uci.proxy.core.vpn.tailscale.ExitNodeListing
 import org.uci.proxy.core.vpn.tailscale.TailscaleExitNode
 import org.uci.proxy.core.port.LocalNetworkPermission
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.common.IdGenerator

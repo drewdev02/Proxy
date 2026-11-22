@@ -2,7 +2,7 @@ package org.uci.proxy.profile
 
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.ProxyProtocol
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.port.PlatformInfo
 import org.uci.proxy.core.port.PlatformKind
 import org.uci.proxy.core.port.TunnelState
