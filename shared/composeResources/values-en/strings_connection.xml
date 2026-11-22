@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="connection_open_usage">Usage</string>
+    <string name="connection_pill_disconnected">No tunnel</string>
+    <string name="connection_pill_connecting">Connecting</string>
+    <string name="connection_pill_connected">Tunnel active</string>
+    <string name="connection_pill_vpn_down">Tunnel · no VPN</string>
+    <string name="connection_pill_failed">Failed</string>
+
+    <string name="connection_empty_title">No profiles yet</string>
+    <string name="connection_empty_message">Add your faculty or residence proxy to start browsing through it.</string>
+    <string name="connection_add_profile">Add profile</string>
+
+    <string name="connection_profile_label">PROFILE</string>
+    <string name="connection_change_profile">Change profile</string>
+    <string name="connection_change_profile_disconnect">Disconnect to change profile</string>
+    <string name="connection_pill_country">Other Country · %1$s</string>
+    <string name="connection_pill_rules">Rules</string>
+    <string name="connection_pill_quota">Quota %1$s</string>
+
+    <string name="connection_unavailable_title">Tunnel not available</string>
+    <string name="connection_unavailable_message">The tunnel can't be created on this system yet. You can manage profiles and test the proxy.</string>
+    <string name="connection_power_connect">Connect</string>
+    <string name="connection_power_connecting">Connecting</string>
+    <string name="connection_power_connected">Connected</string>
+    <string name="connection_power_retry">Retry</string>
+    <string name="connection_status_disconnected">Not connected · tap to connect</string>
+    <string name="connection_status_connecting">Connecting to %1$s…</string>
+    <string name="connection_status_connected">Connected · tap to disconnect</string>
+    <string name="connection_status_connected_for">Connected · %1$s</string>
+    <string name="connection_status_failed">Could not connect</string>
+
+    <string name="connection_quota_paused_title">Paused for the quota</string>
+    <string name="connection_quota_paused_message">You reached %1$d% of your UCI quota and the tunnel was disconnected so it doesn't run out. If you connect, it won't pause again until your usage drops below %2$d%.</string>
+    <string name="connection_connect_anyway">Connect anyway</string>
+    <string name="connection_failed_title">Could not connect</string>
+    <string name="connection_edit_profile">Edit profile</string>
+    <string name="connection_retry">Retry</string>
+    <string name="connection_vpn_down_title">Other Country isn't responding</string>
+    <string name="connection_vpn_down_message">Traffic meant for Other Country goes through the proxy while the VPN reconnects.</string>
+    <string name="connection_via_proxy_title">Some sites go through the proxy</string>
+    <string name="connection_via_proxy_message">Other Country's DNS could not resolve %1$s: those connections go through the proxy, not Other Country.</string>
+    <plurals name="connection_via_proxy_message_more">
+        <item quantity="one">Other Country's DNS could not resolve %1$s and %2$d more: those connections go through the proxy, not Other Country.</item>
+        <item quantity="other">Other Country's DNS could not resolve %1$s and %2$d more: those connections go through the proxy, not Other Country.</item>
+    </plurals>
+
+    <string name="connection_check_title">Test the proxy</string>
+    <string name="connection_check_subtitle">Check the username and password with the proxy</string>
+    <string name="connection_check_button">Test</string>
+    <string name="connection_check_ok">OK · %1$d ms</string>
+    <string name="connection_check_success">The proxy accepted the profile's credentials.</string>
+
+    <string name="connection_routing_title">How traffic goes out</string>
+    <string name="connection_routing_enabled">Exit rules on</string>
+    <string name="connection_routing_disabled">No exit rules</string>
+    <string name="connection_routing_edit">Edit</string>
+    <string name="connection_routing_default">Default</string>
+    <string name="connection_routing_everything">Everything</string>
+    <string name="connection_exit_proxy">Proxy</string>
+    <string name="connection_exit_country">Other Country</string>
+    <string name="connection_exit_direct">Direct</string>
+    <string name="connection_exit_blocked">Blocked</string>
+    <plurals name="connection_rules_domains">
+        <item quantity="one">%1$d site</item>
+        <item quantity="other">%1$d sites</item>
+    </plurals>
+    <plurals name="connection_rules_networks">
+        <item quantity="one">%1$d network</item>
+        <item quantity="other">%1$d networks</item>
+    </plurals>
+    <plurals name="connection_rules_apps">
+        <item quantity="one">%1$d app</item>
+        <item quantity="other">%1$d apps</item>
+    </plurals>
+
+    <string name="connection_recent_activity">Recent activity</string>
+    <string name="connection_see_all">See all</string>
+    <string name="connection_no_activity">No activity yet.</string>
+    <string name="connection_choose_profile">Choose profile</string>
+    <string name="connection_profile_active">Active</string>
+
+    <string name="connection_live_title">Live traffic</string>
+    <string name="connection_live_usage">Usage</string>
+    <string name="connection_live_download">Download</string>
+    <string name="connection_live_download_chart">Download speed over the last minute</string>
+    <string name="connection_live_upload">Upload</string>
+    <string name="connection_live_upload_chart">Upload speed over the last minute</string>
+    <string name="connection_live_connections">Connections</string>
+    <string name="connection_live_connections_caption">open through the proxy</string>
+    <string name="connection_live_session">Session</string>
+    <string name="connection_pill_proxy_failing">Tunnel · proxy failing</string>
+    <string name="connection_proxy_failing_title">The proxy is failing</string>
+    <string name="connection_proxy_auth_rejected_message">The proxy rejects the profile's username or password, so nothing that goes through it loads. Did the password change?</string>
+    <string name="connection_proxy_unreachable_message">The proxy does not answer, so nothing that goes through it loads. Check your network connection.</string>
+    <string name="connection_test_proxy_action">Test the proxy</string>
+    <string name="connection_vpn_down_blocked_message">Traffic meant for Other Country is blocked until the VPN comes back. You can change this in Settings.</string>
+</resources>

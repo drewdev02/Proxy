@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="profile_cancel">Cancel</string>
+
+    <!-- Profile list. -->
+    <string name="profile_list_platform">ProxyUCI on %1$s %2$s</string>
+    <string name="profile_list_title">Profiles</string>
+    <string name="profile_list_none_saved">None saved</string>
+    <plurals name="profile_list_saved_count">
+        <item quantity="one">%1$d profile saved</item>
+        <item quantity="other">%1$d profiles saved</item>
+    </plurals>
+    <string name="profile_list_open_catalog">Component catalog</string>
+    <string name="profile_list_new">New</string>
+    <string name="profile_list_delete_failed_title">Couldn't delete</string>
+    <string name="profile_list_delete_failed">The profile couldn't be deleted. Try again.</string>
+    <string name="profile_list_empty_title">No profiles yet</string>
+    <string name="profile_list_empty_message">A profile stores a proxy's details: server, username and, optionally, Other Country and exit rules.</string>
+    <string name="profile_list_add">Add profile</string>
+    <string name="profile_list_delete_title">Delete “%1$s”?</string>
+    <string name="profile_list_delete_message">Its password and Other Country data are deleted too. This can't be undone.</string>
+    <string name="profile_list_delete_confirm">Delete</string>
+    <string name="profile_list_tag_country_exit">Other Country · %1$s</string>
+    <string name="profile_list_tag_rules">Rules</string>
+    <string name="profile_list_tag_vpn_down">No Other Country</string>
+    <string name="profile_list_tag_connected">Connected</string>
+    <string name="profile_list_tag_connecting">Connecting</string>
+    <string name="profile_list_disconnect_profile">Disconnect %1$s</string>
+    <string name="profile_list_connecting_profile">Connecting %1$s</string>
+    <string name="profile_list_connect_profile">Connect %1$s</string>
+    <string name="profile_list_delete_profile">Delete %1$s</string>
+
+    <!-- Profile editor. -->
+    <string name="profile_editor_title_new">New profile</string>
+    <string name="profile_editor_title_edit">Edit profile</string>
+    <string name="profile_editor_save">Save</string>
+    <string name="profile_editor_save_failed_title">Not saved</string>
+    <string name="profile_editor_save_failed">The profile couldn't be saved. Try again.</string>
+
+    <!-- Server section. -->
+    <string name="profile_server_title">Proxy server</string>
+    <string name="profile_server_subtitle">Which proxy this profile connects to</string>
+    <string name="profile_name_label">Name</string>
+    <string name="profile_name_placeholder">e.g. UCI Staff</string>
+    <string name="profile_name_error">Enter a name for the profile.</string>
+    <string name="profile_host_label">Server</string>
+    <string name="profile_host_placeholder">e.g. proxy.uci.cu</string>
+    <string name="profile_host_error">Just the name or IP, without http:// or spaces.</string>
+    <string name="profile_port_label">Port</string>
+    <string name="profile_port_error">Between 1 and 65535.</string>
+    <string name="profile_protocol_label">Protocol</string>
+
+    <!-- Authentication section. -->
+    <string name="profile_auth_title">Authentication</string>
+    <string name="profile_auth_subtitle">Optional. NTLM is used if the proxy offers it, otherwise Basic</string>
+    <string name="profile_username_label">Username</string>
+    <string name="profile_username_placeholder">first.last</string>
+    <string name="profile_password_label">Password</string>
+    <string name="profile_password_supporting">Stored in the system's secure storage</string>
+    <string name="profile_test_running">Testing…</string>
+    <string name="profile_test_button">Test proxy</string>
+    <string name="profile_uci_quota_title">Check my UCI quota</string>
+    <string name="profile_uci_quota_subtitle">With this username and password, the UCI quota service is asked how many MB you have left this month. Shown in Usage.</string>
+
+    <!-- Other Country section. -->
+    <string name="profile_country_exit_title">Other Country</string>
+    <string name="profile_country_exit_subtitle">Traffic exits through a server in another country, via the proxy</string>
+    <string name="profile_country_exit_toggle">Turn on Other Country</string>
+    <string name="profile_engine_openvpn_description">.ovpn file</string>
+    <string name="profile_engine_tailscale_description">exit node</string>
+    <string name="profile_ovpn_detail">OpenVPN over TCP</string>
+    <string name="profile_ovpn_empty">No .ovpn file chosen</string>
+    <string name="profile_ovpn_choose">Choose .ovpn</string>
+    <string name="profile_ovpn_change">Change</string>
+    <string name="profile_vpn_username_label">VPN username</string>
+    <string name="profile_vpn_username_error">Enter the VPN username.</string>
+    <string name="profile_vpn_password_label">VPN password</string>
+    <string name="profile_tailscale_description">Exits through an exit node on your Tailscale network (or a Headscale server). Behind the proxy, everything goes through Tailscale's relays: it works, with a bit more latency.</string>
+    <string name="profile_tailscale_control_url_label">Control server</string>
+    <string name="profile_tailscale_control_url_error">Enter an http:// or https:// address.</string>
+    <string name="profile_tailscale_auth_key_label">Auth key</string>
+    <string name="profile_tailscale_auth_key_supporting">Create it in the Tailscale admin console (Settings → Keys). Preferably reusable.</string>
+    <string name="profile_tailscale_auth_key_error">Enter the auth key.</string>
+    <string name="profile_tailscale_exit_node_label">Exit node</string>
+    <string name="profile_tailscale_exit_node_placeholder">Empty: the only one on the network</string>
+    <string name="profile_tailscale_searching">Searching for nodes…</string>
+    <string name="profile_tailscale_search">Search for exit nodes</string>
+    <string name="profile_tailscale_hostname_label">This device's name on the network</string>
+
+    <!-- Exit rules section. -->
+    <string name="routing_title">Exit rules</string>
+    <string name="routing_subtitle">What goes through the proxy, through Other Country, direct, or is blocked</string>
+    <string name="routing_toggle">Turn on exit rules</string>
+    <string name="routing_vpn_disabled_warning">Turn on “Other Country” to use that exit; until then, its traffic goes through the proxy.</string>
+    <string name="routing_default_exit_label">Anything that matches no rule exits through</string>
+    <string name="routing_default_exit_hint">Turn on “Other Country” to be able to choose it as an exit too.</string>
+    <string name="routing_no_rules">No rules</string>
+    <string name="routing_rules_header">Rules · the first match wins</string>
+    <string name="routing_help">A domain includes its subdomains. “Direct” bypasses the proxy: for a domain, only if its address is on the local network (if it's public, it goes through the proxy). An app that exits through Other Country may take an extra second on its first connection. If Other Country goes down, its traffic goes through the proxy until it's back.</string>
+    <string name="routing_rule_app">App · %1$s</string>
+    <string name="routing_kind_domain">Domain and subdomains</string>
+    <string name="routing_kind_ip">IP or range</string>
+    <string name="routing_kind_app">App</string>
+    <string name="routing_move_up">Move rule up</string>
+    <string name="routing_remove">Remove rule</string>
+    <string name="routing_new_rule_label">New rule: domain, IP or range</string>
+    <string name="routing_new_rule_error">Enter a domain (netflix.com), an IP or a range (1.2.3.0/24).</string>
+    <string name="routing_add_rule">Add rule</string>
+    <string name="routing_pick_app">Choose app</string>
+    <string name="routing_exit_description">Exit: %1$s</string>
+    <string name="routing_app_picker_title">App that exits through %1$s</string>
+    <string name="routing_app_search">Search by name or package</string>
+    <string name="routing_apps_loading">Loading apps…</string>
+    <string name="routing_no_app_matches">No app matches</string>
+    <string name="routing_exit_proxy">Proxy</string>
+    <string name="routing_exit_vpn">Other Country</string>
+    <string name="routing_exit_direct">Direct</string>
+    <string name="routing_exit_block">Block</string>
+    <string name="profile_editor_save_failed_secure_storage">The system's secure storage could not encrypt the password. Restart the app and try again; if it happens again, delete the profile and create it again.</string>
+    <string name="profile_list_delete_failed_secure_storage">The system's secure storage could not delete the profile's password. Restart the app and try again.</string>
+</resources>

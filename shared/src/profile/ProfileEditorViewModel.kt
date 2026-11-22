@@ -8,20 +8,16 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import org.uci.proxy.core.model.ProxyProfile
-import org.uci.proxy.core.model.RouteExit
-import org.uci.proxy.core.model.RouteRule
-import org.uci.proxy.core.model.RuleKind
-import org.uci.proxy.core.model.RoutingRules
-import org.uci.proxy.core.routing.parseRule
+import org.jetbrains.compose.resources.StringResource
+import org.uci.proxy.common.exitSearchReason
 import org.uci.proxy.core.model.CountryEngineKind
 import org.uci.proxy.core.model.CountryExit
 import org.uci.proxy.core.model.CountryExitSecrets
-import org.uci.proxy.core.settings.AppSettings
-import org.uci.proxy.core.settings.SettingsRepository
-import org.uci.proxy.core.vpn.CountryEngineCatalog
-import org.uci.proxy.core.vpn.tailscale.ExitNodeListing
-import org.uci.proxy.core.vpn.tailscale.TailscaleExitNode
+import org.uci.proxy.core.model.ProxyProfile
+import org.uci.proxy.core.model.RouteExit
+import org.uci.proxy.core.model.RouteRule
+import org.uci.proxy.core.model.RoutingRules
+import org.uci.proxy.core.model.RuleKind
 import org.uci.proxy.core.port.LocalNetworkPermission
 import org.uci.proxy.core.port.LogLevel
 import org.uci.proxy.core.port.Logger
@@ -34,8 +30,19 @@ import org.uci.proxy.core.profile.ProfileValidation
 import org.uci.proxy.core.profile.ProfileValidator
 import org.uci.proxy.core.proxy.ProxyTestResult
 import org.uci.proxy.core.proxy.ProxyTester
+import org.uci.proxy.core.routing.parseRule
+import org.uci.proxy.core.settings.AppSettings
+import org.uci.proxy.core.settings.SettingsRepository
+import org.uci.proxy.core.vpn.CountryEngineCatalog
+import org.uci.proxy.core.vpn.OvpnConfigError
 import org.uci.proxy.core.vpn.OvpnConfigException
 import org.uci.proxy.core.vpn.parseOvpn
+import org.uci.proxy.core.vpn.tailscale.ExitNodeListing
+import org.uci.proxy.core.vpn.tailscale.TailscaleExitNode
+import org.uci.proxy.resources.*
+import org.uci.proxy.resources.Res
+import org.uci.proxy.common.StorageFailure
+import org.uci.proxy.common.classifyStorageError
 
 sealed interface ProxyTestUiState {
     data object Idle : ProxyTestUiState
@@ -59,7 +66,7 @@ data class VpnDraft(
     val username: String = "",
     val password: String = "",
     /** Por qué no sirve el archivo elegido, para mostrarlo. */
-    val fileError: String? = null,
+    val fileError: OvpnConfigError? = null,
     /** Si el servidor VPN pide usuario y contraseña (casi todos los comerciales sí). */
     val needsCredentials: Boolean = true,
     val tailscale: TailscaleDraft = TailscaleDraft(),
@@ -82,7 +89,7 @@ sealed interface ExitNodeSearch {
 
     data class Found(val nodes: List<TailscaleExitNode>) : ExitNodeSearch
 
-    data class Failed(val message: String) : ExitNodeSearch
+    data class Failed(val reason: StringResource) : ExitNodeSearch
 }
 
 /** Las reglas de salida tal como se editan, más la regla que se está escribiendo. */
@@ -111,7 +118,8 @@ data class ProfileEditorUiState(
     val password: String = "",
     val errors: Set<ProfileField> = emptySet(),
     val isSaving: Boolean = false,
-    val saveFailed: Boolean = false,
+    /** Por qué falló el último guardado; null si no falló. */
+    val saveFailure: StorageFailure? = null,
     /** Pasa a true cuando el perfil quedó guardado; la pantalla lo usa para cerrarse. */
     val saved: Boolean = false,
     val test: ProxyTestUiState = ProxyTestUiState.Idle,
@@ -122,6 +130,8 @@ data class ProfileEditorUiState(
     /** Consultar la cuota de la UCI con este perfil; null: según el proxy (sí, si es de la UCI). */
     val uciQuota: Boolean? = null,
 ) {
+    val saveFailed: Boolean get() = saveFailure != null
+
     val isBusy: Boolean get() = isSaving || test == ProxyTestUiState.Running
 
     /** Lo que se hará con la cuota, con lo escrito ahora en el formulario. */
@@ -206,14 +216,14 @@ class ProfileEditorViewModel(
             current.copy(
                 draft = draft,
                 errors = current.errors - changedFields(current.draft, draft),
-                saveFailed = false,
+                saveFailure = null,
                 test = current.test.afterEdit(),
             )
         }
     }
 
     fun updatePassword(password: String) {
-        state.update { it.copy(password = password, saveFailed = false, test = it.test.afterEdit()) }
+        state.update { it.copy(password = password, saveFailure = null, test = it.test.afterEdit()) }
     }
 
     fun setCountryExitEnabled(enabled: Boolean) {
@@ -222,14 +232,14 @@ class ProfileEditorViewModel(
                 vpn = it.vpn.copy(enabled = enabled),
                 routing = it.routing.withNewRuleExitFor(enabled),
                 errors = it.errors - VPN_FIELDS,
-                saveFailed = false,
+                saveFailure = null,
             )
         }
     }
 
     fun selectEngine(engine: CountryEngineKind) {
         if (engine !in state.value.engines) return
-        state.update { it.copy(vpn = it.vpn.copy(engine = engine), errors = it.errors - VPN_FIELDS, saveFailed = false) }
+        state.update { it.copy(vpn = it.vpn.copy(engine = engine), errors = it.errors - VPN_FIELDS, saveFailure = null) }
     }
 
     fun updateTailscaleControlUrl(url: String) = updateTailscale(ProfileField.TAILSCALE_CONTROL_URL) {
@@ -248,7 +258,7 @@ class ProfileEditorViewModel(
             it.copy(
                 vpn = it.vpn.copy(tailscale = change(it.vpn.tailscale)),
                 errors = if (field == null) it.errors else it.errors - field,
-                saveFailed = false,
+                saveFailure = null,
             )
         }
     }
@@ -271,7 +281,7 @@ class ProfileEditorViewModel(
         updateTailscale(null) { it.copy(search = ExitNodeSearch.Running) }
         viewModelScope.launch {
             val outcome = if (!localNetworkPermission.request()) {
-                ExitNodeSearch.Failed("La app necesita permiso para acceder a la red local y alcanzar el proxy.")
+                ExitNodeSearch.Failed(Res.string.error_tunnel_local_network_denied)
             } else {
                 val listing = guarded("buscar los nodos de salida") {
                     catalog.listTailscaleExitNodes(
@@ -284,9 +294,9 @@ class ProfileEditorViewModel(
                 }
                 when (listing) {
                     is ExitNodeListing.Found ->
-                        if (listing.nodes.isEmpty()) ExitNodeSearch.Failed("La red no tiene ningún nodo de salida.") else ExitNodeSearch.Found(listing.nodes)
-                    is ExitNodeListing.Failed -> ExitNodeSearch.Failed(listing.failure.searchMessage())
-                    null -> ExitNodeSearch.Failed("No se pudo buscar los nodos de salida.")
+                        if (listing.nodes.isEmpty()) ExitNodeSearch.Failed(Res.string.error_exit_search_no_nodes) else ExitNodeSearch.Found(listing.nodes)
+                    is ExitNodeListing.Failed -> ExitNodeSearch.Failed(listing.failure.exitSearchReason)
+                    null -> ExitNodeSearch.Failed(Res.string.error_exit_search_failed)
                 }
             }
             state.update {
@@ -316,19 +326,19 @@ class ProfileEditorViewModel(
                 needsCredentials = config.needsCredentials,
             )
         } catch (e: OvpnConfigException) {
-            state.value.vpn.copy(fileName = fileName, ovpn = "", fileError = e.message)
+            state.value.vpn.copy(fileName = fileName, ovpn = "", fileError = e.error)
         }
         state.update {
-            it.copy(vpn = vpn, routing = it.routing.withNewRuleExitFor(vpn.enabled), errors = it.errors - ProfileField.VPN_FILE, saveFailed = false)
+            it.copy(vpn = vpn, routing = it.routing.withNewRuleExitFor(vpn.enabled), errors = it.errors - ProfileField.VPN_FILE, saveFailure = null)
         }
     }
 
     fun updateVpnUsername(username: String) {
-        state.update { it.copy(vpn = it.vpn.copy(username = username), errors = it.errors - ProfileField.VPN_USERNAME, saveFailed = false) }
+        state.update { it.copy(vpn = it.vpn.copy(username = username), errors = it.errors - ProfileField.VPN_USERNAME, saveFailure = null) }
     }
 
     fun updateVpnPassword(password: String) {
-        state.update { it.copy(vpn = it.vpn.copy(password = password), saveFailed = false) }
+        state.update { it.copy(vpn = it.vpn.copy(password = password), saveFailure = null) }
     }
 
     fun setRoutingEnabled(enabled: Boolean) = updateRules { it.copy(enabled = enabled) }
@@ -369,7 +379,7 @@ class ProfileEditorViewModel(
                     newRule = if (clearText) "" else it.routing.newRule,
                     newRuleInvalid = if (clearText) false else it.routing.newRuleInvalid,
                 ),
-                saveFailed = false,
+                saveFailure = null,
             )
         }
     }
@@ -391,7 +401,7 @@ class ProfileEditorViewModel(
     }
 
     private fun updateRules(change: (RoutingRules) -> RoutingRules) {
-        state.update { it.copy(routing = it.routing.copy(rules = change(it.routing.rules)), saveFailed = false) }
+        state.update { it.copy(routing = it.routing.copy(rules = change(it.routing.rules)), saveFailure = null) }
     }
 
     /**
@@ -442,7 +452,7 @@ class ProfileEditorViewModel(
             validation is ProfileValidation.Invalid -> state.update { it.copy(errors = validation.errors + vpnErrors) }
             vpnErrors.isNotEmpty() -> state.update { it.copy(errors = vpnErrors) }
             validation is ProfileValidation.Valid -> {
-                state.update { it.copy(errors = emptySet(), isSaving = true, saveFailed = false) }
+                state.update { it.copy(errors = emptySet(), isSaving = true, saveFailure = null) }
                 viewModelScope.launch {
                     val (exit, secrets) = when {
                         !vpn.enabled -> null to null
@@ -451,8 +461,16 @@ class ProfileEditorViewModel(
                         else -> CountryExit.OpenVpn(vpn.fileName, vpn.username.trim()) to CountryExitSecrets.OpenVpn(vpn.ovpn, vpn.password)
                     }
                     val profile = validation.profile.copy(countryExit = exit, routing = current.routing.rules, uciQuota = current.uciQuota)
-                    val ok = guarded("guardar el perfil") { repository.save(profile, current.password, secrets) } != null
-                    state.update { it.copy(isSaving = false, saved = ok, saveFailed = !ok) }
+                    val failure = try {
+                        repository.save(profile, current.password, secrets)
+                        null
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        logger.log(LogLevel.ERROR, TAG, "No se pudo guardar el perfil: ${e.message}")
+                        classifyStorageError(e)
+                    }
+                    state.update { it.copy(isSaving = false, saved = failure == null, saveFailure = failure) }
                 }
             }
         }
@@ -460,7 +478,7 @@ class ProfileEditorViewModel(
 
     /** Consultar (o no) la cuota de la UCI con este perfil. */
     fun setUciQuota(enabled: Boolean) {
-        state.update { it.copy(uciQuota = enabled, saveFailed = false) }
+        state.update { it.copy(uciQuota = enabled, saveFailure = null) }
     }
 
     /** Frontera con la interfaz: un fallo del almacén se registra y se muestra, no tumba la app. */
@@ -499,16 +517,6 @@ class ProfileEditorViewModel(
         exitNode = exitNode.trim(),
         hostname = hostname.trim().ifEmpty { CountryExit.Tailscale.DEFAULT_HOSTNAME },
     )
-
-    private fun TunnelFailure.searchMessage(): String = when (this) {
-        TunnelFailure.VPN_AUTH_FAILED -> "La red rechazó la clave de autenticación."
-        TunnelFailure.PROXY_AUTH_FAILED -> "El proxy rechazó el usuario o la contraseña del perfil."
-        TunnelFailure.VPN_SERVER_BLOCKED -> "La política del proxy no deja llegar al servidor de control."
-        TunnelFailure.VPN_SERVER_UNREACHABLE -> "No se pudo llegar al servidor de control a través del proxy."
-        TunnelFailure.ENGINE_UNAVAILABLE -> "Tailscale no está disponible en este equipo."
-        TunnelFailure.VPN_PROFILE_INVALID -> "La dirección del servidor de control no es válida."
-        else -> "No se pudo buscar los nodos de salida (puede que haya otra sesión de Tailscale abierta)."
-    }
 
     private fun ProxyProfile.toDraft() = ProfileDraft(
         name = name,

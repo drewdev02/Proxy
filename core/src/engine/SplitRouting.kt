@@ -1,5 +1,6 @@
 package org.uci.proxy.core.engine
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -31,8 +32,12 @@ import org.uci.proxy.core.routing.RuleSet
 import org.uci.proxy.core.traffic.TrafficMeter
 import org.uci.proxy.core.vpn.VpnSession
 
-/** Lo que el motor necesita para repartir las conexiones entre el proxy, la VPN y el bloqueo. */
-class SplitRouting(val rules: RuleSet, val link: VpnLink)
+/**
+ * Lo que el motor necesita para repartir las conexiones entre el proxy, la VPN y el bloqueo.
+ *
+ * @param fallbackToProxy si lo que va por la VPN sale por el proxy mientras está caída; si no, se bloquea.
+ */
+class SplitRouting(val rules: RuleSet, val link: VpnLink, val fallbackToProxy: Boolean = true)
 
 /**
  * La VPN tal como la usa el motor con reglas de salida: puede no estar, caerse y volver.
@@ -95,12 +100,33 @@ class VpnLink(
         unresolvable.clear()
     }
 
-    suspend fun detach() = lock.withLock {
+    suspend fun detach() = lock.withLock { forget() }
+
+    private fun forget() {
         session = null
         pendingDns.clear()
         resolving.values.forEach { it.second.complete(Unit) }
         resolving.clear()
         resolvingHosts.clear()
+    }
+
+    /**
+     * Escribe en [current]; si la sesión murió, la suelta y la cierra (así el supervisor ve la caída y reintenta) para
+     * que lo que iba por ella salga por el proxy en vez de tumbar el bucle del motor.
+     */
+    private suspend fun write(current: VpnSession, bytes: ByteArray): Boolean {
+        try {
+            current.writePacket(bytes)
+            return true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            logger.log(LogLevel.WARN, TAG, "No se pudo escribir en la VPN: ${e.message}. Su tráfico sale por el proxy")
+            // Solo si sigue siendo la misma: el supervisor pudo haber puesto ya otra.
+            val dropped = lock.withLock { (session === current).also { if (it) forget() } }
+            if (dropped) current.close()
+            return false
+        }
     }
 
     /** Cierra la sesión en curso sin esperar al cerrojo, para despertar su lectura al detener el túnel. */
@@ -132,8 +158,7 @@ class VpnLink(
             }
             current to rewriteAddresses(packet, vpnAddress, destination)
         }
-        current.writePacket(translated)
-        return true
+        return write(current, translated)
     }
 
     /**
@@ -148,8 +173,7 @@ class VpnLink(
             current to rewriteAddresses(packet, vpnAddress, vpnDns)
         }
         logger.log(LogLevel.DEBUG, TAG, "DNS por Otro País: $host")
-        current.writePacket(translated)
-        return true
+        return write(current, translated)
     }
 
     /**
@@ -168,7 +192,13 @@ class VpnLink(
             Triple(current, buildUdpPacket(vpnAddress, vpnDns, RESOLVER_PORT, DNS_PORT, buildDnsQuery(name, id)), done)
         }
         logger.log(LogLevel.DEBUG, TAG, "Resolviendo por Otro País: $name")
-        current.writePacket(query)
+        if (!write(current, query)) {
+            lock.withLock {
+                resolvingHosts.remove(name)
+                resolving.entries.removeAll { it.value.first == name }
+            }
+            return
+        }
         val answered = withTimeoutOrNull(timeoutMs) { done.await() } != null
         val failed = lock.withLock {
             resolvingHosts.remove(name)
@@ -275,10 +305,10 @@ class SplitDnsHandler(
         if (datagram.destinationPort != DNS_PORT) return null
         val question = DnsResponder.parseQuestionOf(datagram.payload)
         if (question != null && question.type == DnsResponder.TYPE_A && !hasOverride(question.name) &&
-            routing.rules.exitFor(question.name, address = null) == RouteExit.VPN &&
-            routing.link.sendDnsQuery(packet, datagram, question.name)
+            routing.rules.exitFor(question.name, address = null) == RouteExit.VPN
         ) {
-            return emptyList()
+            // Sin VPN y sin vuelta al proxy no se contesta: un DNS falso llevaría la conexión al proxy.
+            if (routing.link.sendDnsQuery(packet, datagram, question.name) || !routing.fallbackToProxy) return emptyList()
         }
         return fallback.handle(packet)
     }
@@ -345,9 +375,9 @@ class ExitRouterHandler(
     /** @return lo que se devuelve a la app (nada), o null si la conexión debe seguir por el proxy. */
     private suspend fun sendThroughVpn(packet: Ipv4Packet, host: String?, fake: Boolean, opening: Boolean, target: String): List<ByteArray>? {
         val link = routing.link
-        if (!link.isUp) return null
+        if (!link.isUp) return whileVpnDown(packet)
         if (!fake) {
-            if (!link.send(packet)) return null
+            if (!link.send(packet)) return whileVpnDown(packet)
             countSent(packet, host)
             if (opening) logger.log(LogLevel.DEBUG, TAG, "Otro País: $target")
             return emptyList()
@@ -356,7 +386,7 @@ class ExitRouterHandler(
         val name = host ?: return null
         val real = link.addressFor(name)
         if (real != null) {
-            if (!link.send(packet, destination = real)) return null
+            if (!link.send(packet, destination = real)) return whileVpnDown(packet)
             countSent(packet, name)
             if (opening) logger.log(LogLevel.DEBUG, TAG, "Otro País: $target (${formatIpv4(real)})")
             return emptyList()
@@ -364,6 +394,13 @@ class ExitRouterHandler(
         if (link.isUnresolvable(name) || scope == null) return null
         scope.launch { link.resolve(name) }
         return emptyList()
+    }
+
+    /** Sin VPN: por el proxy (null), o bloqueado si el ajuste lo pide (RST en TCP, nada en UDP). */
+    private fun whileVpnDown(packet: Ipv4Packet): List<ByteArray>? {
+        if (routing.fallbackToProxy) return null
+        val segment = TcpSegment.parse(packet) ?: return emptyList()
+        return listOfNotNull(reset(packet, segment))
     }
 
     private suspend fun countSent(packet: Ipv4Packet, host: String?) {

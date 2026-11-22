@@ -29,7 +29,7 @@ class ConnectingProxyTester(
 ) : ProxyTester {
     override suspend fun test(profile: ProxyProfile, password: String): ProxyTestResult {
         val connector = connectors.firstOrNull { it.protocol == profile.protocol }
-            ?: return ProxyTestResult.Failure(ProxyFailure.ProtocolError("Protocolo ${profile.protocol} no disponible"))
+            ?: return ProxyTestResult.Failure(ProxyFailure.ProtocolError(ProtocolIssue.NO_CONNECTOR, "Protocolo ${profile.protocol} no disponible"))
 
         val result = withTimeoutOrNull(timeout) { connector.connect(profile, password, target) }
         return when (result) {

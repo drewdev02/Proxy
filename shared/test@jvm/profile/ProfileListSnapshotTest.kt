@@ -46,7 +46,7 @@ class ProfileListSnapshotTest {
         val snapshots = Snapshots("profile-list")
         render(snapshots, "phone-connected", profiles, TunnelState.Connected("p1"))
         render(snapshots, "phone-empty", emptyList(), TunnelState.Disconnected)
-        render(snapshots, "phone-errors", profiles, TunnelState.Failed(TunnelFailure.PROXY_AUTH_FAILED), deleteFailed = true)
+        render(snapshots, "phone-errors", profiles, TunnelState.Failed(TunnelFailure.ProxyAuthFailed), deleteFailed = true)
         snapshots.assertAllMatch()
     }
 }

@@ -1,0 +1,2 @@
+/* Por qué la app pide acceso a la red local (iOS lo muestra al pedir el permiso). */
+"NSLocalNetworkUsageDescription" = "ProxyUCI se conecta al servidor proxy de tu red local para probarlo y enrutar el tráfico.";

@@ -31,20 +31,20 @@ class ConnectionFormatTest {
     }
 
     @Test
-    fun `rule counts read naturally`() {
-        assertEquals("1 sitio", mapOf(RuleKind.DOMAIN to 1).describe())
-        assertEquals("2 sitios, 1 red, 3 apps", mapOf(RuleKind.APP to 3, RuleKind.DOMAIN to 2, RuleKind.IP to 1).describe())
+    fun `rule counts keep a fixed order and skip empty kinds`() {
+        assertEquals(listOf(RuleKind.DOMAIN to 1), mapOf(RuleKind.DOMAIN to 1).inOrder())
+        assertEquals(
+            listOf(RuleKind.DOMAIN to 2, RuleKind.IP to 1, RuleKind.APP to 3),
+            mapOf(RuleKind.APP to 3, RuleKind.DOMAIN to 2, RuleKind.IP to 1).inOrder(),
+        )
     }
 
     @Test
     fun `the via proxy warning names the latest sites and counts the rest`() {
+        assertEquals(ViaProxyHosts(listOf("a.com"), 0), viaProxyHosts(listOf("a.com")))
         assertEquals(
-            "El DNS de Otro País no resolvió a.com: sus conexiones salen por el proxy, no por Otro País.",
-            viaProxyMessage(listOf("a.com")),
-        )
-        assertEquals(
-            "El DNS de Otro País no resolvió e.com, d.com, c.com y 2 más: sus conexiones salen por el proxy, no por Otro País.",
-            viaProxyMessage(listOf("a.com", "b.com", "c.com", "d.com", "e.com")),
+            ViaProxyHosts(listOf("e.com", "d.com", "c.com"), 2),
+            viaProxyHosts(listOf("a.com", "b.com", "c.com", "d.com", "e.com")),
         )
     }
 }

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="logs_title">Log</string>
+    <string name="logs_filter_all">All</string>
+    <string name="logs_filter_info">Info</string>
+    <string name="logs_filter_warnings">Warnings</string>
+    <string name="logs_filter_errors">Errors</string>
+
+    <plurals name="logs_summary_live">
+        <item quantity="one">Live · %1$d message</item>
+        <item quantity="other">Live · %1$d messages</item>
+    </plurals>
+    <plurals name="logs_summary_live_filtered">
+        <item quantity="one">Live · %1$d of %2$d message</item>
+        <item quantity="other">Live · %1$d of %2$d messages</item>
+    </plurals>
+    <plurals name="logs_summary_paused">
+        <item quantity="one">Paused · %1$d message</item>
+        <item quantity="other">Paused · %1$d messages</item>
+    </plurals>
+    <plurals name="logs_summary_paused_filtered">
+        <item quantity="one">Paused · %1$d of %2$d message</item>
+        <item quantity="other">Paused · %1$d of %2$d messages</item>
+    </plurals>
+
+    <string name="logs_resume">Resume</string>
+    <string name="logs_pause">Pause</string>
+    <string name="logs_copy">Copy what's shown</string>
+    <string name="logs_clear_log">Clear the log</string>
+
+    <string name="logs_empty_title">No messages yet</string>
+    <string name="logs_empty_message">What the tunnel does while connected shows up here.</string>
+    <string name="logs_filtered_empty_title">No messages match this filter</string>
+    <plurals name="logs_filtered_empty_message">
+        <item quantity="one">Choose “All” to see the message.</item>
+        <item quantity="other">Choose “All” to see all %1$d messages.</item>
+    </plurals>
+
+    <string name="logs_clear_title">Clear the log?</string>
+    <plurals name="logs_clear_message">
+        <item quantity="one">The message is deleted, including any copy saved on this device. This can't be undone.</item>
+        <item quantity="other">All %1$d messages are deleted, including the ones saved on this device. This can't be undone.</item>
+    </plurals>
+    <string name="logs_clear_confirm">Clear</string>
+</resources>

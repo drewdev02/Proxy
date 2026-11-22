@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Cómo se escriben los números en cada idioma. Las unidades (B, KB, MB, GB, KB/s, ms) son universales y van en el código. -->
+<resources>
+    <!-- Un solo carácter: la coma de «1,42 GB». -->
+    <string name="format_decimal_separator">,</string>
+    <!-- Un porcentaje entero: «71 %». El % suelto es literal. -->
+    <string name="format_percent">%1$d %</string>
+</resources>

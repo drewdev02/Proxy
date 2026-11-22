@@ -2,6 +2,7 @@ package org.uci.proxy.core.proxy
 
 import org.uci.proxy.core.net.BufferedTcpConnection
 import org.uci.proxy.core.port.TcpConnector
+import org.uci.proxy.core.port.NetFailure
 import org.uci.proxy.core.port.TcpException
 
 /** Cabecera de una respuesta HTTP: línea de estado y cabeceras. */
@@ -43,7 +44,7 @@ class HttpProxySession(
     suspend fun connect(authorization: String?, sameConnection: Boolean = false): HttpResponseHead {
         val current = connection
             ?: if (sameConnection) {
-                throw TcpException("El proxy cerró la conexión a mitad de la autenticación")
+                throw TcpException(NetFailure.CLOSED, "El proxy cerró la conexión a mitad de la autenticación")
             } else {
                 BufferedTcpConnection(tcpConnector.connect(proxyHost, proxyPort)).also { connection = it }
             }
@@ -80,17 +81,17 @@ class HttpProxySession(
     }
 
     private suspend fun readHead(connection: BufferedTcpConnection): HttpResponseHead {
-        val statusLine = connection.readLine() ?: throw TcpException("El proxy cerró la conexión sin responder")
+        val statusLine = connection.readLine() ?: throw TcpException(NetFailure.CLOSED, "El proxy cerró la conexión sin responder")
         val statusCode = statusLine.split(' ').getOrNull(1)?.toIntOrNull()
         if (!statusLine.startsWith("HTTP/") || statusCode == null) {
-            throw TcpException("La respuesta no es HTTP: ${statusLine.take(60)}")
+            throw TcpException(NetFailure.PROTOCOL, "La respuesta no es HTTP: ${statusLine.take(60)}")
         }
 
         val headers = mutableListOf<Pair<String, String>>()
         while (true) {
-            val line = connection.readLine() ?: throw TcpException("El proxy cortó la respuesta")
+            val line = connection.readLine() ?: throw TcpException(NetFailure.CLOSED, "El proxy cortó la respuesta")
             if (line.isEmpty()) break
-            if (headers.size >= MAX_HEADERS) throw TcpException("Demasiadas cabeceras en la respuesta del proxy")
+            if (headers.size >= MAX_HEADERS) throw TcpException(NetFailure.PROTOCOL, "Demasiadas cabeceras en la respuesta del proxy")
             val colon = line.indexOf(':')
             if (colon > 0) headers += line.substring(0, colon).trim() to line.substring(colon + 1).trim()
         }

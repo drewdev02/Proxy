@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- La cuota de la UCI: la tarjeta de Consumo y las notificaciones. Los porcentajes llegan ya escritos (format_percent). -->
+<resources>
+    <!-- La tarjeta. -->
+    <string name="quota_card_title">CUOTA DE LA UCI</string>
+    <string name="quota_checking_now">Consultando la cuota</string>
+    <string name="quota_check_now">Consultar la cuota ahora</string>
+    <!-- %1$s: el porcentaje usado («71 %»); %2$s: lo que queda («593,8 MB»). -->
+    <string name="quota_ring_description">Usado el %1$s de la cuota; quedan %2$s</string>
+    <string name="quota_available">disponibles</string>
+    <!-- %1$s: lo usado sin unidad («1454,2»); %2$d: lo asignado en MB; %3$s: el porcentaje («71 %»). -->
+    <string name="quota_used_of">%1$s de %2$d MB usados · %3$s</string>
+    <string name="quota_over">Te pasaste %1$s de tu cuota.</string>
+    <string name="quota_checking">Consultando la cuota…</string>
+    <!-- %1$d: el umbral de la pausa (95). El % suelto es literal. -->
+    <string name="quota_paused_message">Llegaste al %1$d % y el túnel se desconectó. Puedes conectar igual desde Conexión.</string>
+    <string name="quota_paused_title">Túnel en pausa por la cuota</string>
+    <string name="quota_problem_title_first">No se pudo consultar la cuota</string>
+    <string name="quota_problem_title_update">No se pudo actualizar</string>
+    <string name="quota_edit_profile">Editar perfil</string>
+    <string name="quota_footnote">Es la cuota de toda tu cuenta: cuenta lo que navegas desde cualquier equipo. Lo consumido baja solo con el tiempo, según la UCI.</string>
+    <!-- Cuándo se consultó, tras quota_footnote. -->
+    <string name="quota_checked_now">Consultada ahora mismo.</string>
+    <plurals name="quota_checked_minutes">
+        <item quantity="one">Consultada hace %1$d min.</item>
+        <item quantity="other">Consultada hace %1$d min.</item>
+    </plurals>
+    <plurals name="quota_checked_hours">
+        <item quantity="one">Consultada hace %1$d h.</item>
+        <item quantity="other">Consultada hace %1$d h.</item>
+    </plurals>
+    <plurals name="quota_checked_days">
+        <item quantity="one">Consultada hace %1$d d.</item>
+        <item quantity="other">Consultada hace %1$d d.</item>
+    </plurals>
+
+    <!-- Por qué no se pudo consultar. -->
+    <string name="quota_problem_wrong_credentials">El servicio de cuotas no aceptó el usuario o la contraseña del perfil.</string>
+    <string name="quota_problem_unreachable">No se llegó al servicio de cuotas. Solo responde desde la red de la UCI; se reintenta solo.</string>
+    <string name="quota_problem_untrusted_certificate">El certificado del servicio no se pudo verificar: lo firma una autoridad de la UCI que el sistema no reconoce. Apaga «Verificar el certificado del servicio» en Ajustes.</string>
+    <string name="quota_problem_service_changed">El servicio de cuotas contestó algo que esta versión no entiende.</string>
+
+    <!-- Las notificaciones. %1$s: el porcentaje («92 %»); %2$s: lo usado («920 MB»); %3$d: lo asignado en MB; %4$s: lo que sobra o falta. -->
+    <string name="quota_notification_threshold_title">Cuota de la UCI al %1$s</string>
+    <string name="quota_notification_threshold">Llevas el %1$s de tu cuota: %2$s de %3$d MB.</string>
+    <string name="quota_notification_threshold_over">Llevas el %1$s de tu cuota: %2$s de %3$d MB. Te pasaste %4$s.</string>
+    <string name="quota_notification_threshold_left">Llevas el %1$s de tu cuota: %2$s de %3$d MB. Te quedan %4$s.</string>
+    <string name="quota_notification_paused_title">Túnel en pausa por la cuota</string>
+    <string name="quota_notification_paused">Llegaste al %1$s de tu cuota: se desconectó el túnel para no agotarla. Puedes conectar igual desde Conexión.</string>
+    <string name="quota_problem_not_on_uci_network">El servicio de cuotas no se encuentra: solo existe dentro de la red de la UCI. Se reintenta solo.</string>
+    <string name="quota_problem_no_network">No hay conexión a la red. La cuota se consultará cuando la haya.</string>
+    <string name="quota_problem_timeout">El servicio de cuotas no respondió a tiempo. Se reintenta solo.</string>
+</resources>

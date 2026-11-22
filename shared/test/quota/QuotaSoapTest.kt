@@ -12,6 +12,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import org.uci.proxy.core.port.NetFailure
 
 /** Respuestas de ejemplo con la forma de un servicio SOAP en PHP, como el de la UCI. */
 private fun answer(vararg fields: Pair<String, String>) =
@@ -122,6 +123,6 @@ class HttpUciQuotaServiceTest {
     fun `a network failure means unreachable`() = runTest {
         val failing = HttpUciQuotaService { _ -> HttpClient(MockEngine { throw RuntimeException("sin red") }) { quotaDefaults() } }
 
-        assertEquals(QuotaFetch.Unreachable("sin red"), failing.fetch("ana", "x", QuotaSoap.SERVICE_URL, true))
+        assertEquals(QuotaFetch.Unreachable(NetFailure.OTHER, "sin red"), failing.fetch("ana", "x", QuotaSoap.SERVICE_URL, true))
     }
 }

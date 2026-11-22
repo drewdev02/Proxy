@@ -10,6 +10,8 @@ import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
+import org.uci.proxy.core.port.NetFailure
+import org.uci.proxy.core.port.classifyNetworkError
 
 /** La cuota de navegación de una cuenta de la UCI, tal como la dio el servicio. */
 @Serializable
@@ -34,8 +36,8 @@ sealed interface QuotaFetch {
     /** El servicio rechazó el usuario o la contraseña. */
     data class WrongCredentials(val message: String) : QuotaFetch
 
-    /** No se llegó al servicio: fuera de la red de la UCI, sin red, o no contestó a tiempo. */
-    data class Unreachable(val message: String) : QuotaFetch
+    /** No se llegó al servicio; [kind] dice por qué (fuera de la red de la UCI, sin red, sin respuesta a tiempo…). */
+    data class Unreachable(val kind: NetFailure, val message: String) : QuotaFetch
 
     /** El certificado del servicio no se pudo verificar: quizá es de una autoridad interna de la UCI. */
     data class UntrustedCertificate(val message: String) : QuotaFetch
@@ -79,7 +81,7 @@ class HttpUciQuotaService internal constructor(
             val message = e.message ?: e::class.simpleName.orEmpty()
             // El tiempo agotado de Ktor es una CancellationException en algunas plataformas; se trata arriba como cancelación
             // solo si de verdad se canceló quien llama.
-            return if (isCertificateError(e)) QuotaFetch.UntrustedCertificate(message) else QuotaFetch.Unreachable(message)
+            return if (isCertificateError(e)) QuotaFetch.UntrustedCertificate(message) else QuotaFetch.Unreachable(classifyNetworkError(e), message)
         }
         // SOAP devuelve los fallos con un 500, pero con el detalle en el cuerpo: se lee el cuerpo sea cual sea el código.
         return try {

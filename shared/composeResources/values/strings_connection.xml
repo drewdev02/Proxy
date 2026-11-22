@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- La pantalla Conexión y su tráfico en vivo. -->
+<resources>
+    <!-- La cabecera: el botón de Consumo y el estado del túnel. -->
+    <string name="connection_open_usage">Consumo</string>
+    <string name="connection_pill_disconnected">Sin túnel</string>
+    <string name="connection_pill_connecting">Conectando</string>
+    <string name="connection_pill_connected">Túnel activo</string>
+    <string name="connection_pill_vpn_down">Túnel · sin VPN</string>
+    <string name="connection_pill_failed">Falló</string>
+
+    <!-- Sin perfiles. -->
+    <string name="connection_empty_title">Aún no hay perfiles</string>
+    <string name="connection_empty_message">Añade el proxy de tu facultad o residencia para empezar a navegar a través de él.</string>
+    <string name="connection_add_profile">Añadir perfil</string>
+
+    <!-- La tarjeta del perfil activo. -->
+    <string name="connection_profile_label">PERFIL</string>
+    <string name="connection_change_profile">Cambiar de perfil</string>
+    <string name="connection_change_profile_disconnect">Desconecta para cambiar de perfil</string>
+    <!-- %1$s: el motor de Otro País (OpenVPN, Tailscale). -->
+    <string name="connection_pill_country">Otro País · %1$s</string>
+    <string name="connection_pill_rules">Reglas</string>
+    <!-- %1$s: el porcentaje usado («71 %»). -->
+    <string name="connection_pill_quota">Cuota %1$s</string>
+
+    <!-- El botón de conectar y la línea de estado. -->
+    <string name="connection_unavailable_title">Túnel no disponible</string>
+    <string name="connection_unavailable_message">En este sistema todavía no se puede crear el túnel. Puedes gestionar los perfiles y probar el proxy.</string>
+    <string name="connection_power_connect">Conectar</string>
+    <string name="connection_power_connecting">Conectando</string>
+    <string name="connection_power_connected">Conectado</string>
+    <string name="connection_power_retry">Reintentar</string>
+    <string name="connection_status_disconnected">Sin conexión · pulsa para conectar</string>
+    <!-- %1$s: el servidor del perfil. -->
+    <string name="connection_status_connecting">Conectando con %1$s…</string>
+    <string name="connection_status_connected">Conectado · pulsa para desconectar</string>
+    <!-- %1$s: el tiempo conectado («02:45:07»). -->
+    <string name="connection_status_connected_for">Conectado · %1$s</string>
+    <string name="connection_status_failed">No se pudo conectar</string>
+
+    <!-- Los avisos. %1$d y %2$d: los porcentajes de la pausa y de su fin; el % suelto es literal. -->
+    <string name="connection_quota_paused_title">En pausa por la cuota</string>
+    <string name="connection_quota_paused_message">Llegaste al %1$d % de tu cuota de la UCI y el túnel se desconectó para no agotarla. Si conectas, no se vuelve a pausar hasta que tu consumo baje del %2$d %.</string>
+    <string name="connection_connect_anyway">Conectar igual</string>
+    <string name="connection_failed_title">No se pudo conectar</string>
+    <string name="connection_edit_profile">Editar perfil</string>
+    <string name="connection_retry">Reintentar</string>
+    <string name="connection_vpn_down_title">Otro País no responde</string>
+    <string name="connection_vpn_down_message">Lo que debía salir por Otro País sale por el proxy mientras se reintenta la VPN.</string>
+    <string name="connection_via_proxy_title">Algunos sitios salen por el proxy</string>
+    <!-- %1$s: los nombres que no resolvió («a.com, b.com»). -->
+    <string name="connection_via_proxy_message">El DNS de Otro País no resolvió %1$s: sus conexiones salen por el proxy, no por Otro País.</string>
+    <!-- %1$s: los primeros nombres; %2$d: cuántos más. -->
+    <plurals name="connection_via_proxy_message_more">
+        <item quantity="one">El DNS de Otro País no resolvió %1$s y %2$d más: sus conexiones salen por el proxy, no por Otro País.</item>
+        <item quantity="other">El DNS de Otro País no resolvió %1$s y %2$d más: sus conexiones salen por el proxy, no por Otro País.</item>
+    </plurals>
+
+    <!-- La prueba del proxy. -->
+    <string name="connection_check_title">Probar el proxy</string>
+    <string name="connection_check_subtitle">Comprueba el usuario y la contraseña con el proxy</string>
+    <string name="connection_check_button">Probar</string>
+    <!-- %1$d: lo que tardó la prueba, en milisegundos. -->
+    <string name="connection_check_ok">OK · %1$d ms</string>
+    <string name="connection_check_success">El proxy aceptó los datos del perfil.</string>
+
+    <!-- Cómo sale el tráfico. -->
+    <string name="connection_routing_title">Cómo sale el tráfico</string>
+    <string name="connection_routing_enabled">Reglas de salida activas</string>
+    <string name="connection_routing_disabled">Sin reglas de salida</string>
+    <string name="connection_routing_edit">Editar</string>
+    <string name="connection_routing_default">Por defecto</string>
+    <string name="connection_routing_everything">Todo</string>
+    <string name="connection_exit_proxy">Proxy</string>
+    <string name="connection_exit_country">Otro País</string>
+    <string name="connection_exit_direct">Directo</string>
+    <string name="connection_exit_blocked">Bloqueado</string>
+    <!-- Cuántas reglas hay de cada tipo; se juntan con comas: «2 sitios, 1 app». -->
+    <plurals name="connection_rules_domains">
+        <item quantity="one">%1$d sitio</item>
+        <item quantity="other">%1$d sitios</item>
+    </plurals>
+    <plurals name="connection_rules_networks">
+        <item quantity="one">%1$d red</item>
+        <item quantity="other">%1$d redes</item>
+    </plurals>
+    <plurals name="connection_rules_apps">
+        <item quantity="one">%1$d app</item>
+        <item quantity="other">%1$d apps</item>
+    </plurals>
+
+    <!-- La actividad reciente y el selector de perfil. -->
+    <string name="connection_recent_activity">Actividad reciente</string>
+    <string name="connection_see_all">Ver todo</string>
+    <string name="connection_no_activity">Sin actividad todavía.</string>
+    <string name="connection_choose_profile">Elegir perfil</string>
+    <string name="connection_profile_active">Activo</string>
+
+    <!-- El tráfico en vivo. -->
+    <string name="connection_live_title">Tráfico en vivo</string>
+    <string name="connection_live_usage">Consumo</string>
+    <string name="connection_live_download">Descarga</string>
+    <string name="connection_live_download_chart">Velocidad de descarga del último minuto</string>
+    <string name="connection_live_upload">Subida</string>
+    <string name="connection_live_upload_chart">Velocidad de subida del último minuto</string>
+    <string name="connection_live_connections">Conexiones</string>
+    <string name="connection_live_connections_caption">abiertas por el proxy</string>
+    <string name="connection_live_session">Sesión</string>
+    <string name="connection_pill_proxy_failing">Túnel · el proxy falla</string>
+    <string name="connection_proxy_failing_title">El proxy está fallando</string>
+    <string name="connection_proxy_auth_rejected_message">El proxy rechaza el usuario o la contraseña del perfil, así que no carga nada de lo que pasa por él. ¿Cambió la contraseña?</string>
+    <string name="connection_proxy_unreachable_message">El proxy no responde, así que no carga nada de lo que pasa por él. Revisa tu conexión a la red.</string>
+    <string name="connection_test_proxy_action">Probar el proxy</string>
+    <string name="connection_vpn_down_blocked_message">Lo que debía salir por Otro País está bloqueado hasta que la VPN vuelva. Puedes cambiarlo en Ajustes.</string>
+</resources>

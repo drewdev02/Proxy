@@ -1,5 +1,6 @@
 package org.uci.proxy.core.engine
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
@@ -145,10 +146,11 @@ class TunnelEngineFactory(
         localDns: LocalDns? = null,
         /** Dónde se cuentan los bytes que pasan; null si no se mide. */
         meter: TrafficMeter? = null,
+        /** Cómo le va al proxy; quien la pasa puede vigilarla para avisar si falla con el túnel en pie. */
+        health: ProxyHealth = ProxyHealth(timeSource),
     ): TunnelEngine {
         val fakeDns = FakeDnsTable(plan.subnetBase)
         val connector = connectors.first { it.protocol == profile.protocol }
-        val health = ProxyHealth(timeSource)
         val checks = ConnectivityChecks(settings.answerConnectivityChecks, health)
         val relay = TunnelRelay(
             connector, profile, password, logger, health, checks, IpNamer(settings, nameReporter, timeSource),
@@ -182,7 +184,7 @@ class TunnelEngineFactory(
                 UdpRejectHandler(),
             )
         }
-        return TunnelEngine(handlers, requeued)
+        return TunnelEngine(handlers, requeued, logger)
     }
 
     private companion object {
@@ -201,6 +203,7 @@ class TunnelEngineFactory(
 class TunnelEngine(
     private val handlers: List<PacketHandler>,
     private val requeued: ReceiveChannel<Ipv4Packet>? = null,
+    private val logger: Logger? = null,
 ) {
     /** Corre hasta que la interfaz se cierra. */
     suspend fun run(tun: TunDevice) {
@@ -216,8 +219,13 @@ class TunnelEngine(
         }
     }
 
-    private suspend fun firstReply(packet: Ipv4Packet): List<ByteArray>? {
-        for (handler in handlers) handler.handle(packet)?.let { return it }
-        return null
+    /** Un manejador que lanza pierde ese paquete, pero no termina el motor: con él caería todo el túnel. */
+    private suspend fun firstReply(packet: Ipv4Packet): List<ByteArray>? = try {
+        handlers.firstNotNullOfOrNull { it.handle(packet) }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        logger?.log(LogLevel.ERROR, "Motor", "Error al atender un paquete: ${e.message}")
+        null
     }
 }

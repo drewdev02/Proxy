@@ -25,6 +25,7 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
+import org.uci.proxy.core.port.NetFailure
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class QuotaMonitorTest {
@@ -44,7 +45,7 @@ class QuotaMonitorTest {
     }
 
     private val service = FakeService()
-    private val notifications = mutableListOf<Pair<String, String>>()
+    private val notifications = mutableListOf<QuotaAlert>()
     private val keyValues = InMemoryKeyValueStore()
     private val settings = StoredSettingsRepository(InMemoryKeyValueStore())
     private val tunnel = FakeTunnel()
@@ -57,7 +58,12 @@ class QuotaMonitorTest {
             override fun now() = Instant.fromEpochMilliseconds(1_795_348_800_000 + testScheduler.currentTime)
         }
         return QuotaMonitor(
-            profiles, active, tunnel, tunnel, settings, service, QuotaStore(keyValues), { title, message -> notifications += title to message },
+            profiles, active, tunnel, tunnel, settings, service, QuotaStore(keyValues),
+            object : QuotaNotifier {
+                override suspend fun notify(alert: QuotaAlert) {
+                    notifications += alert
+                }
+            },
             clock, AppDispatchers(StandardTestDispatcher(testScheduler)), RecordingLogger(),
         )
     }
@@ -123,10 +129,22 @@ class QuotaMonitorTest {
     }
 
     @Test
+    fun `a service name that does not exist means being outside the UCI network`() = runTest {
+        tunnel.emit(TunnelState.Connected("p1"))
+        val monitor = started()
+        service.next = { QuotaFetch.Unreachable(NetFailure.NAME_NOT_FOUND, "cuotas.uci.cu") }
+
+        advanceTimeBy(5.minutes + 1.seconds)
+
+        assertEquals(QuotaProblem.NOT_ON_UCI_NETWORK, monitor.status.value.problem)
+        monitor.stop()
+    }
+
+    @Test
     fun `out of reach it retries sooner but keeps the last known quota`() = runTest {
         tunnel.emit(TunnelState.Connected("p1"))
         val monitor = started()
-        service.next = { QuotaFetch.Unreachable("sin red") }
+        service.next = { QuotaFetch.Unreachable(NetFailure.OTHER, "sin red") }
 
         advanceTimeBy(5.minutes + 1.seconds)
         assertEquals(2, service.calls.size)
@@ -143,7 +161,7 @@ class QuotaMonitorTest {
         service.next = { QuotaFetch.Success(1000, used, "x") }
         tunnel.emit(TunnelState.Connected("p1"))
         val monitor = started()
-        assertEquals(listOf("Cuota de la UCI al 90 %"), notifications.map { it.first }, "solo el más alto")
+        assertEquals(listOf(90), notifications.map { (it as QuotaAlert.Threshold).threshold }, "solo el más alto")
 
         // Sigue por encima, o baja poco (al 88 %): no se repite.
         used = 880.0
@@ -169,7 +187,7 @@ class QuotaMonitorTest {
 
         assertEquals(115.0, monitor.status.value.quota?.percent)
         assertEquals(0.0, monitor.status.value.quota?.remainingMb)
-        assertTrue(notifications.single().second.contains("Te pasaste 300 MB"))
+        assertEquals(2300.0, (notifications.single() as QuotaAlert.Threshold).quota.usedMb)
         monitor.stop()
     }
 
@@ -183,7 +201,7 @@ class QuotaMonitorTest {
 
         assertEquals(TunnelState.Disconnected, tunnel.state.value)
         assertTrue(monitor.status.value.paused)
-        assertTrue(notifications.any { it.first == "Túnel en pausa por la cuota" })
+        assertTrue(notifications.any { it is QuotaAlert.Paused })
 
         // «Conectar igual»: mientras siga por encima, no vuelve a pausar.
         monitor.allowOverLimit()
@@ -226,7 +244,7 @@ class QuotaMonitorTest {
     @Test
     fun `the last quota is shown at once on the next start`() = runTest {
         started().stop()
-        service.next = { QuotaFetch.Unreachable("fuera de la UCI") }
+        service.next = { QuotaFetch.Unreachable(NetFailure.OTHER, "fuera de la UCI") }
 
         advanceTimeBy(10.minutes)
         val again = started()

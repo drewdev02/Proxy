@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Los textos del catálogo de componentes (solo en modo desarrollo). Los datos de ejemplo técnicos (servidores, IPs, archivos) no se traducen. -->
+<resources>
+    <string name="catalog_title">Catálogo de componentes</string>
+    <string name="catalog_subtitle">Solo en modo desarrollo</string>
+
+    <!-- Secciones -->
+    <string name="catalog_section_foundations">Colores y tipografía</string>
+    <string name="catalog_section_containers">Contenedores</string>
+    <string name="catalog_section_buttons">Botones</string>
+    <string name="catalog_section_power">Botón de conexión</string>
+    <string name="catalog_section_status">Estado</string>
+    <string name="catalog_section_forms">Formularios</string>
+    <string name="catalog_section_lists">Listas</string>
+    <string name="catalog_section_navigation">Navegación</string>
+    <string name="catalog_section_data">Datos</string>
+
+    <!-- Palabras que se repiten en varias secciones -->
+    <string name="catalog_connected">Conectado</string>
+    <string name="catalog_other_country">Otro País</string>
+    <string name="catalog_error">Error</string>
+    <string name="catalog_disabled">Inactivo</string>
+    <string name="catalog_delete">Borrar</string>
+    <string name="catalog_retry">Reintentar</string>
+    <string name="catalog_edit_profile">Editar perfil</string>
+
+    <!-- Colores y tipografía -->
+    <string name="catalog_surfaces">Superficies</string>
+    <string name="catalog_swatch_background">Fondo</string>
+    <string name="catalog_swatch_card">Tarjeta</string>
+    <string name="catalog_swatch_border">Borde</string>
+    <string name="catalog_swatch_control">Control</string>
+    <string name="catalog_swatch_control_border">Borde ctrl.</string>
+    <string name="catalog_meaning">Significado</string>
+    <string name="catalog_swatch_active">Activo</string>
+    <string name="catalog_swatch_idle">Reposo</string>
+    <string name="catalog_swatch_warning">Aviso</string>
+    <string name="catalog_swatch_primary">Primario</string>
+    <string name="catalog_typography">Tipografía</string>
+    <string name="catalog_type_body">Body 14 — texto normal de la interfaz</string>
+
+    <!-- Contenedores -->
+    <string name="catalog_cards_by_tone">Tarjetas por tono</string>
+    <string name="catalog_card_normal">Normal</string>
+    <string name="catalog_card_clickable">Otro País (se puede pulsar)</string>
+    <string name="catalog_section_card">Tarjeta de sección</string>
+    <string name="catalog_other_country_subtitle">Canadá · OpenVPN tras el proxy</string>
+    <string name="catalog_enable_other_country">Activar Otro País</string>
+    <string name="catalog_other_country_body">El tráfico pasa primero por el proxy para autenticarse y luego sale por la VPN.</string>
+    <string name="catalog_icon_box">Caja de icono</string>
+
+    <!-- Botones -->
+    <string name="catalog_variants">Variantes</string>
+    <string name="catalog_loading_full_width">Cargando y ancho completo</string>
+    <string name="catalog_testing_connection">Probando conexión</string>
+    <string name="catalog_save_changes">Guardar cambios</string>
+    <string name="catalog_icon_only">Solo icono</string>
+    <string name="catalog_switch_profile">Cambiar perfil</string>
+    <string name="catalog_copy">Copiar</string>
+    <string name="catalog_logs">Registros</string>
+    <string name="catalog_edit">Editar</string>
+
+    <!-- Botón de conexión -->
+    <string name="catalog_connect">Conectar</string>
+    <string name="catalog_connecting">Conectando</string>
+
+    <!-- Estado -->
+    <string name="catalog_tags">Etiquetas</string>
+    <string name="catalog_pill_isolated">Aislado</string>
+    <string name="catalog_pill_failure">Falla</string>
+    <string name="catalog_dots_latency">Puntos y latencia</string>
+    <string name="catalog_filters">Filtros</string>
+    <string name="catalog_filter_all">Todos</string>
+    <string name="catalog_filter_errors">Errores</string>
+    <string name="catalog_alerts">Avisos</string>
+    <string name="catalog_alert_info">Los servicios de nombres se probarán al conectar.</string>
+    <string name="catalog_alert_success">Conectado por sslip.io (42 ms).</string>
+    <string name="catalog_alert_warning_title">Servicio aislado</string>
+    <string name="catalog_alert_warning">nip.io falló 3 veces y queda aislado 10 minutos.</string>
+    <string name="catalog_alert_error_title">No se pudo conectar</string>
+    <string name="catalog_alert_error">El proxy rechazó el usuario o la contraseña.</string>
+
+    <!-- Formularios -->
+    <string name="catalog_fields">Campos</string>
+    <string name="catalog_server">Servidor</string>
+    <string name="catalog_server_hint">Nombre o IP del proxy</string>
+    <string name="catalog_port">Puerto</string>
+    <string name="catalog_port_error">Debe ser un número entre 1 y 65535</string>
+    <string name="catalog_user">Usuario</string>
+    <string name="catalog_user_placeholder">nombre.apellido</string>
+    <string name="catalog_password">Contraseña</string>
+    <string name="catalog_password_hint">Se guarda en el almacén seguro del sistema</string>
+    <string name="catalog_read_only">solo lectura</string>
+    <string name="catalog_search_placeholder">Buscar dominio, IP o etiqueta</string>
+    <string name="catalog_selector">Selector</string>
+    <string name="catalog_no_auth">Sin auth</string>
+    <string name="catalog_mode_inclusive">Solo seleccionadas</string>
+    <string name="catalog_mode_exclusive">Todas excepto</string>
+    <string name="catalog_mode_inclusive_description">Modo Inclusivo</string>
+    <string name="catalog_mode_exclusive_description">Modo Exclusivo</string>
+    <string name="catalog_switches_checkboxes">Interruptores y casillas</string>
+    <string name="catalog_answer_network_checks">Responder comprobaciones de red</string>
+    <string name="catalog_answer_network_checks_hint">El túnel contesta en local</string>
+    <string name="catalog_dns_leak_protection">Protección de fugas de DNS</string>
+    <string name="catalog_unavailable_here">No disponible aquí</string>
+    <string name="catalog_university_networks">Redes de la universidad</string>
+    <string name="catalog_home_networks">Redes domésticas</string>
+    <string name="catalog_file">Archivo</string>
+    <string name="catalog_file_detail">14,2 KB · importado</string>
+
+    <!-- Listas -->
+    <string name="catalog_setting_rows">Filas de ajuste</string>
+    <string name="catalog_name_services">Servicios de nombres</string>
+    <string name="catalog_version">Versión</string>
+    <string name="catalog_profiles">Perfiles</string>
+    <string name="catalog_reorderable_list">Lista ordenable</string>
+    <string name="catalog_empty">Vacío</string>
+    <string name="catalog_empty_title">Aún no hay perfiles</string>
+    <string name="catalog_empty_message">Añade el proxy de tu facultad para empezar.</string>
+    <string name="catalog_add_profile">Añadir perfil</string>
+
+    <!-- Navegación -->
+    <string name="catalog_header">Cabecera</string>
+    <string name="catalog_bottom_bar">Barra inferior (móvil)</string>
+    <string name="catalog_side_rail">Barra lateral (tableta y escritorio)</string>
+    <string name="catalog_dialog_sheet">Diálogo y hoja inferior</string>
+    <string name="catalog_delete_profile">Borrar perfil</string>
+    <string name="catalog_choose_country">Elegir país</string>
+    <!-- %1$s: el nombre del perfil. -->
+    <string name="catalog_delete_profile_title">¿Borrar «%1$s»?</string>
+    <string name="catalog_delete_profile_message">Se borran también su contraseña y su VPN guardadas.</string>
+    <string-array name="catalog_countries">
+        <item>Canadá</item>
+        <item>Países Bajos</item>
+        <item>Japón</item>
+    </string-array>
+
+    <!-- Datos -->
+    <string name="catalog_figures">Cifras</string>
+    <string name="catalog_download">Descarga</string>
+    <string name="catalog_upload">Subida</string>
+    <string name="catalog_connections">Conexiones</string>
+    <string name="catalog_connections_caption">TCP activas</string>
+    <string name="catalog_session">Sesión</string>
+    <string name="catalog_session_caption">desde las 14:30</string>
+    <string name="catalog_usage">Consumo</string>
+    <!-- Los siete días del gráfico, de jueves a miércoles. -->
+    <string-array name="catalog_days">
+        <item>Ju</item>
+        <item>Vi</item>
+        <item>Sá</item>
+        <item>Do</item>
+        <item>Lu</item>
+        <item>Ma</item>
+        <item>Mi</item>
+    </string-array>
+    <string name="catalog_log">Registro</string>
+    <string name="catalog_log_tunnel_open">Túnel HTTP CONNECT abierto</string>
+    <string name="catalog_log_route">Ruta</string>
+    <string name="catalog_log_resolved">Resuelto por el servicio de nombres</string>
+    <string name="catalog_log_auth_rejected">407: el proxy rechazó las credenciales</string>
+</resources>

@@ -93,6 +93,7 @@ val tunnelModule = module {
                     io = get<AppDispatchers>().background,
                 ),
             ),
+            logger = get(),
         )
     }
     // Con get() explícitos: las rutas públicas usan el valor por defecto del constructor.
@@ -111,6 +112,8 @@ val tunnelModule = module {
             dnsTransport = get(),
             traffic = get(),
             timeSource = get(),
+            proxyProbe = get(),
+            localAddresses = get(),
         )
     }
 }

@@ -2,6 +2,7 @@ package org.uci.proxy.core.proxy
 
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.ProxyProtocol
+import org.uci.proxy.core.port.NetFailure
 import org.uci.proxy.core.port.TcpConnector
 import org.uci.proxy.core.port.TcpException
 
@@ -24,7 +25,11 @@ class HttpConnectConnector(
         val failure = try {
             negotiate(session, ProxyCredentials(profile.username, password))
         } catch (e: TcpException) {
-            ProxyFailure.Unreachable(e.message.orEmpty())
+            if (e.kind == NetFailure.PROTOCOL) {
+                ProxyFailure.ProtocolError(ProtocolIssue.NOT_HTTP_PROXY, e.message.orEmpty())
+            } else {
+                ProxyFailure.Unreachable(e.kind, e.message.orEmpty())
+            }
         }
 
         return if (failure == null) {
@@ -38,7 +43,7 @@ class HttpConnectConnector(
     private suspend fun negotiate(session: HttpProxySession, credentials: ProxyCredentials): ProxyFailure? {
         val first = session.connect(authorization = null)
         if (first.statusCode in 200..299) return null
-        if (first.statusCode != 407) return ProxyFailure.Refused(first.statusLine)
+        if (first.statusCode != 407) return ProxyFailure.Refused(RefusalReason.ofHttp(first.statusCode), first.statusLine)
 
         if (credentials.username.isEmpty()) return ProxyFailure.AuthRequired
 

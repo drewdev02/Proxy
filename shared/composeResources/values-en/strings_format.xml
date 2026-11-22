@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="format_decimal_separator">.</string>
+    <string name="format_percent">%1$d%</string>
+</resources>

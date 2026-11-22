@@ -9,6 +9,7 @@ import org.uci.proxy.core.settings.IpNameService
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import org.uci.proxy.core.port.NetFailure
 
 class NameServiceTesterTest {
     private val profile = ProxyProfile("p", "UCI", "10.0.0.1", 3128, ProxyProtocol.HTTP, "andrey")
@@ -40,9 +41,9 @@ class NameServiceTesterTest {
 
     @Test
     fun `a refusal is reported with the proxy's own words`() = runTest {
-        val result = tester(FakeProxyConnector.failingWith(ProxyFailure.Refused("HTTP/1.1 403 Forbidden"))).test(IpNameService.SSLIP, profile, "")
+        val result = tester(FakeProxyConnector.failingWith(ProxyFailure.Refused(RefusalReason.FORBIDDEN, "HTTP/1.1 403 Forbidden"))).test(IpNameService.SSLIP, profile, "")
 
-        assertEquals(NameServiceTestResult.Refused("HTTP/1.1 403 Forbidden"), result)
+        assertEquals(NameServiceTestResult.Refused(RefusalReason.FORBIDDEN, "HTTP/1.1 403 Forbidden"), result)
     }
 
     @Test
@@ -54,9 +55,9 @@ class NameServiceTesterTest {
 
     @Test
     fun `a network failure is reported as such`() = runTest {
-        val result = tester(FakeProxyConnector.failingWith(ProxyFailure.Unreachable("sin ruta"))).test(IpNameService.SSLIP, profile, "")
+        val result = tester(FakeProxyConnector.failingWith(ProxyFailure.Unreachable(NetFailure.NO_ROUTE, "sin ruta"))).test(IpNameService.SSLIP, profile, "")
 
-        assertEquals(NameServiceTestResult.Unreachable("sin ruta"), result)
+        assertEquals(NameServiceTestResult.Unreachable(NetFailure.NO_ROUTE, "sin ruta"), result)
     }
 
     @Test

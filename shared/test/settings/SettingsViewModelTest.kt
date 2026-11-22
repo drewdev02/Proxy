@@ -24,6 +24,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import org.uci.proxy.core.proxy.RefusalReason
+import org.uci.proxy.core.port.NetFailure
 
 class SettingsViewModelTest : MainDispatcherTest() {
     private val store = InMemoryKeyValueStore()
@@ -100,6 +102,16 @@ class SettingsViewModelTest : MainDispatcherTest() {
 
         assertFalse(viewModel.uiState.value.settings.intranetDirect)
         assertFalse(StoredSettingsRepository(store).settings.value.intranetDirect)
+    }
+
+    @Test
+    fun `the Otro País fallback switch starts on and is stored`() {
+        assertTrue(viewModel.uiState.value.settings.vpnFallbackToProxy)
+
+        viewModel.setVpnFallbackToProxy(false)
+
+        assertFalse(viewModel.uiState.value.settings.vpnFallbackToProxy)
+        assertFalse(StoredSettingsRepository(store).settings.value.vpnFallbackToProxy)
     }
 
     @Test
@@ -212,7 +224,7 @@ class SettingsViewModelTest : MainDispatcherTest() {
 
     @Test
     fun `a refusal is recorded as the service's status`() {
-        testResult = NameServiceTestResult.Refused("HTTP/1.1 403 Forbidden")
+        testResult = NameServiceTestResult.Refused(RefusalReason.FORBIDDEN, "HTTP/1.1 403 Forbidden")
 
         viewModel.testService("nip")
 
@@ -222,7 +234,7 @@ class SettingsViewModelTest : MainDispatcherTest() {
 
     @Test
     fun `a network failure or rejected credentials are shown but not recorded as the service's status`() {
-        testResult = NameServiceTestResult.Unreachable("sin ruta")
+        testResult = NameServiceTestResult.Unreachable(NetFailure.NO_ROUTE, "sin ruta")
         viewModel.testService("sslip")
         testResult = NameServiceTestResult.ProxyAuth
         viewModel.testService("nip")
@@ -279,18 +291,18 @@ class TimeAgoTest {
 
     @Test
     fun `recent moments read as seconds`() {
-        assertEquals("hace unos segundos", timeAgo(now - 5_000, now))
-        assertEquals("hace unos segundos", timeAgo(now + 5_000, now), "el futuro cuenta como ahora")
+        assertEquals(TimeAgo.Seconds, timeAgo(now - 5_000, now))
+        assertEquals(TimeAgo.Seconds, timeAgo(now + 5_000, now), "el futuro cuenta como ahora")
     }
 
     @Test
     fun `minutes hours and days`() {
-        assertEquals("hace 1 min", timeAgo(now - 50_000, now))
-        assertEquals("hace 5 min", timeAgo(now - 5 * 60_000, now))
-        assertEquals("hace 59 min", timeAgo(now - 59 * 60_000, now))
-        assertEquals("hace 1 h", timeAgo(now - 3_600_000, now))
-        assertEquals("hace 23 h", timeAgo(now - 23 * 3_600_000, now))
-        assertEquals("hace 1 d", timeAgo(now - 86_400_000, now))
-        assertEquals("hace 3 d", timeAgo(now - 3 * 86_400_000, now))
+        assertEquals(TimeAgo.Minutes(1), timeAgo(now - 50_000, now))
+        assertEquals(TimeAgo.Minutes(5), timeAgo(now - 5 * 60_000, now))
+        assertEquals(TimeAgo.Minutes(59), timeAgo(now - 59 * 60_000, now))
+        assertEquals(TimeAgo.Hours(1), timeAgo(now - 3_600_000, now))
+        assertEquals(TimeAgo.Hours(23), timeAgo(now - 23 * 3_600_000, now))
+        assertEquals(TimeAgo.Days(1), timeAgo(now - 86_400_000, now))
+        assertEquals(TimeAgo.Days(3), timeAgo(now - 3 * 86_400_000, now))
     }
 }

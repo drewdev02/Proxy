@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="catalog_title">Component catalog</string>
+    <string name="catalog_subtitle">Developer mode only</string>
+
+    <string name="catalog_section_foundations">Colors and typography</string>
+    <string name="catalog_section_containers">Containers</string>
+    <string name="catalog_section_buttons">Buttons</string>
+    <string name="catalog_section_power">Connect button</string>
+    <string name="catalog_section_status">Status</string>
+    <string name="catalog_section_forms">Forms</string>
+    <string name="catalog_section_lists">Lists</string>
+    <string name="catalog_section_navigation">Navigation</string>
+    <string name="catalog_section_data">Data</string>
+
+    <string name="catalog_connected">Connected</string>
+    <string name="catalog_other_country">Other Country</string>
+    <string name="catalog_error">Error</string>
+    <string name="catalog_disabled">Disabled</string>
+    <string name="catalog_delete">Delete</string>
+    <string name="catalog_retry">Retry</string>
+    <string name="catalog_edit_profile">Edit profile</string>
+
+    <string name="catalog_surfaces">Surfaces</string>
+    <string name="catalog_swatch_background">Background</string>
+    <string name="catalog_swatch_card">Card</string>
+    <string name="catalog_swatch_border">Border</string>
+    <string name="catalog_swatch_control">Control</string>
+    <string name="catalog_swatch_control_border">Ctrl. border</string>
+    <string name="catalog_meaning">Meaning</string>
+    <string name="catalog_swatch_active">Active</string>
+    <string name="catalog_swatch_idle">Idle</string>
+    <string name="catalog_swatch_warning">Warning</string>
+    <string name="catalog_swatch_primary">Primary</string>
+    <string name="catalog_typography">Typography</string>
+    <string name="catalog_type_body">Body 14 — regular interface text</string>
+
+    <string name="catalog_cards_by_tone">Cards by tone</string>
+    <string name="catalog_card_normal">Normal</string>
+    <string name="catalog_card_clickable">Other Country (clickable)</string>
+    <string name="catalog_section_card">Section card</string>
+    <string name="catalog_other_country_subtitle">Canada · OpenVPN behind the proxy</string>
+    <string name="catalog_enable_other_country">Enable Other Country</string>
+    <string name="catalog_other_country_body">Traffic goes through the proxy first to authenticate, then leaves through the VPN.</string>
+    <string name="catalog_icon_box">Icon box</string>
+
+    <string name="catalog_variants">Variants</string>
+    <string name="catalog_loading_full_width">Loading and full width</string>
+    <string name="catalog_testing_connection">Testing connection</string>
+    <string name="catalog_save_changes">Save changes</string>
+    <string name="catalog_icon_only">Icon only</string>
+    <string name="catalog_switch_profile">Switch profile</string>
+    <string name="catalog_copy">Copy</string>
+    <string name="catalog_logs">Logs</string>
+    <string name="catalog_edit">Edit</string>
+
+    <string name="catalog_connect">Connect</string>
+    <string name="catalog_connecting">Connecting</string>
+
+    <string name="catalog_tags">Tags</string>
+    <string name="catalog_pill_isolated">Isolated</string>
+    <string name="catalog_pill_failure">Failing</string>
+    <string name="catalog_dots_latency">Dots and latency</string>
+    <string name="catalog_filters">Filters</string>
+    <string name="catalog_filter_all">All</string>
+    <string name="catalog_filter_errors">Errors</string>
+    <string name="catalog_alerts">Alerts</string>
+    <string name="catalog_alert_info">Name services will be tested when you connect.</string>
+    <string name="catalog_alert_success">Connected via sslip.io (42 ms).</string>
+    <string name="catalog_alert_warning_title">Service isolated</string>
+    <string name="catalog_alert_warning">nip.io failed 3 times and is isolated for 10 minutes.</string>
+    <string name="catalog_alert_error_title">Couldn't connect</string>
+    <string name="catalog_alert_error">The proxy rejected the username or password.</string>
+
+    <string name="catalog_fields">Fields</string>
+    <string name="catalog_server">Server</string>
+    <string name="catalog_server_hint">Proxy name or IP</string>
+    <string name="catalog_port">Port</string>
+    <string name="catalog_port_error">Must be a number between 1 and 65535</string>
+    <string name="catalog_user">Username</string>
+    <string name="catalog_user_placeholder">first.last</string>
+    <string name="catalog_password">Password</string>
+    <string name="catalog_password_hint">Stored in the system's secure storage</string>
+    <string name="catalog_read_only">read only</string>
+    <string name="catalog_search_placeholder">Search domain, IP or tag</string>
+    <string name="catalog_selector">Selector</string>
+    <string name="catalog_no_auth">No auth</string>
+    <string name="catalog_mode_inclusive">Only selected</string>
+    <string name="catalog_mode_exclusive">All except</string>
+    <string name="catalog_mode_inclusive_description">Inclusive mode</string>
+    <string name="catalog_mode_exclusive_description">Exclusive mode</string>
+    <string name="catalog_switches_checkboxes">Switches and checkboxes</string>
+    <string name="catalog_answer_network_checks">Answer network checks</string>
+    <string name="catalog_answer_network_checks_hint">The tunnel answers locally</string>
+    <string name="catalog_dns_leak_protection">DNS leak protection</string>
+    <string name="catalog_unavailable_here">Not available here</string>
+    <string name="catalog_university_networks">University networks</string>
+    <string name="catalog_home_networks">Home networks</string>
+    <string name="catalog_file">File</string>
+    <string name="catalog_file_detail">14.2 KB · imported</string>
+
+    <string name="catalog_setting_rows">Setting rows</string>
+    <string name="catalog_name_services">Name services</string>
+    <string name="catalog_version">Version</string>
+    <string name="catalog_profiles">Profiles</string>
+    <string name="catalog_reorderable_list">Reorderable list</string>
+    <string name="catalog_empty">Empty</string>
+    <string name="catalog_empty_title">No profiles yet</string>
+    <string name="catalog_empty_message">Add your faculty's proxy to get started.</string>
+    <string name="catalog_add_profile">Add profile</string>
+
+    <string name="catalog_header">Header</string>
+    <string name="catalog_bottom_bar">Bottom bar (mobile)</string>
+    <string name="catalog_side_rail">Side rail (tablet and desktop)</string>
+    <string name="catalog_dialog_sheet">Dialog and bottom sheet</string>
+    <string name="catalog_delete_profile">Delete profile</string>
+    <string name="catalog_choose_country">Choose country</string>
+    <string name="catalog_delete_profile_title">Delete “%1$s”?</string>
+    <string name="catalog_delete_profile_message">Its saved password and VPN are deleted too.</string>
+    <string-array name="catalog_countries">
+        <item>Canada</item>
+        <item>Netherlands</item>
+        <item>Japan</item>
+    </string-array>
+
+    <string name="catalog_figures">Figures</string>
+    <string name="catalog_download">Download</string>
+    <string name="catalog_upload">Upload</string>
+    <string name="catalog_connections">Connections</string>
+    <string name="catalog_connections_caption">Active TCP</string>
+    <string name="catalog_session">Session</string>
+    <string name="catalog_session_caption">since 14:30</string>
+    <string name="catalog_usage">Usage</string>
+    <string-array name="catalog_days">
+        <item>Th</item>
+        <item>Fr</item>
+        <item>Sa</item>
+        <item>Su</item>
+        <item>Mo</item>
+        <item>Tu</item>
+        <item>We</item>
+    </string-array>
+    <string name="catalog_log">Log</string>
+    <string name="catalog_log_tunnel_open">HTTP CONNECT tunnel open</string>
+    <string name="catalog_log_route">Route</string>
+    <string name="catalog_log_resolved">Resolved by the name service</string>
+    <string name="catalog_log_auth_rejected">407: the proxy rejected the credentials</string>
+</resources>

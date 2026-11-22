@@ -4,6 +4,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.uci.proxy.core.log.LogEntry
 import org.uci.proxy.core.model.ProxyProfile
+import org.uci.proxy.core.port.ProxyProblem
 import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.settings.AppSettings
@@ -50,7 +51,9 @@ object EngineProtocol {
 
     /** Tras «connected»: Otro País no está y su tráfico sale por el proxy. */
     private const val VPN_DOWN = "vpn-down"
+    private const val VPN_BLOCKED = "vpn-blocked"
     private const val VIA_PROXY = "via-proxy="
+    private const val PROXY_PROBLEM = "proxy-problem="
 
     private const val NAMESTAT_PREFIX = "NAMESTAT "
     private const val TRAFFIC_PREFIX = "TRAFFIC "
@@ -112,10 +115,13 @@ object EngineProtocol {
     fun encodeState(state: TunnelState): String? = when (state) {
         is TunnelState.Connected -> STATE_PREFIX + "connected" +
             (if (state.vpnDown) " $VPN_DOWN" else "") +
+            (if (state.vpnBlocked) " $VPN_BLOCKED" else "") +
             // Los nombres no llevan espacios ni comas: van en una sola palabra.
-            (if (state.viaProxy.isNotEmpty()) " $VIA_PROXY" + state.viaProxy.joinToString(",") else "")
+            (if (state.viaProxy.isNotEmpty()) " $VIA_PROXY" + state.viaProxy.joinToString(",") else "") +
+            (state.proxyProblem?.let { " $PROXY_PROBLEM${it.name}" } ?: "")
         TunnelState.Disconnected -> STATE_PREFIX + "disconnected"
-        is TunnelState.Failed -> STATE_PREFIX + "failed " + state.failure.name
+        // El fallo lleva datos (el servidor, el cifrado…): va en JSON, que no tiene saltos de línea.
+        is TunnelState.Failed -> STATE_PREFIX + "failed " + json.encodeToString(TunnelFailure.serializer(), state.failure)
         is TunnelState.Connecting -> null
     }
 
@@ -127,10 +133,20 @@ object EngineProtocol {
             "connected" -> TunnelState.Connected(
                 profileId,
                 vpnDown = VPN_DOWN in parts,
+                vpnBlocked = VPN_BLOCKED in parts,
                 viaProxy = parts.firstOrNull { it.startsWith(VIA_PROXY) }?.removePrefix(VIA_PROXY)?.split(',')?.filter { it.isNotEmpty() }.orEmpty(),
+                proxyProblem = parts.firstOrNull { it.startsWith(PROXY_PROBLEM) }?.removePrefix(PROXY_PROBLEM)
+                    ?.let { name -> ProxyProblem.entries.firstOrNull { it.name == name } },
             )
             "disconnected" -> TunnelState.Disconnected
-            "failed" -> TunnelFailure.entries.firstOrNull { it.name == parts.getOrNull(1) }?.let(TunnelState::Failed)
+            "failed" -> try {
+                TunnelState.Failed(json.decodeFromString(TunnelFailure.serializer(), line.removePrefix(STATE_PREFIX).removePrefix("failed ")))
+            } catch (_: kotlinx.serialization.SerializationException) {
+                // Un motor de otra versión con un fallo que esta no conoce: al menos se dice que falló.
+                TunnelState.Failed(TunnelFailure.EngineInternal)
+            } catch (_: IllegalArgumentException) {
+                TunnelState.Failed(TunnelFailure.EngineInternal)
+            }
             else -> null
         }
     }

@@ -17,15 +17,21 @@ import org.uci.proxy.core.port.TunnelControl
 import org.uci.proxy.core.port.TunnelMonitor
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.profile.ProfileRepository
+import org.uci.proxy.common.StorageFailure
+import org.uci.proxy.common.classifyStorageError
 
 data class ProfileListUiState(
     val profiles: List<ProxyProfile> = emptyList(),
-    /** Si falló el último borrado; se muestra hasta que la persona cierra el aviso. */
-    val deleteFailed: Boolean = false,
+    /** Por qué falló el último borrado; se muestra hasta que la persona cierra el aviso. */
+    val deleteFailure: StorageFailure? = null,
     val tunnel: TunnelUiModel = TunnelUiModel(isAvailable = false, state = TunnelState.Disconnected),
-    /** «ProxyUCI en Android 16», al pie de la lista. */
-    val platformLabel: String = "",
-)
+    /** La plataforma («Android», «iOS»…; es un nombre propio, no se traduce), para el pie de la lista. */
+    val platformName: String = "",
+    /** La versión del sistema, tal como la da la plataforma. */
+    val osVersion: String = "",
+) {
+    val deleteFailed: Boolean get() = deleteFailure != null
+}
 
 /**
  * El único ViewModel de la lista de perfiles. Lo que comparte con otras pantallas (los perfiles, el túnel, la
@@ -38,15 +44,17 @@ class ProfileListViewModel(
     platformInfo: PlatformInfo,
     private val logger: Logger,
 ) : ViewModel() {
-    private val deleteFailed = MutableStateFlow(false)
-    private val platformLabel = "ProxyUCI en ${platformInfo.kind.displayName} ${platformInfo.osVersion}"
+    private val deleteFailure = MutableStateFlow<StorageFailure?>(null)
+    private val platformName = platformInfo.kind.displayName
+    private val osVersion = platformInfo.osVersion
 
-    val uiState: StateFlow<ProfileListUiState> = combine(repository.profiles, deleteFailed, monitor.state) { profiles, failed, tunnel ->
+    val uiState: StateFlow<ProfileListUiState> = combine(repository.profiles, deleteFailure, monitor.state) { profiles, failure, tunnel ->
         ProfileListUiState(
             profiles = profiles,
-            deleteFailed = failed,
+            deleteFailure = failure,
             tunnel = TunnelUiModel(isAvailable = control.isAvailable, state = tunnel),
-            platformLabel = platformLabel,
+            platformName = platformName,
+            osVersion = osVersion,
         )
     }.stateIn(
         viewModelScope,
@@ -55,7 +63,8 @@ class ProfileListViewModel(
         ProfileListUiState(
             profiles = repository.profiles.value,
             tunnel = TunnelUiModel(isAvailable = control.isAvailable, state = monitor.state.value),
-            platformLabel = platformLabel,
+            platformName = platformName,
+            osVersion = osVersion,
         ),
     )
 
@@ -68,13 +77,13 @@ class ProfileListViewModel(
             } catch (e: Exception) {
                 // Frontera con la interfaz: un fallo del almacén se muestra, no tumba la app.
                 logger.log(LogLevel.ERROR, TAG, "No se pudo eliminar el perfil $id: ${e.message}")
-                deleteFailed.value = true
+                deleteFailure.value = classifyStorageError(e)
             }
         }
     }
 
     fun dismissDeleteError() {
-        deleteFailed.value = false
+        deleteFailure.value = null
     }
 
     fun connect(profileId: String) {

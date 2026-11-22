@@ -10,6 +10,7 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import org.uci.proxy.core.port.NetFailure
 
 class Socks5ConnectorTest {
     private val target = ProxyTarget("example.org", 443)
@@ -96,7 +97,7 @@ class Socks5ConnectorTest {
     fun `a refused destination is reported with the SOCKS code`() = runTest {
         val server = FakeSocksServer(replyCode = 5)
 
-        assertEquals(ProxyFailure.Refused("SOCKS5 código 5"), connect(server).failure())
+        assertEquals(ProxyFailure.Refused(RefusalReason.DESTINATION_REFUSED, "SOCKS5 código 5"), connect(server).failure())
     }
 
     @Test
@@ -121,6 +122,6 @@ class Socks5ConnectorTest {
     fun `a failed connection is unreachable`() = runTest {
         val result = Socks5Connector(unreachableConnector).connect(profile(), "", target)
 
-        assertEquals(ProxyFailure.Unreachable("no se pudo conectar con 10.0.0.1"), result.failure())
+        assertEquals(ProxyFailure.Unreachable(NetFailure.REFUSED, "no se pudo conectar con 10.0.0.1"), result.failure())
     }
 }

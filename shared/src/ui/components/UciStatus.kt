@@ -34,6 +34,9 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import org.jetbrains.compose.resources.stringResource
+import org.uci.proxy.resources.Res
+import org.uci.proxy.resources.*
 import org.uci.proxy.theme.ProxyUciTheme
 import org.uci.proxy.ui.icons.UciIcons
 
@@ -185,7 +188,7 @@ fun UciInlineAlert(
             }
             action?.invoke(this)
             if (onDismiss != null) {
-                UciIconButton(UciIcons.Close, "Cerrar aviso", onDismiss, bordered = false, modifier = Modifier.align(Alignment.Top))
+                UciIconButton(UciIcons.Close, stringResource(Res.string.ui_alert_dismiss), onDismiss, bordered = false, modifier = Modifier.align(Alignment.Top))
             }
         }
     }
