@@ -128,4 +128,6 @@
     <string name="routing_exit_vpn">Otro País</string>
     <string name="routing_exit_direct">Directo</string>
     <string name="routing_exit_block">Bloquear</string>
+    <string name="profile_editor_save_failed_secure_storage">El almacén seguro del sistema no pudo cifrar la contraseña. Reinicia la app e inténtalo de nuevo; si se repite, borra el perfil y créalo otra vez.</string>
+    <string name="profile_list_delete_failed_secure_storage">El almacén seguro del sistema no pudo borrar la contraseña del perfil. Reinicia la app e inténtalo de nuevo.</string>
 </resources>

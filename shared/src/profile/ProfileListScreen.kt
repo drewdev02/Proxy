@@ -48,6 +48,7 @@ import org.uci.proxy.ui.components.UciStatusPill
 import org.uci.proxy.ui.components.UciTone
 import org.uci.proxy.ui.components.UciTopBar
 import org.uci.proxy.ui.icons.UciIcons
+import org.uci.proxy.common.StorageFailure
 
 /** Lo que la lista necesita saber del túnel. */
 data class TunnelUiModel(
@@ -78,6 +79,7 @@ internal fun ProfileListScreen(
         profiles = state.profiles,
         platformLabel = stringResource(Res.string.profile_list_platform, state.platformName, state.osVersion),
         deleteFailed = state.deleteFailed,
+        deleteFailure = state.deleteFailure,
         tunnel = state.tunnel,
         onAdd = onAdd,
         onEdit = onEdit,
@@ -99,6 +101,7 @@ fun ProfileListScreen(
     platformLabel: String,
     deleteFailed: Boolean,
     tunnel: TunnelUiModel,
+    deleteFailure: StorageFailure? = null,
     onAdd: () -> Unit,
     onEdit: (String) -> Unit,
     onDelete: (String) -> Unit,
@@ -139,7 +142,13 @@ fun ProfileListScreen(
                 if (deleteFailed) {
                     item(key = "delete-failed") {
                         UciInlineAlert(
-                            stringResource(Res.string.profile_list_delete_failed),
+                            stringResource(
+                                if (deleteFailure == StorageFailure.SECURE_STORAGE) {
+                                    Res.string.profile_list_delete_failed_secure_storage
+                                } else {
+                                    Res.string.profile_list_delete_failed
+                                },
+                            ),
                             title = stringResource(Res.string.profile_list_delete_failed_title),
                             tone = UciTone.Danger,
                             onDismiss = onDismissDeleteError,

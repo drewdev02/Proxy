@@ -70,6 +70,7 @@ import org.uci.proxy.ui.icons.UciIcons
 import org.uci.proxy.common.FailureDetails
 import org.uci.proxy.common.code
 import org.uci.proxy.common.technicalDetail
+import org.uci.proxy.common.StorageFailure
 
 /**
  * El editor de perfil a nivel de pantalla: obtiene su ViewModel y pasa solo estado y acciones a la versión sin estado.
@@ -196,7 +197,13 @@ fun ProfileEditorScreen(
                 }
                 if (state.saveFailed) {
                     UciInlineAlert(
-                        stringResource(Res.string.profile_editor_save_failed),
+                        stringResource(
+                            if (state.saveFailure == StorageFailure.SECURE_STORAGE) {
+                                Res.string.profile_editor_save_failed_secure_storage
+                            } else {
+                                Res.string.profile_editor_save_failed
+                            },
+                        ),
                         tone = UciTone.Danger,
                         title = stringResource(Res.string.profile_editor_save_failed_title),
                     )

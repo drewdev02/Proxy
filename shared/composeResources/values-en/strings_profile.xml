@@ -116,4 +116,6 @@
     <string name="routing_exit_vpn">Other Country</string>
     <string name="routing_exit_direct">Direct</string>
     <string name="routing_exit_block">Block</string>
+    <string name="profile_editor_save_failed_secure_storage">The system's secure storage could not encrypt the password. Restart the app and try again; if it happens again, delete the profile and create it again.</string>
+    <string name="profile_list_delete_failed_secure_storage">The system's secure storage could not delete the profile's password. Restart the app and try again.</string>
 </resources>

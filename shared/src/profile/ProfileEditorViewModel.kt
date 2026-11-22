@@ -41,6 +41,8 @@ import org.uci.proxy.core.vpn.tailscale.ExitNodeListing
 import org.uci.proxy.core.vpn.tailscale.TailscaleExitNode
 import org.uci.proxy.resources.*
 import org.uci.proxy.resources.Res
+import org.uci.proxy.common.StorageFailure
+import org.uci.proxy.common.classifyStorageError
 
 sealed interface ProxyTestUiState {
     data object Idle : ProxyTestUiState
@@ -116,7 +118,8 @@ data class ProfileEditorUiState(
     val password: String = "",
     val errors: Set<ProfileField> = emptySet(),
     val isSaving: Boolean = false,
-    val saveFailed: Boolean = false,
+    /** Por qué falló el último guardado; null si no falló. */
+    val saveFailure: StorageFailure? = null,
     /** Pasa a true cuando el perfil quedó guardado; la pantalla lo usa para cerrarse. */
     val saved: Boolean = false,
     val test: ProxyTestUiState = ProxyTestUiState.Idle,
@@ -127,6 +130,8 @@ data class ProfileEditorUiState(
     /** Consultar la cuota de la UCI con este perfil; null: según el proxy (sí, si es de la UCI). */
     val uciQuota: Boolean? = null,
 ) {
+    val saveFailed: Boolean get() = saveFailure != null
+
     val isBusy: Boolean get() = isSaving || test == ProxyTestUiState.Running
 
     /** Lo que se hará con la cuota, con lo escrito ahora en el formulario. */
@@ -211,14 +216,14 @@ class ProfileEditorViewModel(
             current.copy(
                 draft = draft,
                 errors = current.errors - changedFields(current.draft, draft),
-                saveFailed = false,
+                saveFailure = null,
                 test = current.test.afterEdit(),
             )
         }
     }
 
     fun updatePassword(password: String) {
-        state.update { it.copy(password = password, saveFailed = false, test = it.test.afterEdit()) }
+        state.update { it.copy(password = password, saveFailure = null, test = it.test.afterEdit()) }
     }
 
     fun setCountryExitEnabled(enabled: Boolean) {
@@ -227,14 +232,14 @@ class ProfileEditorViewModel(
                 vpn = it.vpn.copy(enabled = enabled),
                 routing = it.routing.withNewRuleExitFor(enabled),
                 errors = it.errors - VPN_FIELDS,
-                saveFailed = false,
+                saveFailure = null,
             )
         }
     }
 
     fun selectEngine(engine: CountryEngineKind) {
         if (engine !in state.value.engines) return
-        state.update { it.copy(vpn = it.vpn.copy(engine = engine), errors = it.errors - VPN_FIELDS, saveFailed = false) }
+        state.update { it.copy(vpn = it.vpn.copy(engine = engine), errors = it.errors - VPN_FIELDS, saveFailure = null) }
     }
 
     fun updateTailscaleControlUrl(url: String) = updateTailscale(ProfileField.TAILSCALE_CONTROL_URL) {
@@ -253,7 +258,7 @@ class ProfileEditorViewModel(
             it.copy(
                 vpn = it.vpn.copy(tailscale = change(it.vpn.tailscale)),
                 errors = if (field == null) it.errors else it.errors - field,
-                saveFailed = false,
+                saveFailure = null,
             )
         }
     }
@@ -324,16 +329,16 @@ class ProfileEditorViewModel(
             state.value.vpn.copy(fileName = fileName, ovpn = "", fileError = e.error)
         }
         state.update {
-            it.copy(vpn = vpn, routing = it.routing.withNewRuleExitFor(vpn.enabled), errors = it.errors - ProfileField.VPN_FILE, saveFailed = false)
+            it.copy(vpn = vpn, routing = it.routing.withNewRuleExitFor(vpn.enabled), errors = it.errors - ProfileField.VPN_FILE, saveFailure = null)
         }
     }
 
     fun updateVpnUsername(username: String) {
-        state.update { it.copy(vpn = it.vpn.copy(username = username), errors = it.errors - ProfileField.VPN_USERNAME, saveFailed = false) }
+        state.update { it.copy(vpn = it.vpn.copy(username = username), errors = it.errors - ProfileField.VPN_USERNAME, saveFailure = null) }
     }
 
     fun updateVpnPassword(password: String) {
-        state.update { it.copy(vpn = it.vpn.copy(password = password), saveFailed = false) }
+        state.update { it.copy(vpn = it.vpn.copy(password = password), saveFailure = null) }
     }
 
     fun setRoutingEnabled(enabled: Boolean) = updateRules { it.copy(enabled = enabled) }
@@ -374,7 +379,7 @@ class ProfileEditorViewModel(
                     newRule = if (clearText) "" else it.routing.newRule,
                     newRuleInvalid = if (clearText) false else it.routing.newRuleInvalid,
                 ),
-                saveFailed = false,
+                saveFailure = null,
             )
         }
     }
@@ -396,7 +401,7 @@ class ProfileEditorViewModel(
     }
 
     private fun updateRules(change: (RoutingRules) -> RoutingRules) {
-        state.update { it.copy(routing = it.routing.copy(rules = change(it.routing.rules)), saveFailed = false) }
+        state.update { it.copy(routing = it.routing.copy(rules = change(it.routing.rules)), saveFailure = null) }
     }
 
     /**
@@ -447,7 +452,7 @@ class ProfileEditorViewModel(
             validation is ProfileValidation.Invalid -> state.update { it.copy(errors = validation.errors + vpnErrors) }
             vpnErrors.isNotEmpty() -> state.update { it.copy(errors = vpnErrors) }
             validation is ProfileValidation.Valid -> {
-                state.update { it.copy(errors = emptySet(), isSaving = true, saveFailed = false) }
+                state.update { it.copy(errors = emptySet(), isSaving = true, saveFailure = null) }
                 viewModelScope.launch {
                     val (exit, secrets) = when {
                         !vpn.enabled -> null to null
@@ -456,8 +461,16 @@ class ProfileEditorViewModel(
                         else -> CountryExit.OpenVpn(vpn.fileName, vpn.username.trim()) to CountryExitSecrets.OpenVpn(vpn.ovpn, vpn.password)
                     }
                     val profile = validation.profile.copy(countryExit = exit, routing = current.routing.rules, uciQuota = current.uciQuota)
-                    val ok = guarded("guardar el perfil") { repository.save(profile, current.password, secrets) } != null
-                    state.update { it.copy(isSaving = false, saved = ok, saveFailed = !ok) }
+                    val failure = try {
+                        repository.save(profile, current.password, secrets)
+                        null
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        logger.log(LogLevel.ERROR, TAG, "No se pudo guardar el perfil: ${e.message}")
+                        classifyStorageError(e)
+                    }
+                    state.update { it.copy(isSaving = false, saved = failure == null, saveFailure = failure) }
                 }
             }
         }
@@ -465,7 +478,7 @@ class ProfileEditorViewModel(
 
     /** Consultar (o no) la cuota de la UCI con este perfil. */
     fun setUciQuota(enabled: Boolean) {
-        state.update { it.copy(uciQuota = enabled, saveFailed = false) }
+        state.update { it.copy(uciQuota = enabled, saveFailure = null) }
     }
 
     /** Frontera con la interfaz: un fallo del almacén se registra y se muestra, no tumba la app. */
