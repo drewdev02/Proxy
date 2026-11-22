@@ -38,11 +38,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.delay
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import org.uci.proxy.common.LocalNetworkDeniedForTest
 import org.uci.proxy.common.isFixedInProfile
 import org.uci.proxy.common.message
+import org.uci.proxy.common.percentText
 import org.uci.proxy.common.reason
 import org.uci.proxy.core.log.LogEntry
 import org.uci.proxy.core.model.CountryExit
@@ -61,8 +64,10 @@ import org.uci.proxy.logs.formatLogTime
 import org.uci.proxy.logs.tone
 import org.uci.proxy.profile.label
 import org.uci.proxy.profile.tone
-import org.uci.proxy.quota.percentText
 import org.uci.proxy.quota.tone
+import org.uci.proxy.quota.wholePercent
+import org.uci.proxy.resources.Res
+import org.uci.proxy.resources.*
 import org.uci.proxy.theme.ProxyUciTheme
 import org.uci.proxy.ui.components.UciBottomSheet
 import org.uci.proxy.ui.components.UciButton
@@ -150,10 +155,10 @@ internal fun ConnectionScreen(
         val profile = state.activeProfile
         if (profile == null) {
             UciEmptyState(
-                title = "Aún no hay perfiles",
+                title = stringResource(Res.string.connection_empty_title),
                 icon = UciIcons.Badge,
-                message = "Añade el proxy de tu facultad o residencia para empezar a navegar a través de él.",
-                action = { UciButton("Añadir perfil", navigation.onAddProfile, icon = UciIcons.Add) },
+                message = stringResource(Res.string.connection_empty_message),
+                action = { UciButton(stringResource(Res.string.connection_add_profile), navigation.onAddProfile, icon = UciIcons.Add) },
                 modifier = Modifier.padding(top = spacing.xl),
             )
             return@Column
@@ -217,16 +222,17 @@ private fun Header(state: ConnectionUiState, onOpenUsage: () -> Unit, modifier: 
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("ProxyUCI", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f).semantics { heading() })
         // El consumo guardado se puede ver también sin conexión.
-        if (state.tunnelAvailable) UciIconButton(UciIcons.BarChart, "Consumo", onOpenUsage, bordered = false)
+        if (state.tunnelAvailable) UciIconButton(UciIcons.BarChart, stringResource(Res.string.connection_open_usage), onOpenUsage, bordered = false)
         if (state.tunnelAvailable) {
             val (text, tone) = when (val tunnel = state.tunnel) {
-                TunnelState.Disconnected -> "Sin túnel" to UciTone.Neutral
-                is TunnelState.Connecting -> "Conectando" to UciTone.Active
-                is TunnelState.Connected -> (if (tunnel.vpnDown) "Túnel · sin VPN" else "Túnel activo") to
-                    (if (tunnel.vpnDown) UciTone.Warning else UciTone.Success)
-                is TunnelState.Failed -> "Falló" to UciTone.Danger
+                TunnelState.Disconnected -> Res.string.connection_pill_disconnected to UciTone.Neutral
+                is TunnelState.Connecting -> Res.string.connection_pill_connecting to UciTone.Active
+                is TunnelState.Connected ->
+                    (if (tunnel.vpnDown) Res.string.connection_pill_vpn_down else Res.string.connection_pill_connected) to
+                        (if (tunnel.vpnDown) UciTone.Warning else UciTone.Success)
+                is TunnelState.Failed -> Res.string.connection_pill_failed to UciTone.Danger
             }
-            UciStatusPill(text, tone = tone)
+            UciStatusPill(stringResource(text), tone = tone)
         }
     }
 }
@@ -239,7 +245,7 @@ private fun ActiveProfileCard(state: ConnectionUiState, profile: ProxyProfile, o
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             UciIconBox(UciIcons.Badge, tone = if (connected) UciTone.Success else UciTone.Neutral)
             Column(Modifier.weight(1f)) {
-                Text("PERFIL", style = ProxyUciTheme.mono.badge, color = ProxyUciTheme.colors.onSurfaceFaint)
+                Text(stringResource(Res.string.connection_profile_label), style = ProxyUciTheme.mono.badge, color = ProxyUciTheme.colors.onSurfaceFaint)
                 Text(profile.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
                     profile.address(),
@@ -252,7 +258,7 @@ private fun ActiveProfileCard(state: ConnectionUiState, profile: ProxyProfile, o
             if (state.profiles.size > 1) {
                 UciIconButton(
                     UciIcons.Swap,
-                    if (state.canChangeProfile) "Cambiar de perfil" else "Desconecta para cambiar de perfil",
+                    stringResource(if (state.canChangeProfile) Res.string.connection_change_profile else Res.string.connection_change_profile_disconnect),
                     onChange,
                     enabled = state.canChangeProfile,
                 )
@@ -262,11 +268,11 @@ private fun ActiveProfileCard(state: ConnectionUiState, profile: ProxyProfile, o
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             UciStatusPill(profile.protocol.name)
             // El motor importa: OpenVPN y Tailscale fallan y se configuran distinto.
-            profile.countryExit?.let { UciStatusPill("Otro País · ${it.kind.label}", tone = UciTone.Routing) }
-            if (profile.routing.enabled) UciStatusPill("Reglas", tone = UciTone.Routing)
+            profile.countryExit?.let { UciStatusPill(stringResource(Res.string.connection_pill_country, it.kind.label), tone = UciTone.Routing) }
+            if (profile.routing.enabled) UciStatusPill(stringResource(Res.string.connection_pill_rules), tone = UciTone.Routing)
             // La cuota de la UCI, si este perfil la consulta y ya se sabe.
             state.quota.quota?.takeIf { state.quota.enabled && state.quota.profileId == profile.id }?.let { quota ->
-                UciStatusPill("Cuota ${percentText(quota)}", tone = quota.tone)
+                UciStatusPill(stringResource(Res.string.connection_pill_quota, percentText(quota.wholePercent)), tone = quota.tone)
             }
         }
     }
@@ -276,21 +282,21 @@ private fun ActiveProfileCard(state: ConnectionUiState, profile: ProxyProfile, o
 private fun PowerArea(state: ConnectionUiState, actions: ConnectionActions) {
     if (!state.tunnelAvailable) {
         UciInlineAlert(
-            "En este sistema todavía no se puede crear el túnel. Puedes gestionar los perfiles y probar el proxy.",
-            title = "Túnel no disponible",
+            stringResource(Res.string.connection_unavailable_message),
+            title = stringResource(Res.string.connection_unavailable_title),
         )
         return
     }
     val (powerState, label) = when (state.tunnel) {
-        TunnelState.Disconnected -> UciPowerState.Idle to "Conectar"
-        is TunnelState.Connecting -> UciPowerState.Connecting to "Conectando"
-        is TunnelState.Connected -> UciPowerState.Connected to "Conectado"
-        is TunnelState.Failed -> UciPowerState.Error to "Reintentar"
+        TunnelState.Disconnected -> UciPowerState.Idle to Res.string.connection_power_connect
+        is TunnelState.Connecting -> UciPowerState.Connecting to Res.string.connection_power_connecting
+        is TunnelState.Connected -> UciPowerState.Connected to Res.string.connection_power_connected
+        is TunnelState.Failed -> UciPowerState.Error to Res.string.connection_power_retry
     }
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         UciPowerButton(
             state = powerState,
-            label = label,
+            label = stringResource(label),
             onClick = {
                 when (state.tunnel) {
                     is TunnelState.Connected, is TunnelState.Connecting -> actions.onDisconnect()
@@ -305,13 +311,13 @@ private fun PowerArea(state: ConnectionUiState, actions: ConnectionActions) {
 @Composable
 private fun StatusLine(state: ConnectionUiState) {
     val text = when (state.tunnel) {
-        TunnelState.Disconnected -> "Sin conexión · pulsa para conectar"
-        is TunnelState.Connecting -> "Conectando con ${state.activeProfile?.host.orEmpty()}…"
+        TunnelState.Disconnected -> stringResource(Res.string.connection_status_disconnected)
+        is TunnelState.Connecting -> stringResource(Res.string.connection_status_connecting, state.activeProfile?.host.orEmpty())
         is TunnelState.Connected -> {
             // Si la VPN está caída lo explica el aviso de debajo; aquí no se repite.
             val since = state.connectedSince
             if (since == null) {
-                "Conectado · pulsa para desconectar"
+                stringResource(Res.string.connection_status_connected)
             } else {
                 var elapsed by remember(since) { mutableStateOf(since.elapsedNow()) }
                 LaunchedEffect(since) {
@@ -320,10 +326,10 @@ private fun StatusLine(state: ConnectionUiState) {
                         delay(1.seconds)
                     }
                 }
-                "Conectado · ${formatElapsed(elapsed)}"
+                stringResource(Res.string.connection_status_connected_for, formatElapsed(elapsed))
             }
         }
-        is TunnelState.Failed -> "No se pudo conectar"
+        is TunnelState.Failed -> stringResource(Res.string.connection_status_failed)
     }
     Text(
         text,
@@ -334,12 +340,23 @@ private fun StatusLine(state: ConnectionUiState) {
     )
 }
 
+/** Los nombres que no resolvió el DNS de Otro País, para el aviso: los últimos [ViaProxyHosts.names] y cuántos más hay. */
+internal data class ViaProxyHosts(val names: List<String>, val rest: Int)
+
+/** Los [shown] nombres más recientes, del último al primero, y cuántos quedan sin nombrar. */
+internal fun viaProxyHosts(hosts: List<String>, shown: Int = 3): ViaProxyHosts =
+    ViaProxyHosts(hosts.takeLast(shown).asReversed(), hosts.size - minOf(hosts.size, shown))
+
 /** «El DNS de Otro País no resolvió a.com, b.com y 3 más: …», con los primeros nombres y cuántos quedan. */
-internal fun viaProxyMessage(hosts: List<String>, shown: Int = 3): String {
-    val names = hosts.takeLast(shown).asReversed().joinToString(", ")
-    val rest = hosts.size - minOf(hosts.size, shown)
-    val more = if (rest > 0) " y $rest más" else ""
-    return "El DNS de Otro País no resolvió $names$more: sus conexiones salen por el proxy, no por Otro País."
+@Composable
+private fun viaProxyMessage(hosts: List<String>): String {
+    val (names, rest) = viaProxyHosts(hosts)
+    val list = names.joinToString(", ")
+    return if (rest > 0) {
+        pluralStringResource(Res.plurals.connection_via_proxy_message_more, rest, list, rest)
+    } else {
+        stringResource(Res.string.connection_via_proxy_message, list)
+    }
 }
 
 /** `usuario@host:puerto`, o `host:puerto` si el perfil no tiene usuario. */
@@ -357,36 +374,35 @@ internal fun formatElapsed(duration: Duration): String {
 private fun StatusAlerts(state: ConnectionUiState, actions: ConnectionActions, onEdit: () -> Unit) {
     if (state.quota.paused && state.tunnel !is TunnelState.Connected) {
         UciInlineAlert(
-            "Llegaste al ${QuotaSettings.PAUSE_THRESHOLD} % de tu cuota de la UCI y el túnel se desconectó para no agotarla. " +
-                "Si conectas, no se vuelve a pausar hasta que tu consumo baje del ${QuotaSettings.PAUSE_THRESHOLD - 5} %.",
-            title = "En pausa por la cuota",
+            stringResource(Res.string.connection_quota_paused_message, QuotaSettings.PAUSE_THRESHOLD, QuotaSettings.PAUSE_THRESHOLD - 5),
+            title = stringResource(Res.string.connection_quota_paused_title),
             tone = UciTone.Danger,
-            action = { UciButton("Conectar igual", actions.onConnect, variant = UciButtonVariant.Text) },
+            action = { UciButton(stringResource(Res.string.connection_connect_anyway), actions.onConnect, variant = UciButtonVariant.Text) },
         )
     }
     when (val tunnel = state.tunnel) {
         is TunnelState.Failed -> UciInlineAlert(
             stringResource(tunnel.failure.reason),
-            title = "No se pudo conectar",
+            title = stringResource(Res.string.connection_failed_title),
             tone = UciTone.Danger,
             action = {
                 if (tunnel.failure.isFixedInProfile) {
-                    UciButton("Editar perfil", onEdit, variant = UciButtonVariant.Text)
+                    UciButton(stringResource(Res.string.connection_edit_profile), onEdit, variant = UciButtonVariant.Text)
                 } else {
-                    UciButton("Reintentar", actions.onConnect, variant = UciButtonVariant.Text)
+                    UciButton(stringResource(Res.string.connection_retry), actions.onConnect, variant = UciButtonVariant.Text)
                 }
             },
         )
         is TunnelState.Connected -> when {
             tunnel.vpnDown -> UciInlineAlert(
-                "Lo que debía salir por Otro País sale por el proxy mientras se reintenta la VPN.",
-                title = "Otro País no responde",
+                stringResource(Res.string.connection_vpn_down_message),
+                title = stringResource(Res.string.connection_vpn_down_title),
                 tone = UciTone.Warning,
             )
             // Otro País está, pero su DNS no resolvió algunos nombres: esos salen por el proxy y hay que decirlo.
             tunnel.viaProxy.isNotEmpty() -> UciInlineAlert(
                 viaProxyMessage(tunnel.viaProxy),
-                title = "Algunos sitios salen por el proxy",
+                title = stringResource(Res.string.connection_via_proxy_title),
                 tone = UciTone.Warning,
             )
         }
@@ -398,12 +414,12 @@ private fun StatusAlerts(state: ConnectionUiState, actions: ConnectionActions, o
 private fun ProxyCheckCard(state: ConnectionUiState, onTest: () -> Unit) {
     val check = state.check
     UciSectionCard(
-        title = "Probar el proxy",
-        subtitle = "Comprueba el usuario y la contraseña con el proxy",
+        title = stringResource(Res.string.connection_check_title),
+        subtitle = stringResource(Res.string.connection_check_subtitle),
         icon = UciIcons.Speed,
         trailing = {
             UciButton(
-                "Probar",
+                stringResource(Res.string.connection_check_button),
                 onTest,
                 variant = UciButtonVariant.Secondary,
                 loading = check == ProxyCheck.Running,
@@ -417,8 +433,8 @@ private fun ProxyCheckCard(state: ConnectionUiState, onTest: () -> Unit) {
                 // El tiempo es el de la prueba entera (conectar, autenticarse, abrir el túnel), no una latencia: no se
                 // le aplican los umbrales de latencia del diseño.
                 ProxyTestResult.Success -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    UciStatusPill("OK · ${check.millis} ms", tone = UciTone.Success, icon = UciIcons.Check)
-                    Text("El proxy aceptó los datos del perfil.", style = MaterialTheme.typography.bodyMedium, color = ProxyUciTheme.colors.onSurfaceMuted)
+                    UciStatusPill(stringResource(Res.string.connection_check_ok, check.millis), tone = UciTone.Success, icon = UciIcons.Check)
+                    Text(stringResource(Res.string.connection_check_success), style = MaterialTheme.typography.bodyMedium, color = ProxyUciTheme.colors.onSurfaceMuted)
                 }
                 ProxyTestResult.Timeout -> UciInlineAlert(check.result.message(), tone = UciTone.Warning)
                 is ProxyTestResult.Failure -> UciInlineAlert(check.result.message(), tone = UciTone.Danger)
@@ -431,13 +447,13 @@ private fun ProxyCheckCard(state: ConnectionUiState, onTest: () -> Unit) {
 private fun RoutingCard(summary: RoutingSummary?, onEdit: () -> Unit) {
     summary ?: return
     UciSectionCard(
-        title = "Cómo sale el tráfico",
-        subtitle = if (summary.enabled) "Reglas de salida activas" else "Sin reglas de salida",
+        title = stringResource(Res.string.connection_routing_title),
+        subtitle = stringResource(if (summary.enabled) Res.string.connection_routing_enabled else Res.string.connection_routing_disabled),
         icon = UciIcons.Split,
         tone = if (summary.enabled) UciTone.Routing else UciTone.Neutral,
-        trailing = { UciButton("Editar", onEdit, variant = UciButtonVariant.Text) },
+        trailing = { UciButton(stringResource(Res.string.connection_routing_edit), onEdit, variant = UciButtonVariant.Text) },
     ) {
-        ExitRow(if (summary.enabled) "Por defecto" else "Todo", summary.defaultExit)
+        ExitRow(stringResource(if (summary.enabled) Res.string.connection_routing_default else Res.string.connection_routing_everything), summary.defaultExit)
         RouteExit.entries.forEach { exit ->
             val kinds = summary.rules[exit] ?: return@forEach
             UciDivider()
@@ -450,34 +466,40 @@ private fun RoutingCard(summary: RoutingSummary?, onEdit: () -> Unit) {
 private fun ExitRow(label: String, exit: RouteExit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-        UciStatusPill(exit.label(), tone = exit.tone)
+        UciStatusPill(stringResource(exit.summaryName), tone = exit.tone)
     }
 }
 
-private fun RouteExit.label(): String = when (this) {
-    RouteExit.PROXY -> "Proxy"
-    RouteExit.VPN -> "Otro País"
-    RouteExit.DIRECT -> "Directo"
-    RouteExit.BLOCK -> "Bloqueado"
-}
+/** El nombre corto de cada salida en el resumen («Bloqueado», no el «Bloquear» de la regla). */
+private val RouteExit.summaryName: StringResource
+    get() = when (this) {
+        RouteExit.PROXY -> Res.string.connection_exit_proxy
+        RouteExit.VPN -> Res.string.connection_exit_country
+        RouteExit.DIRECT -> Res.string.connection_exit_direct
+        RouteExit.BLOCK -> Res.string.connection_exit_blocked
+    }
+
+/** Cuántas reglas hay de cada tipo, siempre en el mismo orden (sitios, redes, apps) y sin los tipos que no tienen. */
+internal fun Map<RuleKind, Int>.inOrder(): List<Pair<RuleKind, Int>> =
+    RuleKind.entries.mapNotNull { kind -> this[kind]?.let { kind to it } }
 
 /** «2 sitios, 1 app» a partir de cuántas reglas hay de cada tipo. */
-internal fun Map<RuleKind, Int>.describe(): String = RuleKind.entries.mapNotNull { kind ->
-    val count = this[kind] ?: return@mapNotNull null
-    val (one, many) = when (kind) {
-        RuleKind.DOMAIN -> "sitio" to "sitios"
-        RuleKind.IP -> "red" to "redes"
-        RuleKind.APP -> "app" to "apps"
+@Composable
+private fun Map<RuleKind, Int>.describe(): String = inOrder().map { (kind, count) ->
+    val plural = when (kind) {
+        RuleKind.DOMAIN -> Res.plurals.connection_rules_domains
+        RuleKind.IP -> Res.plurals.connection_rules_networks
+        RuleKind.APP -> Res.plurals.connection_rules_apps
     }
-    "$count ${if (count == 1) one else many}"
+    pluralStringResource(plural, count, count)
 }.joinToString(", ")
 
 @Composable
 private fun RecentActivity(entries: List<LogEntry>, onOpenLogs: () -> Unit) {
-    UciSectionHeader("Actividad reciente", trailing = { UciButton("Ver todo", onOpenLogs, variant = UciButtonVariant.Text) })
+    UciSectionHeader(stringResource(Res.string.connection_recent_activity), trailing = { UciButton(stringResource(Res.string.connection_see_all), onOpenLogs, variant = UciButtonVariant.Text) })
     UciCard(Modifier.fillMaxWidth()) {
         if (entries.isEmpty()) {
-            Text("Sin actividad todavía.", style = MaterialTheme.typography.bodyMedium, color = ProxyUciTheme.colors.onSurfaceMuted)
+            Text(stringResource(Res.string.connection_no_activity), style = MaterialTheme.typography.bodyMedium, color = ProxyUciTheme.colors.onSurfaceMuted)
         }
         entries.forEachIndexed { index, entry ->
             if (index > 0) UciDivider()
@@ -497,7 +519,7 @@ private fun RecentActivity(entries: List<LogEntry>, onOpenLogs: () -> Unit) {
 
 @Composable
 private fun ProfilePicker(state: ConnectionUiState, onSelect: (String) -> Unit, onAdd: () -> Unit, onDismiss: () -> Unit) {
-    UciBottomSheet("Elegir perfil", onDismiss = onDismiss) {
+    UciBottomSheet(stringResource(Res.string.connection_choose_profile), onDismiss = onDismiss) {
         UciCard(Modifier.fillMaxWidth().widthIn(max = 560.dp)) {
             state.profiles.forEachIndexed { index, profile ->
                 if (index > 0) UciDivider()
@@ -508,14 +530,14 @@ private fun ProfilePicker(state: ConnectionUiState, onSelect: (String) -> Unit, 
                     icon = if (active) UciIcons.CheckCircle else UciIcons.Badge,
                     onClick = { onSelect(profile.id) },
                     trailing = if (active) {
-                        { UciStatusPill("Activo", tone = UciTone.Active) }
+                        { UciStatusPill(stringResource(Res.string.connection_profile_active), tone = UciTone.Active) }
                     } else {
                         null
                     },
                 )
             }
         }
-        UciButton("Añadir perfil", onAdd, variant = UciButtonVariant.Secondary, icon = UciIcons.Add, modifier = Modifier.fillMaxWidth())
+        UciButton(stringResource(Res.string.connection_add_profile), onAdd, variant = UciButtonVariant.Secondary, icon = UciIcons.Add, modifier = Modifier.fillMaxWidth())
     }
 }
 
