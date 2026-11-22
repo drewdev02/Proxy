@@ -16,6 +16,7 @@
     <string name="ui_power_connecting">Connecting</string>
     <string name="ui_power_connected">Connected</string>
     <string name="ui_power_error">Error</string>
+    <string name="ui_pick_ovpn_title">Choose .ovpn file</string>
 
     <string name="nav_connection">Connection</string>
     <string name="nav_logs">Logs</string>
