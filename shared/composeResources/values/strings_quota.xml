@@ -47,4 +47,7 @@
     <string name="quota_notification_threshold_left">Llevas el %1$s de tu cuota: %2$s de %3$d MB. Te quedan %4$s.</string>
     <string name="quota_notification_paused_title">Túnel en pausa por la cuota</string>
     <string name="quota_notification_paused">Llegaste al %1$s de tu cuota: se desconectó el túnel para no agotarla. Puedes conectar igual desde Conexión.</string>
+    <string name="quota_problem_not_on_uci_network">El servicio de cuotas no se encuentra: solo existe dentro de la red de la UCI. Se reintenta solo.</string>
+    <string name="quota_problem_no_network">No hay conexión a la red. La cuota se consultará cuando la haya.</string>
+    <string name="quota_problem_timeout">El servicio de cuotas no respondió a tiempo. Se reintenta solo.</string>
 </resources>

@@ -123,7 +123,7 @@ fun QuotaCard(ui: QuotaCardUi, onRefresh: () -> Unit, onEditProfile: () -> Unit,
             UciInlineAlert(
                 stringResource(problem.message),
                 title = stringResource(if (quota == null) Res.string.quota_problem_title_first else Res.string.quota_problem_title_update),
-                tone = if (problem == QuotaProblem.UNREACHABLE) UciTone.Warning else UciTone.Danger,
+                tone = if (problem.isNetwork) UciTone.Warning else UciTone.Danger,
                 action = if (problem == QuotaProblem.WRONG_CREDENTIALS) {
                     { UciButton(stringResource(Res.string.quota_edit_profile), onEditProfile, variant = UciButtonVariant.Text) }
                 } else {
@@ -143,6 +143,9 @@ fun QuotaCard(ui: QuotaCardUi, onRefresh: () -> Unit, onEditProfile: () -> Unit,
 internal val QuotaProblem.message: StringResource
     get() = when (this) {
         QuotaProblem.WRONG_CREDENTIALS -> Res.string.quota_problem_wrong_credentials
+        QuotaProblem.NOT_ON_UCI_NETWORK -> Res.string.quota_problem_not_on_uci_network
+        QuotaProblem.NO_NETWORK -> Res.string.quota_problem_no_network
+        QuotaProblem.TIMEOUT -> Res.string.quota_problem_timeout
         QuotaProblem.UNREACHABLE -> Res.string.quota_problem_unreachable
         QuotaProblem.UNTRUSTED_CERTIFICATE -> Res.string.quota_problem_untrusted_certificate
         QuotaProblem.SERVICE_CHANGED -> Res.string.quota_problem_service_changed

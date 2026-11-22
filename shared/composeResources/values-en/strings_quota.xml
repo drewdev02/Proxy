@@ -39,4 +39,7 @@
     <string name="quota_notification_threshold_left">You have used %1$s of your quota: %2$s of %3$d MB. You have %4$s left.</string>
     <string name="quota_notification_paused_title">Tunnel paused for the quota</string>
     <string name="quota_notification_paused">You reached %1$s of your quota: the tunnel was disconnected so it doesn't run out. You can still connect from Connection.</string>
+    <string name="quota_problem_not_on_uci_network">The quota service cannot be found: it only exists inside the UCI network. It will retry on its own.</string>
+    <string name="quota_problem_no_network">There is no network connection. The quota will be checked when there is one.</string>
+    <string name="quota_problem_timeout">The quota service did not answer in time. It will retry on its own.</string>
 </resources>

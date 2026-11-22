@@ -25,6 +25,7 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
+import org.uci.proxy.core.port.NetFailure
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class QuotaMonitorTest {
@@ -128,10 +129,22 @@ class QuotaMonitorTest {
     }
 
     @Test
+    fun `a service name that does not exist means being outside the UCI network`() = runTest {
+        tunnel.emit(TunnelState.Connected("p1"))
+        val monitor = started()
+        service.next = { QuotaFetch.Unreachable(NetFailure.NAME_NOT_FOUND, "cuotas.uci.cu") }
+
+        advanceTimeBy(5.minutes + 1.seconds)
+
+        assertEquals(QuotaProblem.NOT_ON_UCI_NETWORK, monitor.status.value.problem)
+        monitor.stop()
+    }
+
+    @Test
     fun `out of reach it retries sooner but keeps the last known quota`() = runTest {
         tunnel.emit(TunnelState.Connected("p1"))
         val monitor = started()
-        service.next = { QuotaFetch.Unreachable("sin red") }
+        service.next = { QuotaFetch.Unreachable(NetFailure.OTHER, "sin red") }
 
         advanceTimeBy(5.minutes + 1.seconds)
         assertEquals(2, service.calls.size)
@@ -231,7 +244,7 @@ class QuotaMonitorTest {
     @Test
     fun `the last quota is shown at once on the next start`() = runTest {
         started().stop()
-        service.next = { QuotaFetch.Unreachable("fuera de la UCI") }
+        service.next = { QuotaFetch.Unreachable(NetFailure.OTHER, "fuera de la UCI") }
 
         advanceTimeBy(10.minutes)
         val again = started()

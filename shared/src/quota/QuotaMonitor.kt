@@ -37,9 +37,30 @@ import kotlin.math.floor
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
+import org.uci.proxy.core.port.NetFailure
 
 /** Por qué no se pudo consultar la cuota la última vez. */
-enum class QuotaProblem { WRONG_CREDENTIALS, UNREACHABLE, UNTRUSTED_CERTIFICATE, SERVICE_CHANGED }
+enum class QuotaProblem {
+    WRONG_CREDENTIALS,
+
+    /** El nombre del servicio no existe: solo lo resuelve el DNS de la red de la UCI. */
+    NOT_ON_UCI_NETWORK,
+
+    /** El equipo no tiene red. */
+    NO_NETWORK,
+
+    /** El servicio no contestó a tiempo. */
+    TIMEOUT,
+
+    /** No se llegó al servicio por otro motivo. */
+    UNREACHABLE,
+    UNTRUSTED_CERTIFICATE,
+    SERVICE_CHANGED,
+    ;
+
+    /** Un problema de red: se arregla solo cuando se llega al servicio, y se reintenta sin avisar con urgencia. */
+    val isNetwork: Boolean get() = this == NOT_ON_UCI_NETWORK || this == NO_NETWORK || this == TIMEOUT || this == UNREACHABLE
+}
 
 /** La cuota de la UCI del perfil activo, tal como la ve la interfaz. */
 data class QuotaStatus(
@@ -248,7 +269,12 @@ class QuotaMonitor(
                 null
             }
             is QuotaFetch.WrongCredentials -> QuotaProblem.WRONG_CREDENTIALS
-            is QuotaFetch.Unreachable -> QuotaProblem.UNREACHABLE
+            is QuotaFetch.Unreachable -> when (result.kind) {
+                NetFailure.NAME_NOT_FOUND -> QuotaProblem.NOT_ON_UCI_NETWORK
+                NetFailure.NO_NETWORK -> QuotaProblem.NO_NETWORK
+                NetFailure.TIMEOUT -> QuotaProblem.TIMEOUT
+                else -> QuotaProblem.UNREACHABLE
+            }
             is QuotaFetch.UntrustedCertificate -> QuotaProblem.UNTRUSTED_CERTIFICATE
             is QuotaFetch.ServiceChanged -> QuotaProblem.SERVICE_CHANGED
         }
@@ -304,6 +330,9 @@ class QuotaMonitor(
 
     private fun describe(problem: QuotaProblem) = when (problem) {
         QuotaProblem.WRONG_CREDENTIALS -> "el servicio no aceptó el usuario o la contraseña"
+        QuotaProblem.NOT_ON_UCI_NETWORK -> "su nombre no existe fuera de la red de la UCI"
+        QuotaProblem.NO_NETWORK -> "no hay red"
+        QuotaProblem.TIMEOUT -> "no respondió a tiempo"
         QuotaProblem.UNREACHABLE -> "no se llegó al servicio (¿fuera de la red de la UCI?)"
         QuotaProblem.UNTRUSTED_CERTIFICATE -> "su certificado no se pudo verificar"
         QuotaProblem.SERVICE_CHANGED -> "contestó algo que no se entiende"
