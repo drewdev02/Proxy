@@ -1,4 +1,4 @@
-package org.uci.proxy.core.profile
+package org.uci.proxy.core.port
 
 import kotlinx.coroutines.flow.StateFlow
 import org.uci.proxy.core.model.ProxyProfile

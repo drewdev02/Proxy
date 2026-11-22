@@ -21,8 +21,8 @@ import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.port.TunnelControl
 import org.uci.proxy.core.port.TunnelMonitor
 import org.uci.proxy.core.port.TunnelState
-import org.uci.proxy.core.profile.ActiveProfileStore
-import org.uci.proxy.core.profile.ProfileRepository
+import org.uci.proxy.core.port.ActiveProfileStore
+import org.uci.proxy.core.port.ProfileRepository
 import org.uci.proxy.core.profile.resolveActiveProfileId
 import org.uci.proxy.core.proxy.ProxyTestResult
 import org.uci.proxy.core.proxy.ProxyTester

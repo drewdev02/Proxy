@@ -1,5 +1,6 @@
 package org.uci.proxy.core.profile
 
+import org.uci.proxy.core.data.StoredActiveProfileStore
 import org.uci.proxy.core.fakes.InMemoryKeyValueStore
 import kotlin.test.Test
 import kotlin.test.assertEquals

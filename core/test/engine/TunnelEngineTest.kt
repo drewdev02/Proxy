@@ -30,7 +30,7 @@ import org.uci.proxy.core.packet.readU16
 import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.common.AppDispatchers
-import org.uci.proxy.core.profile.StoredProfileRepository
+import org.uci.proxy.core.data.StoredProfileRepository
 import org.uci.proxy.core.proxy.ProxyTarget
 import kotlin.test.Test
 import org.uci.proxy.core.model.RouteExit

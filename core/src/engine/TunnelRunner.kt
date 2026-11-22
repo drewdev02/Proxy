@@ -36,7 +36,7 @@ import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.port.TunnelUnavailableException
 import org.uci.proxy.core.common.AppDispatchers
 import org.uci.proxy.core.port.TunDevice
-import org.uci.proxy.core.profile.ProfileRepository
+import org.uci.proxy.core.port.ProfileRepository
 import org.uci.proxy.core.routing.RuleSet
 import org.uci.proxy.core.traffic.TrafficMeter
 import org.uci.proxy.core.traffic.TrafficStore

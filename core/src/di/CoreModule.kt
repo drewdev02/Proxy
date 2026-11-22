@@ -12,10 +12,10 @@ import org.uci.proxy.core.net.KtorTcpConnector
 import org.uci.proxy.core.port.TcpConnector
 import org.uci.proxy.core.common.AppDispatchers
 import org.uci.proxy.core.common.IdGenerator
-import org.uci.proxy.core.profile.ProfileRepository
+import org.uci.proxy.core.port.ProfileRepository
 import org.uci.proxy.core.profile.ProfileValidator
 import org.uci.proxy.core.common.RandomIdGenerator
-import org.uci.proxy.core.profile.StoredProfileRepository
+import org.uci.proxy.core.data.StoredProfileRepository
 import org.uci.proxy.core.proxy.BasicAuthScheme
 import org.uci.proxy.core.proxy.ConnectingProxyTester
 import org.uci.proxy.core.proxy.HttpConnectConnector
@@ -29,8 +29,8 @@ import org.uci.proxy.core.proxy.Socks5Connector
 import org.uci.proxy.core.settings.IpNameServiceValidator
 import org.uci.proxy.core.port.NameServiceReporter
 import org.uci.proxy.core.port.NameServiceStatusRepository
-import org.uci.proxy.core.profile.ActiveProfileStore
-import org.uci.proxy.core.profile.StoredActiveProfileStore
+import org.uci.proxy.core.port.ActiveProfileStore
+import org.uci.proxy.core.data.StoredActiveProfileStore
 import org.uci.proxy.core.port.SettingsRepository
 import org.uci.proxy.core.data.StoredNameServiceStatusRepository
 import org.uci.proxy.core.data.StoredSettingsRepository
