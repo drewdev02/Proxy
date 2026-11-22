@@ -1,5 +1,54 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="settings_title">Settings</string>
+    <string name="settings_subtitle">Applied the next time you connect</string>
+
+    <!-- Connection -->
+    <string name="settings_connection_title">Connection</string>
+    <string name="settings_connection_subtitle">How the tunnel behaves with the system</string>
+    <string name="settings_connectivity_checks_title">Answer connectivity checks</string>
+    <string name="settings_connectivity_checks_subtitle">Many proxies block the checks Android, Windows and macOS use to detect internet access, so the system shows “no internet” even when there is. ProxyUCI answers them while the proxy works; if it stops responding, the warning appears.</string>
+    <string name="settings_intranet_direct_title">Open the local network without the proxy</string>
+    <string name="settings_intranet_direct_subtitle">Sites on the network you are on (such as those on uci.cu) are looked up in that network's DNS and, if they are internal, opened directly, without going through the proxy or Other Country: the proxy usually does not open them. For other internal sites, add a domain rule with the “Direct” exit.</string>
+
+    <!-- UCI quota -->
+    <string name="settings_quota_title">UCI quota</string>
+    <string name="settings_quota_subtitle">The browsing MB the UCI gives your account</string>
+    <string name="settings_quota_description">With UCI profiles, the quota is checked with the profile's username and password when the app opens and every few minutes while you are connected. It shows in Usage.</string>
+    <string name="settings_quota_alert_label">Alert when reaching</string>
+    <string name="settings_quota_alert_threshold">%1$d%</string>
+    <string name="settings_quota_check_label">Check every</string>
+    <plurals name="settings_quota_check_minutes">
+        <item quantity="one">%1$d min</item>
+        <item quantity="other">%1$d min</item>
+    </plurals>
+    <string name="settings_quota_pause_title">Pause the tunnel at %1$d%</string>
+    <string name="settings_quota_pause_subtitle">When reached, it disconnects so you do not use up the quota without noticing. You can connect anyway: it will not pause again until your usage drops below %1$d%.</string>
+    <string name="settings_quota_verify_title">Verify the service certificate</string>
+    <string name="settings_quota_verify_subtitle">Off, as in UCIProxy: the quota service certificate is signed by a UCI authority that systems do not recognize, and with verification on the check fails.</string>
+    <string name="settings_quota_service_url_label">Quota service (development)</string>
+    <string name="settings_quota_service_url_supporting">For testing with tools/test_cuotas.py. Empty: the UCI one.</string>
+
+    <!-- Name services -->
+    <string name="settings_names_title">Name services</string>
+    <string name="settings_names_subtitle">To ask the proxy for public IPs by name</string>
+    <string name="settings_names_switch">Use name services</string>
+    <string name="settings_names_description">The UCI proxy rejects connections to an IP written as a number, but accepts the same destination with a name. These services give a name to any IP. They are tried in this order (drag to change it), starting with the one that worked last time; one the proxy rejects several times in a row is set aside for a few minutes.</string>
+    <string name="settings_try_raw_ip_title">Also try the IP as is</string>
+    <string name="settings_try_raw_ip_subtitle">If no name works, the IP without a name is tried as a last resort.</string>
+    <string name="settings_add_service">Add service</string>
+    <string name="settings_reset_services">Restore</string>
+    <string name="settings_names_warning">Whoever provides the name learns which IPs are requested: do not use services you do not trust.</string>
+
+    <!-- Each service in the list -->
+    <string name="settings_service_use">Use %1$s</string>
+    <string name="settings_service_no_data">No data yet</string>
+    <string name="settings_service_test">Test</string>
+    <string name="settings_service_testing">Testing…</string>
+    <string name="settings_service_built_in">Built-in</string>
+    <string name="settings_service_remove">Remove</string>
+
+    <!-- The last thing known about a service, with how long ago -->
     <string name="settings_status_worked_seconds">Worked a few seconds ago</string>
     <plurals name="settings_status_worked_minutes">
         <item quantity="one">Worked %1$d min ago</item>
@@ -26,4 +75,28 @@
         <item quantity="one">The proxy rejected it %1$d day ago</item>
         <item quantity="other">The proxy rejected it %1$d days ago</item>
     </plurals>
+
+    <!-- Testing a service. The detail (%1$s) is technical and shown as is. -->
+    <string name="settings_test_running">Testing with the proxy…</string>
+    <string name="settings_test_no_profile">Create a proxy profile to be able to test.</string>
+    <string name="settings_test_works">The proxy accepts this service.</string>
+    <string name="settings_test_refused">The proxy rejects it: %1$s</string>
+    <string name="settings_test_proxy_auth">The proxy rejected the profile's username or password: the test is not valid.</string>
+    <string name="settings_test_unreachable">Could not reach the proxy. %1$s If the tunnel is active, disconnect it and try again.</string>
+
+    <!-- Adding a custom service -->
+    <string name="settings_add_name_label">Name</string>
+    <string name="settings_add_name_placeholder">e.g. My domain</string>
+    <string name="settings_add_template_label">Template</string>
+    <string name="settings_add_template_supporting">{ip} is the IP with dots (149.22.82.28) and {ip-} with hyphens (149-22-82-28).</string>
+    <string name="settings_add_warning">Only add services you trust: whoever provides the name learns which IPs are requested, and a malicious one could redirect unencrypted traffic.</string>
+    <string name="settings_add_cancel">Cancel</string>
+    <string name="settings_add_confirm">Add</string>
+
+    <!-- Why the service being added is not valid -->
+    <string name="settings_error_name_empty">Enter a name (40 characters max).</string>
+    <string name="settings_error_no_placeholder">The template must include {ip} or {ip-}, where the IP goes.</string>
+    <string name="settings_error_invalid_host">With an IP filled in, it does not give a valid domain name (letters, digits, hyphens and dots).</string>
+    <string name="settings_error_local_domain">That domain is local or reserved: the proxy could not resolve it.</string>
+    <string name="settings_error_duplicate">There is already a service with that template.</string>
 </resources>
