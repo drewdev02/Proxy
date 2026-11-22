@@ -16,9 +16,11 @@ private fun answer(vararg fields: Pair<String, String>) =
   </SOAP-ENV:Body>
 </SOAP-ENV:Envelope>"""
 
+
 /** Tal cual la da el servicio de la UCI (con otro usuario y otras cifras). */
 private const val REAL = """<?xml version="1.0" encoding="UTF-8"?>
 <SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns1="urn:InetCuotasWS" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:SOAP-ENC="http://schemas.xmlsoap.org/soap/encoding/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><SOAP-ENV:Body><ns1:ObtenerCuotaResponse><ObtenerCuotaReturn xsi:type="ns1:Usuario"><cuota xsi:type="xsd:float">240</cuota><cuota_usada xsi:type="xsd:float">171.97552394867</cuota_usada><nivel_navegacion xsi:type="xsd:string">Navegación plena</nivel_navegacion><usuario xsi:type="xsd:string">ana.perez</usuario></ObtenerCuotaReturn></ns1:ObtenerCuotaResponse></SOAP-ENV:Body></SOAP-ENV:Envelope>"""
+
 
 /** El fallo del servicio de la UCI con usuario o contraseña malos. */
 private const val FAULT = """<?xml version="1.0" encoding="UTF-8"?>

@@ -48,14 +48,17 @@ import org.uci.proxy.core.packet.writeInt
 import org.uci.proxy.core.packet.writeU16
 import org.uci.proxy.core.port.ConnectionOwner
 import org.uci.proxy.core.model.LogLevel
+import org.uci.proxy.core.port.TcpException
 import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.common.AppDispatchers
 import org.uci.proxy.core.data.StoredProfileRepository
+import org.uci.proxy.core.model.AppSettings
 import org.uci.proxy.core.vpn.CountryExitStart
 import org.uci.proxy.core.vpn.VpnConnectResult
 import org.uci.proxy.core.vpn.VpnNetwork
 import org.uci.proxy.core.vpn.VpnSession
+import org.uci.proxy.core.port.NetFailure
 
 private val VPN_ADDRESS = parseIpv4("10.98.0.9")!!
 private val VPN_DNS = parseIpv4("10.98.0.1")!!
@@ -68,7 +71,11 @@ private class ScriptedVpnSession : VpnSession {
     var closed = false
         private set
 
+    /** La sesión murió por debajo: escribir lanza, como OpenVPN con la conexión del proxy rota. */
+    var broken = false
+
     override suspend fun writePacket(packet: ByteArray) {
+        if (broken) throw TcpException(NetFailure.RESET, "conexión con el proxy perdida")
         sent += packet
     }
 
@@ -118,7 +125,11 @@ class SplitRoutingTest {
         if (next is VpnConnectResult.Connected) VpnConnectResult.Connected(ScriptedVpnSession().also { sessions += it }) else next
     }
 
-    private fun TestScope.connect(profile: ProxyProfile = this@SplitRoutingTest.profile, vpn: CountryExitStart? = start) = backgroundScope.launch {
+    private fun TestScope.connect(
+        profile: ProxyProfile = this@SplitRoutingTest.profile,
+        vpn: CountryExitStart? = start,
+        settings: AppSettings = AppSettings(),
+    ) = backgroundScope.launch {
         val dispatchers = AppDispatchers(background = UnconfinedTestDispatcher(testScheduler))
         val runner = TunnelRunner(
             profiles = StoredProfileRepository(InMemoryKeyValueStore(), InMemorySecretStore(), dispatchers, logger),
@@ -129,8 +140,9 @@ class SplitRoutingTest {
             dispatchers = dispatchers,
             logger = logger,
             engines = exit,
+            timeSource = testScheduler.timeSource,
         )
-        runner.run(platformTunnel, profile, "x", vpn = vpn)
+        runner.run(platformTunnel, profile, "x", settings = settings, vpn = vpn)
     }.also { runCurrent() }
 
     private val app get() = parseIpv4(assertNotNull(platformTunnel.config).address)!!
@@ -292,7 +304,7 @@ class SplitRoutingTest {
 
     @Test
     fun `if the VPN does not connect the tunnel still starts and its names use the proxy`() = runTest(UnconfinedTestDispatcher()) {
-        results += VpnConnectResult.Failed(TunnelFailure.VPN_SERVER_UNREACHABLE)
+        results += VpnConnectResult.Failed(TunnelFailure.VpnServerUnreachable)
         connect()
 
         assertEquals(TunnelState.Connected("p1", vpnDown = true), stateStore.state.value)
@@ -323,8 +335,32 @@ class SplitRoutingTest {
     }
 
     @Test
+    fun `a VPN session that fails to write sends its traffic through the proxy without bringing the tunnel down`() = runTest(UnconfinedTestDispatcher()) {
+        connect()
+        askDns("www.netflix.com")
+        fromVpn(vpnDnsAnswer("www.netflix.com", "52.1.2.3"))
+        val server = parseIpv4("52.1.2.3")!!
+        val first = session
+
+        first.broken = true
+        send(syn(server))
+
+        assertAnsweredByProxyStack(server)
+        assertTrue(first.closed, "se cierra para que el supervisor vea la caída")
+        assertEquals(TunnelState.Connected("p1", vpnDown = true), stateStore.state.value)
+        assertFalse(tun.closed, "el túnel sigue en pie")
+        val written = tun.written.size
+        askDns("www.netflix.com", port = 41001)
+        assertEquals(written + 1, tun.written.size, "contestado con el DNS falso, para ir por el proxy")
+
+        advanceTimeBy(6.seconds)
+        runCurrent()
+        assertEquals(TunnelState.Connected("p1"), stateStore.state.value, "y se reintenta como en cualquier caída")
+    }
+
+    @Test
     fun `bad VPN credentials are not retried`() = runTest(UnconfinedTestDispatcher()) {
-        results += VpnConnectResult.Failed(TunnelFailure.VPN_AUTH_FAILED)
+        results += VpnConnectResult.Failed(TunnelFailure.VpnAuthFailed)
         connect()
 
         advanceTimeBy(300.seconds)
@@ -342,12 +378,131 @@ class SplitRoutingTest {
         assertEquals(TunnelState.Connected("p1"), stateStore.state.value)
     }
 
+    private val allThroughVpn get() = profile.copy(routing = RoutingRules())
+    private val killSwitch = AppSettings(vpnFallbackToProxy = false)
+
+    /** El túnel contestó al último SYN con un RST, sin abrir nada en el proxy. */
+    private fun assertReset() {
+        assertTrue(assertNotNull(TcpSegment.parse(lastToApp())).has(TcpFlags.RST))
+        assertTrue(connector.targets.isEmpty(), "nada por el proxy")
+    }
+
     @Test
-    fun `without rules a profile with a VPN still sends everything through it`() = runTest(UnconfinedTestDispatcher()) {
-        connect(profile.copy(routing = RoutingRules()))
+    fun `without rules a profile with a VPN sends names and connections through it as with rules`() = runTest(UnconfinedTestDispatcher()) {
+        connect(allThroughVpn)
 
         assertEquals(1, attempts)
-        assertEquals("10.98.0.9", assertNotNull(platformTunnel.config).address, "el modo de siempre: la interfaz es de la VPN")
+        val config = assertNotNull(platformTunnel.config)
+        assertTrue(config.routes.any { it.contains(VPN_DNS) }, "la red de la VPN entra en la interfaz")
+        askDns("www.google.com")
+        val query = assertNotNull(Ipv4Packet.parse(session.sent.single()))
+        assertEquals(VPN_DNS, query.destination, "el DNS se pregunta a la VPN")
+        fromVpn(vpnDnsAnswer("www.google.com", "142.250.1.1"))
+        val answer = UdpDatagram.parse(lastToApp())!!.payload
+        assertEquals("142.250.1.1", formatIpv4(answer.readInt(answer.size - 4)), "la app recibe la IP real")
+
+        send(buildUdpPacket(app, parseIpv4("142.250.1.1")!!, 50001, 443, ByteArray(1200)))
+        send(syn(parseIpv4("8.8.8.8")!!))
+
+        assertEquals(PROTOCOL_UDP, Ipv4Packet.parse(session.sent[1])!!.protocol, "el UDP sigue pasando")
+        assertEquals(PROTOCOL_TCP, Ipv4Packet.parse(session.sent[2])!!.protocol, "y una IP sin nombre también va por la VPN")
+        assertTrue(connector.targets.isEmpty())
+    }
+
+    private fun TestScope.assertStartsWithVpnDown(settings: AppSettings) {
+        results += VpnConnectResult.Failed(TunnelFailure.VpnServerUnreachable)
+        connect(allThroughVpn, settings = settings)
+
+        assertNotNull(platformTunnel.config)
+        assertEquals(TunnelState.Connected("p1", vpnDown = true, vpnBlocked = !settings.vpnFallbackToProxy), stateStore.state.value)
+    }
+
+    @Test
+    fun `without rules and the VPN down at start the tunnel starts and says so`() = runTest(UnconfinedTestDispatcher()) {
+        assertStartsWithVpnDown(AppSettings())
+    }
+
+    @Test
+    fun `without rules and the VPN down at start the tunnel starts and says so with the kill switch too`() =
+        runTest(UnconfinedTestDispatcher()) {
+            assertStartsWithVpnDown(killSwitch)
+        }
+
+    @Test
+    fun `without rules and the VPN down at start its traffic goes through the proxy`() = runTest(UnconfinedTestDispatcher()) {
+        results += VpnConnectResult.Failed(TunnelFailure.VpnServerUnreachable)
+        connect(allThroughVpn)
+        val server = parseIpv4("8.8.8.8")!!
+
+        send(syn(server))
+
+        assertAnsweredByProxyStack(server)
+    }
+
+    @Test
+    fun `without rules and the VPN down at start the kill switch blocks its traffic`() = runTest(UnconfinedTestDispatcher()) {
+        results += VpnConnectResult.Failed(TunnelFailure.VpnServerUnreachable)
+        connect(allThroughVpn, settings = killSwitch)
+
+        send(syn(parseIpv4("8.8.8.8")!!))
+        assertReset()
+        val written = tun.written.size
+        askDns("www.google.com")
+        send(buildUdpPacket(app, parseIpv4("8.8.4.4")!!, 50001, 443, ByteArray(100)))
+
+        assertEquals(written, tun.written.size, "ni DNS falso ni respuesta al UDP")
+    }
+
+    @Test
+    fun `without rules bad VPN credentials fail the tunnel in both modes and no interface is created`() = runTest(UnconfinedTestDispatcher()) {
+        for (settings in listOf(AppSettings(), killSwitch)) {
+            results.clear()
+            results += VpnConnectResult.Failed(TunnelFailure.VpnAuthFailed)
+            connect(allThroughVpn, settings = settings)
+
+            assertEquals(TunnelState.Failed(TunnelFailure.VpnAuthFailed), stateStore.state.value)
+            assertEquals(null, platformTunnel.config)
+        }
+    }
+
+    @Test
+    fun `with the kill switch what goes abroad is blocked while the VPN is down and resumes when it comes back`() =
+        runTest(UnconfinedTestDispatcher()) {
+            connect(settings = killSwitch)
+            askDns("www.netflix.com")
+            fromVpn(vpnDnsAnswer("www.netflix.com", "52.1.2.3"))
+            val server = parseIpv4("52.1.2.3")!!
+
+            session.fromServer.close()
+            runCurrent()
+            assertEquals(TunnelState.Connected("p1", vpnDown = true, vpnBlocked = true), stateStore.state.value)
+            send(syn(server))
+            assertReset()
+            val written = tun.written.size
+            askDns("www.netflix.com", port = 41001)
+            assertEquals(written, tun.written.size, "su DNS no se contesta: un DNS falso lo llevaría al proxy")
+            // Lo que va por el proxy por las reglas sigue igual.
+            send(syn(parseIpv4("1.2.3.4")!!, sourcePort = 50010))
+            assertAnsweredByProxyStack(parseIpv4("1.2.3.4")!!)
+
+            advanceTimeBy(6.seconds)
+            runCurrent()
+            assertEquals(TunnelState.Connected("p1"), stateStore.state.value)
+            send(syn(server, sourcePort = 50020))
+            assertEquals(server, Ipv4Packet.parse(session.sent.last())!!.destination, "vuelve a salir por la VPN")
+        }
+
+    @Test
+    fun `with the kill switch a session that fails to write blocks instead of using the proxy`() = runTest(UnconfinedTestDispatcher()) {
+        connect(settings = killSwitch)
+        askDns("www.netflix.com")
+        fromVpn(vpnDnsAnswer("www.netflix.com", "52.1.2.3"))
+
+        session.broken = true
+        send(syn(parseIpv4("52.1.2.3")!!))
+
+        assertReset()
+        assertFalse(tun.closed)
     }
 
     @Test
@@ -466,6 +621,110 @@ class SplitRoutingTest {
         advanceTimeBy(6.seconds)
         runCurrent()
         assertEquals(TunnelState.Connected("p1"), stateStore.state.value)
+    }
+
+    private val netflixApp = listOf("com.netflix.mediaclient")
+
+    /**
+     * Una app con regla «Otro País» va a [name], cuyo DNS de la VPN dice que no existe ([answered]) o no contesta. Devuelve
+     * la dirección inventada, tras el segundo SYN (el primero dispara la resolución y se descarta).
+     */
+    private fun TestScope.connectToUnresolvable(settings: AppSettings, answered: Boolean, name: String = "nada.invalid"): Int {
+        connect(profile.copy(routing = appRules), settings = settings)
+        val fake = fakeAddressOf(name)
+        appsByPort[50003] = netflixApp
+        send(syn(fake, sourcePort = 50003))
+        val query = UdpDatagram.parse(assertNotNull(Ipv4Packet.parse(session.sent.single())))!!
+        if (answered) {
+            fromVpn(vpnDnsAnswer(name, null, port = query.sourcePort, id = query.payload.readU16(0)))
+        } else {
+            advanceTimeBy(6.seconds)
+            runCurrent()
+        }
+        send(syn(fake, sourcePort = 50003))
+        return fake
+    }
+
+    private fun assertBlockedWithoutProxy(name: String = "nada.invalid") {
+        assertTrue(assertNotNull(TcpSegment.parse(lastToApp())).has(TcpFlags.RST), "RST como una regla «Bloquear»")
+        assertTrue(connector.targets.isEmpty(), "nada por el proxy")
+        assertEquals(emptyList(), (stateStore.state.value as TunnelState.Connected).viaProxy, "no se dice que sale por el proxy")
+        assertTrue(logger.entries.any { (level, message) -> level == LogLevel.WARN && name in message && "se bloquean" in message })
+    }
+
+    @Test
+    fun `with the kill switch a name the VPN says does not exist is blocked and never goes through the proxy`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val fake = connectToUnresolvable(killSwitch, answered = true)
+
+            assertBlockedWithoutProxy()
+            assertEquals(1, session.sent.size, "solo la consulta")
+            send(buildUdpPacket(app, fake, 50005, 443, ByteArray(100)).also { appsByPort[50005] = netflixApp })
+            assertEquals(1, Ipv4Packet.parse(tun.written.last())!!.protocol, "el UDP recibe un ICMP de puerto inalcanzable")
+        }
+
+    @Test
+    fun `with the kill switch a name the VPN's DNS does not answer is blocked and never goes through the proxy`() =
+        runTest(UnconfinedTestDispatcher()) {
+            connectToUnresolvable(killSwitch, answered = false)
+
+            assertBlockedWithoutProxy()
+        }
+
+    @Test
+    fun `a name the VPN's DNS does not answer goes through the proxy as before with the fallback on`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val fake = connectToUnresolvable(AppSettings(), answered = false)
+
+            assertAnsweredByProxyStack(fake)
+            assertEquals(listOf("nada.invalid"), (stateStore.state.value as TunnelState.Connected).viaProxy)
+        }
+
+    @Test
+    fun `with the fallback on a name without address stays on the proxy until the VPN reconnects`() = runTest(UnconfinedTestDispatcher()) {
+        val fake = connectToUnresolvable(AppSettings(), answered = true)
+        advanceTimeBy(120.seconds)
+        runCurrent()
+
+        send(syn(fake, sourcePort = 50003))
+
+        assertEquals(1, session.sent.size, "no se vuelve a preguntar")
+        assertAnsweredByProxyStack(fake)
+    }
+
+    @Test
+    fun `with the kill switch a name without address is asked again after a minute`() = runTest(UnconfinedTestDispatcher()) {
+        val fake = connectToUnresolvable(killSwitch, answered = true)
+
+        advanceTimeBy(58.seconds)
+        runCurrent()
+        send(syn(fake, sourcePort = 50003))
+        assertBlockedWithoutProxy()
+        assertEquals(1, session.sent.size, "aún no se vuelve a preguntar")
+
+        advanceTimeBy(3.seconds)
+        runCurrent()
+        val written = tun.written.size
+        send(syn(fake, sourcePort = 50003))
+        assertEquals(2, session.sent.size, "se pregunta otra vez al DNS de la VPN")
+        assertEquals(written, tun.written.size, "y mientras tanto el SYN se descarta")
+    }
+
+    @Test
+    fun `with the kill switch a name the DNS did not answer is asked again after ten seconds`() = runTest(UnconfinedTestDispatcher()) {
+        val fake = connectToUnresolvable(killSwitch, answered = false)
+
+        advanceTimeBy(8.seconds)
+        runCurrent()
+        send(syn(fake, sourcePort = 50003))
+        assertBlockedWithoutProxy()
+        assertEquals(1, session.sent.size)
+
+        advanceTimeBy(3.seconds)
+        runCurrent()
+        send(syn(fake, sourcePort = 50003))
+        assertEquals(2, session.sent.size, "se pregunta otra vez al DNS de la VPN")
+        assertTrue(connector.targets.isEmpty())
     }
 
     @Test

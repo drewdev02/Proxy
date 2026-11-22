@@ -80,14 +80,14 @@ class DesktopTunnelController(
         if (session?.isActive == true) return
         val profile = profiles.profiles.value.firstOrNull { it.id == profileId }
         if (profile == null) {
-            mutableState.value = TunnelState.Failed(TunnelFailure.PROFILE_NOT_FOUND)
+            mutableState.value = TunnelState.Failed(TunnelFailure.ProfileNotFound)
             return
         }
         val vpn = profile.countryExit?.let { exit ->
             val secrets = profiles.exitSecrets(profileId)
             if (secrets == null) {
                 logger.log(LogLevel.ERROR, TAG, "El perfil sale por Otro País pero no se pudieron leer sus secretos")
-                mutableState.value = TunnelState.Failed(TunnelFailure.VPN_PROFILE_INVALID)
+                mutableState.value = TunnelState.Failed(TunnelFailure.VpnSecretsMissing)
                 return
             }
             CountryExitStart(exit, secrets, stateDirectories.forProfile(profileId))
@@ -123,7 +123,7 @@ class DesktopTunnelController(
                 val socket = awaitEngine(server, launched)
                 if (socket == null) {
                     // El motor no llegó a presentarse: la persona canceló la contraseña o el arranque falló.
-                    if (!stopRequested) failure = TunnelFailure.VPN_PERMISSION_DENIED
+                    if (!stopRequested) failure = TunnelFailure.VpnPermissionDenied
                     return
                 }
                 socket.use {
@@ -133,7 +133,7 @@ class DesktopTunnelController(
             }
         } catch (e: IOException) {
             logger.log(LogLevel.ERROR, TAG, "Fallo hablando con el motor: ${e.message}")
-            if (!stopRequested) failure = TunnelFailure.INTERFACE_UNAVAILABLE
+            if (!stopRequested) failure = TunnelFailure.EngineStopped
         } finally {
             engineSocket = null
             serverSocket = null
@@ -167,7 +167,7 @@ class DesktopTunnelController(
         // Cualquier proceso local puede conectarse al puerto: solo se confía en quien presenta el token.
         if (reader.readLine() != token) {
             logger.log(LogLevel.ERROR, TAG, "Conexión local rechazada: token incorrecto")
-            return TunnelFailure.INTERFACE_UNAVAILABLE
+            return TunnelFailure.EngineStopped
         }
         writer.println(EngineProtocol.encodeStart(start))
         traffic.reset()

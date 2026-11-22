@@ -28,6 +28,11 @@ class StoredSettingsRepository(private val keyValueStore: KeyValueStore) : Setti
         state.value = state.value.copy(intranetDirect = enabled)
     }
 
+    override fun setVpnFallbackToProxy(enabled: Boolean) {
+        keyValueStore.putString(VPN_FALLBACK_TO_PROXY_KEY, enabled.toString())
+        state.value = state.value.copy(vpnFallbackToProxy = enabled)
+    }
+
     override fun setNameByIp(enabled: Boolean) {
         keyValueStore.putString(NAME_BY_IP_KEY, enabled.toString())
         state.value = state.value.copy(nameByIp = enabled)
@@ -76,6 +81,7 @@ class StoredSettingsRepository(private val keyValueStore: KeyValueStore) : Setti
         return AppSettings(
             answerConnectivityChecks = flag(ANSWER_CONNECTIVITY_CHECKS_KEY, defaults.answerConnectivityChecks),
             intranetDirect = flag(INTRANET_DIRECT_KEY, defaults.intranetDirect),
+            vpnFallbackToProxy = flag(VPN_FALLBACK_TO_PROXY_KEY, defaults.vpnFallbackToProxy),
             nameByIp = flag(NAME_BY_IP_KEY, defaults.nameByIp),
             tryRawIp = flag(TRY_RAW_IP_KEY, defaults.tryRawIp),
             nameServices = loadServices() ?: defaults.nameServices,
@@ -109,6 +115,7 @@ class StoredSettingsRepository(private val keyValueStore: KeyValueStore) : Setti
     internal companion object {
         const val ANSWER_CONNECTIVITY_CHECKS_KEY = "settings.answer_connectivity_checks"
         const val INTRANET_DIRECT_KEY = "settings.intranet_direct"
+        const val VPN_FALLBACK_TO_PROXY_KEY = "settings.vpn_fallback_to_proxy"
         const val NAME_BY_IP_KEY = "settings.name_by_ip"
         const val TRY_RAW_IP_KEY = "settings.try_raw_ip"
         const val NAME_SERVICES_KEY = "settings.name_services"

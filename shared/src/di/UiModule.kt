@@ -17,9 +17,17 @@ import org.uci.proxy.logs.LogsViewModel
 import org.uci.proxy.profile.ProfileEditorViewModel
 import org.uci.proxy.profile.ProfileListViewModel
 import org.uci.proxy.settings.SettingsViewModel
+import org.uci.proxy.common.SystemSettings
+import org.uci.proxy.i18n.AppLanguageSetting
+import org.uci.proxy.i18n.StoredLanguageSetting
 import kotlin.time.TimeSource
 
 val uiModule = module {
+    // El idioma lo guarda la app; Android 13 o superior lo sustituye por el del sistema.
+    single { StoredLanguageSetting(get()) }
+    single<AppLanguageSetting> { get<StoredLanguageSetting>() }
+    // Android lo sustituye: es la única plataforma donde se puede llevar a sus ajustes.
+    single<SystemSettings> { SystemSettings.None }
     // La cuota de la UCI: se consulta en este proceso. Android sustituye el aviso por una notificación.
     single<QuotaStore> { StoredQuotaStore(get()) }
     single<UciQuotaService> { HttpUciQuotaService() }

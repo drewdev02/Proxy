@@ -70,6 +70,19 @@ class StoredSettingsRepositoryTest {
     }
 
     @Test
+    fun `falling back to the proxy when Otro País is down is on by default and survives a restart`() {
+        assertTrue(AppSettings().vpnFallbackToProxy)
+        store.putString(StoredSettingsRepository.INTRANET_DIRECT_KEY, "false")
+        assertTrue(reopened().settings.value.vpnFallbackToProxy, "también para quien ya tenía ajustes guardados sin la clave")
+
+        val repository = reopened()
+        repository.setVpnFallbackToProxy(false)
+
+        assertFalse(repository.settings.value.vpnFallbackToProxy)
+        assertFalse(reopened().settings.value.vpnFallbackToProxy)
+    }
+
+    @Test
     fun `names for public IPs are on by default with sslip and nip in that order`() {
         val settings = reopened().settings.value
 

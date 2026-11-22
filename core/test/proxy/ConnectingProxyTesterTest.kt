@@ -77,6 +77,6 @@ class ConnectingProxyTesterTest {
 
         val result = tester(socks).test(httpProfile, "secreta")
 
-        assertEquals(ProxyTestResult.Failure(ProxyFailure.ProtocolError("Protocolo HTTP no disponible")), result)
+        assertEquals(ProxyTestResult.Failure(ProxyFailure.ProtocolError(ProtocolIssue.NO_CONNECTOR, "Protocolo HTTP no disponible")), result)
     }
 }

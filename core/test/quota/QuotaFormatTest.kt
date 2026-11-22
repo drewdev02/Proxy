@@ -12,8 +12,9 @@ class QuotaFormatTest {
         assertEquals(71.0, quota(1420.0).percent)
         assertEquals(115.0, quota(2300.0).percent)
         assertEquals(0.0, quota(2500.0).remainingMb)
-        assertEquals("71 %", percentText(quota(1420.53)))
-        assertEquals("1420,5 MB", mbText(1420.53))
-        assertEquals("12 MB", mbText(12.0))
+        assertEquals(71, quota(1420.53).wholePercent)
+        assertEquals("1420,5 MB", mbText(1420.53, ','))
+        assertEquals("1420.5 MB", mbText(1420.53, '.'))
+        assertEquals("12 MB", mbText(12.0, ','))
     }
 }

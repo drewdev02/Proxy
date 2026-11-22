@@ -16,6 +16,7 @@ import org.uci.proxy.core.quota.QuotaTracker
 import org.uci.proxy.core.model.UciQuota
 import org.uci.proxy.fakes.MainDispatcherTest
 import kotlin.test.Test
+import kotlin.time.Duration.Companion.minutes
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -89,7 +90,7 @@ class UsageViewModelTest : MainDispatcherTest() {
 
         val quota = withQuota.uiState.value.quota
         assertEquals(1500.0, quota.status.quota?.usedMb)
-        assertEquals("hace 3 min", quota.checkedAgo)
+        assertEquals(3.minutes, quota.checkedAgo)
     }
 
     @Test

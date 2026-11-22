@@ -15,6 +15,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Instant
+import org.uci.proxy.core.port.NetFailure
 
 class HttpConnectConnectorTest {
     private val target = ProxyTarget("example.org", 443)
@@ -156,21 +157,22 @@ class HttpConnectConnectorTest {
     fun `a refusal for the destination is reported with the status line`() = runTest {
         val proxy = FakeHttpProxy(statusWhenAuthorized = "403 Forbidden")
 
-        assertEquals(ProxyFailure.Refused("HTTP/1.1 403 Forbidden"), connect(proxy).failure())
+        assertEquals(ProxyFailure.Refused(RefusalReason.FORBIDDEN, "HTTP/1.1 403 Forbidden"), connect(proxy).failure())
     }
 
     @Test
     fun `a failed connection to the proxy is unreachable`() = runTest {
         val result = connector(unreachableConnector).connect(profile(), "secreta", target)
 
-        assertEquals(ProxyFailure.Unreachable("no se pudo conectar con proxy.uci.cu"), result.failure())
+        assertEquals(ProxyFailure.Unreachable(NetFailure.REFUSED, "no se pudo conectar con proxy.uci.cu"), result.failure())
     }
 
     @Test
-    fun `a server that does not speak HTTP is unreachable`() = runTest {
+    fun `a server that does not speak HTTP is a protocol error and not an unreachable proxy`() = runTest {
         val tcp = FakeTcpConnector { FakeConnection { "SSH-2.0-OpenSSH\r\n".encodeToByteArray() } }
 
-        assertIs<ProxyFailure.Unreachable>(connector(tcp).connect(profile(), "secreta", target).failure())
+        val failure = assertIs<ProxyFailure.ProtocolError>(connector(tcp).connect(profile(), "secreta", target).failure())
+        assertEquals(ProtocolIssue.NOT_HTTP_PROXY, failure.issue)
     }
 
     @Test

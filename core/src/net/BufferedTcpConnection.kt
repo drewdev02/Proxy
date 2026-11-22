@@ -1,6 +1,7 @@
 package org.uci.proxy.core.net
 
 import org.uci.proxy.core.port.TcpConnection
+import org.uci.proxy.core.port.NetFailure
 import org.uci.proxy.core.port.TcpException
 
 /**
@@ -40,11 +41,11 @@ class BufferedTcpConnection(private val delegate: TcpConnection) : TcpConnection
                 buffer = buffer.copyOfRange(newline + 1, buffer.size)
                 return line
             }
-            if (buffer.size > maxLength) throw TcpException("Línea demasiado larga del servidor")
+            if (buffer.size > maxLength) throw TcpException(NetFailure.PROTOCOL, "Línea demasiado larga del servidor")
             val more = delegate.read()
             if (more == null) {
                 if (buffer.isEmpty()) return null
-                throw TcpException("La conexión se cerró a mitad de una línea")
+                throw TcpException(NetFailure.CLOSED, "La conexión se cerró a mitad de una línea")
             }
             buffer += more
         }
@@ -53,7 +54,7 @@ class BufferedTcpConnection(private val delegate: TcpConnection) : TcpConnection
     /** @throws TcpException si la conexión se cierra antes de reunir [count] bytes. */
     suspend fun readExactly(count: Int): ByteArray {
         while (buffer.size < count) {
-            buffer += delegate.read() ?: throw TcpException("La conexión se cerró antes de recibir $count bytes")
+            buffer += delegate.read() ?: throw TcpException(NetFailure.CLOSED, "La conexión se cerró antes de recibir $count bytes")
         }
         val out = buffer.copyOf(count)
         buffer = buffer.copyOfRange(count, buffer.size)

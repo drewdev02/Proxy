@@ -61,7 +61,7 @@ val tunnelModule = module {
         )
     }
     // Los motores de esta plataforma; cada uno dice si puede usarse aquí (Tailscale, si su librería está).
-    single { CountryEngines(listOf(get<OpenVpnEngine>(), get<TailscaleEngine>())) }
+    single { CountryEngines(listOf(get<OpenVpnEngine>(), get<TailscaleEngine>()), logger = get()) }
     // Con get() explícitos: las rutas públicas usan el valor por defecto del constructor.
     single {
         TunnelRunner(
@@ -78,6 +78,8 @@ val tunnelModule = module {
             dnsTransport = get(),
             traffic = get(),
             timeSource = get(),
+            proxyProbe = get(),
+            localAddresses = get(),
         )
     }
 }

@@ -11,6 +11,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
+import org.uci.proxy.core.port.NetFailure
 import org.uci.proxy.core.port.QuotaFetch
 import org.uci.proxy.core.quota.QuotaSoap
 
@@ -24,6 +25,7 @@ private fun answer(vararg fields: Pair<String, String>) =
     </ns1:ObtenerCuotaResponse>
   </SOAP-ENV:Body>
 </SOAP-ENV:Envelope>"""
+
 
 /** El fallo del servicio de la UCI con usuario o contraseña malos. */
 private const val FAULT = """<?xml version="1.0" encoding="UTF-8"?>
@@ -67,6 +69,6 @@ class HttpUciQuotaServiceTest {
     fun `a network failure means unreachable`() = runTest {
         val failing = HttpUciQuotaService { _ -> HttpClient(MockEngine { throw RuntimeException("sin red") }) { quotaDefaults() } }
 
-        assertEquals(QuotaFetch.Unreachable("sin red"), failing.fetch("ana", "x", QuotaSoap.SERVICE_URL, true))
+        assertEquals(QuotaFetch.Unreachable(NetFailure.OTHER, "sin red"), failing.fetch("ana", "x", QuotaSoap.SERVICE_URL, true))
     }
 }

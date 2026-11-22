@@ -25,6 +25,7 @@ import org.uci.proxy.core.model.NameServiceStatus
 import org.uci.proxy.core.port.NameServiceStatusRepository
 import org.uci.proxy.core.settings.ServiceValidation
 import org.uci.proxy.core.port.SettingsRepository
+import org.uci.proxy.core.port.classifyNetworkError
 
 /** Lo que muestra la fila de un servicio tras pulsar «Probar». */
 sealed interface ServiceTestUi {
@@ -75,6 +76,8 @@ class SettingsViewModel(
     fun setAnswerConnectivityChecks(enabled: Boolean) = repository.setAnswerConnectivityChecks(enabled)
 
     fun setIntranetDirect(enabled: Boolean) = repository.setIntranetDirect(enabled)
+
+    fun setVpnFallbackToProxy(enabled: Boolean) = repository.setVpnFallbackToProxy(enabled)
 
     fun setNameByIp(enabled: Boolean) = repository.setNameByIp(enabled)
 
@@ -149,7 +152,7 @@ class SettingsViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                ServiceTestUi.Done(NameServiceTestResult.Unreachable(e.message.orEmpty()))
+                ServiceTestUi.Done(NameServiceTestResult.Unreachable(classifyNetworkError(e), e.message.orEmpty()))
             }
             setTest(id, outcome)
         }

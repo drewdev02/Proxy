@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Los textos propios de los componentes Uci* y de la navegación principal. -->
+<resources>
+    <!-- Componentes: lo que dicen por defecto y lo que anuncian a los lectores de pantalla. -->
+    <string name="ui_loading">Cargando</string>
+    <string name="ui_password_hide">Ocultar contraseña</string>
+    <string name="ui_password_show">Mostrar contraseña</string>
+    <string name="ui_search_clear">Borrar búsqueda</string>
+    <string name="ui_file_none">Ningún archivo elegido</string>
+    <string name="ui_file_choose">Elegir archivo</string>
+    <string name="ui_file_change">Cambiar</string>
+    <string name="ui_move_up">Subir</string>
+    <string name="ui_move_down">Bajar</string>
+    <string name="ui_alert_dismiss">Cerrar aviso</string>
+    <string name="ui_back">Volver</string>
+    <string name="ui_cancel">Cancelar</string>
+    <!-- Estado del botón de conexión para los lectores de pantalla. -->
+    <string name="ui_power_idle">Desconectado</string>
+    <string name="ui_power_connecting">Conectando</string>
+    <string name="ui_power_connected">Conectado</string>
+    <string name="ui_power_error">Error</string>
+    <!-- Título del selector de archivos del sistema al importar un perfil de OpenVPN (escritorio). -->
+    <string name="ui_pick_ovpn_title">Elegir archivo .ovpn</string>
+
+    <!-- Pestañas de la navegación principal. -->
+    <string name="nav_connection">Conexión</string>
+    <string name="nav_logs">Registros</string>
+    <string name="nav_profiles">Perfiles</string>
+    <string name="nav_settings">Ajustes</string>
+</resources>

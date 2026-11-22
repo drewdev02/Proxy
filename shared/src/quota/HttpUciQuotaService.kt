@@ -12,6 +12,7 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import kotlinx.coroutines.CancellationException
+import org.uci.proxy.core.port.classifyNetworkError
 
 /**
  * Un cliente HTTP que va siempre sin proxy (el servicio es de la intranet, como en UCIProxy) y, con [verifyCertificate]
@@ -43,7 +44,7 @@ class HttpUciQuotaService internal constructor(
             val message = e.message ?: e::class.simpleName.orEmpty()
             // El tiempo agotado de Ktor es una CancellationException en algunas plataformas; se trata arriba como cancelación
             // solo si de verdad se canceló quien llama.
-            return if (isCertificateError(e)) QuotaFetch.UntrustedCertificate(message) else QuotaFetch.Unreachable(message)
+            return if (isCertificateError(e)) QuotaFetch.UntrustedCertificate(message) else QuotaFetch.Unreachable(classifyNetworkError(e), message)
         }
         // SOAP devuelve los fallos con un 500, pero con el detalle en el cuerpo: se lee el cuerpo sea cual sea el código.
         return try {

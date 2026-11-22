@@ -129,9 +129,15 @@ class TunnelRelay(
             }
             is ProxyConnectResult.Failed -> {
                 logger.log(LogLevel.WARN, TAG, "El proxy no abrió ${target.host}:${target.port}: ${result.failure}")
+                when (result.failure) {
+                    ProxyFailure.AuthRejected, ProxyFailure.AuthRequired, is ProxyFailure.UnsupportedAuth -> health.markAuthRejected()
+                    is ProxyFailure.Unreachable -> health.markUnreachable()
+                    is ProxyFailure.Refused, is ProxyFailure.ProtocolError -> Unit
+                }
                 null
             }
             null -> {
+                health.markUnreachable()
                 logger.log(LogLevel.WARN, TAG, "Tiempo agotado conectando con ${target.host}:${target.port}")
                 null
             }

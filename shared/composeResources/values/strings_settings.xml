@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Los textos de la pantalla de Ajustes. -->
+<resources>
+    <string name="settings_title">Ajustes</string>
+    <string name="settings_subtitle">Se aplican al conectar la próxima vez</string>
+
+    <!-- Conexión -->
+    <string name="settings_connection_title">Conexión</string>
+    <string name="settings_connection_subtitle">Cómo se comporta el túnel con el sistema</string>
+    <string name="settings_connectivity_checks_title">Contestar las comprobaciones de conexión</string>
+    <string name="settings_connectivity_checks_subtitle">Muchos proxies bloquean las pruebas con las que Android, Windows y macOS detectan si hay internet, y el sistema muestra «sin internet» aunque lo haya. ProxyUCI las contesta mientras el proxy funcione; si deja de responder, el aviso aparece.</string>
+    <string name="settings_intranet_direct_title">Abrir la red local sin proxy</string>
+    <string name="settings_intranet_direct_subtitle">Los sitios de la red donde estás (como los de uci.cu) se buscan en el DNS de esa red y, si son internos, se abren directamente, sin pasar por el proxy ni por Otro País: el proxy no suele abrirlos. Para otros sitios internos, añade una regla de dominio con salida «Directo».</string>
+
+    <!-- Cuota de la UCI -->
+    <string name="settings_quota_title">Cuota de la UCI</string>
+    <string name="settings_quota_subtitle">Los MB de navegación que la UCI da a tu cuenta</string>
+    <string name="settings_quota_description">Con los perfiles de la UCI se consulta la cuota con el usuario y la contraseña del perfil, al abrir la app y cada pocos minutos mientras estás conectado. Se ve en Consumo.</string>
+    <string name="settings_quota_alert_label">Avisar al llegar al</string>
+    <!-- Un porcentaje en un botón: «80 %». -->
+    <string name="settings_quota_alert_threshold">%1$d %</string>
+    <string name="settings_quota_check_label">Consultar cada</string>
+    <plurals name="settings_quota_check_minutes">
+        <item quantity="one">%1$d min</item>
+        <item quantity="other">%1$d min</item>
+    </plurals>
+    <string name="settings_quota_pause_title">Pausar el túnel al %1$d %</string>
+    <string name="settings_quota_pause_subtitle">Al llegar, se desconecta para no agotar la cuota sin darte cuenta. Puedes conectar igual: no vuelve a pausar hasta que tu consumo baje del %1$d %.</string>
+    <string name="settings_quota_verify_title">Verificar el certificado del servicio</string>
+    <string name="settings_quota_verify_subtitle">Apagado, como en UCIProxy: el certificado del servicio de cuotas lo firma una autoridad de la UCI que los sistemas no reconocen, y con la verificación encendida la consulta falla.</string>
+    <string name="settings_quota_service_url_label">Servicio de cuotas (desarrollo)</string>
+    <string name="settings_quota_service_url_supporting">Para probar con tools/test_cuotas.py. Vacío: el de la UCI.</string>
+
+    <!-- Servicios de nombres -->
+    <string name="settings_names_title">Servicios de nombres</string>
+    <string name="settings_names_subtitle">Para pedir al proxy las IP públicas por un nombre</string>
+    <string name="settings_names_switch">Usar servicios de nombres</string>
+    <string name="settings_names_description">El proxy de la UCI rechaza las conexiones a una IP escrita como número, pero acepta el mismo destino con un nombre. Estos servicios dan un nombre a cualquier IP. Se prueban en este orden (arrastra para cambiarlo), empezando por el que funcionó la última vez; uno que el proxy rechaza varias veces seguidas se aparta unos minutos.</string>
+    <string name="settings_try_raw_ip_title">Probar también la IP tal cual</string>
+    <string name="settings_try_raw_ip_subtitle">Si ningún nombre sirve, se intenta la IP sin nombre como último recurso.</string>
+    <string name="settings_add_service">Añadir servicio</string>
+    <string name="settings_reset_services">Restaurar</string>
+    <string name="settings_names_warning">Quien da el nombre se entera de qué IP se piden: no uses servicios en los que no confíes.</string>
+
+    <!-- Cada servicio de la lista -->
+    <string name="settings_service_use">Usar %1$s</string>
+    <string name="settings_service_no_data">Sin datos todavía</string>
+    <string name="settings_service_test">Probar</string>
+    <string name="settings_service_testing">Probando…</string>
+    <string name="settings_service_built_in">De fábrica</string>
+    <string name="settings_service_remove">Eliminar</string>
+
+    <!-- Lo último que se sabe de un servicio, con cuánto hace -->
+    <string name="settings_status_worked_seconds">Funcionó hace unos segundos</string>
+    <plurals name="settings_status_worked_minutes">
+        <item quantity="one">Funcionó hace %1$d min</item>
+        <item quantity="other">Funcionó hace %1$d min</item>
+    </plurals>
+    <plurals name="settings_status_worked_hours">
+        <item quantity="one">Funcionó hace %1$d h</item>
+        <item quantity="other">Funcionó hace %1$d h</item>
+    </plurals>
+    <plurals name="settings_status_worked_days">
+        <item quantity="one">Funcionó hace %1$d d</item>
+        <item quantity="other">Funcionó hace %1$d d</item>
+    </plurals>
+    <string name="settings_status_refused_seconds">El proxy lo rechazó hace unos segundos</string>
+    <plurals name="settings_status_refused_minutes">
+        <item quantity="one">El proxy lo rechazó hace %1$d min</item>
+        <item quantity="other">El proxy lo rechazó hace %1$d min</item>
+    </plurals>
+    <plurals name="settings_status_refused_hours">
+        <item quantity="one">El proxy lo rechazó hace %1$d h</item>
+        <item quantity="other">El proxy lo rechazó hace %1$d h</item>
+    </plurals>
+    <plurals name="settings_status_refused_days">
+        <item quantity="one">El proxy lo rechazó hace %1$d d</item>
+        <item quantity="other">El proxy lo rechazó hace %1$d d</item>
+    </plurals>
+
+    <!-- La prueba de un servicio. El detalle (%1$s) es técnico y sale tal cual. -->
+    <string name="settings_test_running">Probando con el proxy…</string>
+    <string name="settings_test_no_profile">Crea un perfil de proxy para poder probar.</string>
+    <string name="settings_test_works">El proxy acepta este servicio.</string>
+    <string name="settings_test_refused">El proxy lo rechaza: %1$s</string>
+    <string name="settings_test_proxy_auth">El proxy rechazó el usuario o la contraseña del perfil: la prueba no vale.</string>
+    <string name="settings_test_unreachable">%1$s Si el túnel está activo, desconéctalo y prueba otra vez.</string>
+
+    <!-- Añadir un servicio propio -->
+    <string name="settings_add_name_label">Nombre</string>
+    <string name="settings_add_name_placeholder">p. ej. Mi dominio</string>
+    <string name="settings_add_template_label">Plantilla</string>
+    <string name="settings_add_template_supporting">{ip} es la IP con puntos (149.22.82.28) y {ip-} con guiones (149-22-82-28).</string>
+    <string name="settings_add_warning">Solo añade servicios en los que confíes: quien da el nombre se entera de qué IP se piden, y uno malicioso podría desviar el tráfico que no va cifrado.</string>
+    <string name="settings_add_cancel">Cancelar</string>
+    <string name="settings_add_confirm">Añadir</string>
+
+    <!-- Por qué no vale el servicio que se quiere añadir -->
+    <string name="settings_error_name_empty">Escribe un nombre (máximo 40 letras).</string>
+    <string name="settings_error_no_placeholder">La plantilla debe llevar {ip} o {ip-}, donde irá la IP.</string>
+    <string name="settings_error_invalid_host">Con una IP puesta, no da un nombre de dominio válido (letras, cifras, guiones y puntos).</string>
+    <string name="settings_error_local_domain">Ese dominio es local o reservado: el proxy no podría resolverlo.</string>
+    <string name="settings_error_duplicate">Ya hay un servicio con esa plantilla.</string>
+    <string name="settings_language_title">Idioma</string>
+    <string name="settings_language_subtitle">Se aplica al momento</string>
+    <string name="settings_language_system">Del sistema</string>
+    <string name="settings_vpn_fallback_title">Si Otro País se cae, salir por el proxy</string>
+    <string name="settings_vpn_fallback_subtitle">Si está apagado, lo que va por Otro País se bloquea hasta que vuelva.</string>
+</resources>

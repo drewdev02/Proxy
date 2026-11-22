@@ -28,7 +28,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
+import org.uci.proxy.common.SystemSettings
+import org.uci.proxy.common.action
 import org.uci.proxy.common.message
 import org.uci.proxy.core.model.LogEntry
 import org.uci.proxy.core.model.CountryExit
@@ -45,6 +48,8 @@ import org.uci.proxy.core.proxy.ProxyTestResult
 import org.uci.proxy.logs.tone
 import org.uci.proxy.profile.tone
 import org.uci.proxy.quota.tone
+import org.uci.proxy.resources.Res
+import org.uci.proxy.resources.*
 import org.uci.proxy.theme.ProxyUciTheme
 import org.uci.proxy.ui.components.UciButton
 import org.uci.proxy.ui.components.UciEmptyState
@@ -52,6 +57,7 @@ import org.uci.proxy.ui.components.UciIconButton
 import org.uci.proxy.ui.components.UciStatusPill
 import org.uci.proxy.ui.components.UciTone
 import org.uci.proxy.ui.icons.UciIcons
+import org.koin.compose.koinInject
 
 /** Lo que la pantalla puede pedir a quien la contiene (navegar a otras pantallas). */
 class ConnectionNavigation(
@@ -70,6 +76,7 @@ internal fun ConnectionScreen(
     wide: Boolean,
     navigation: ConnectionNavigation,
     viewModel: ConnectionViewModel = koinViewModel(),
+    systemSettings: SystemSettings = koinInject(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     ConnectionScreen(
@@ -80,6 +87,7 @@ internal fun ConnectionScreen(
             onDisconnect = viewModel::disconnect,
             onSelectProfile = viewModel::selectProfile,
             onTestProxy = viewModel::testProxy,
+            systemSettings = systemSettings,
         ),
         navigation = navigation,
     )
@@ -91,6 +99,8 @@ class ConnectionActions(
     val onDisconnect: () -> Unit = {},
     val onSelectProfile: (String) -> Unit = {},
     val onTestProxy: () -> Unit = {},
+    /** Para llevar a los ajustes del sistema cuando un fallo se arregla allí; None donde no se puede. */
+    val systemSettings: SystemSettings = SystemSettings.None,
 )
 
 /**
@@ -120,10 +130,10 @@ internal fun ConnectionScreen(
         val profile = state.activeProfile
         if (profile == null) {
             UciEmptyState(
-                title = "Aún no hay perfiles",
+                title = stringResource(Res.string.connection_empty_title),
                 icon = UciIcons.Badge,
-                message = "Añade el proxy de tu facultad o residencia para empezar a navegar a través de él.",
-                action = { UciButton("Añadir perfil", navigation.onAddProfile, icon = UciIcons.Add) },
+                message = stringResource(Res.string.connection_empty_message),
+                action = { UciButton(stringResource(Res.string.connection_add_profile), navigation.onAddProfile, icon = UciIcons.Add) },
                 modifier = Modifier.padding(top = spacing.xl),
             )
             return@Column
@@ -187,16 +197,19 @@ private fun Header(state: ConnectionUiState, onOpenUsage: () -> Unit, modifier: 
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("ProxyUCI", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f).semantics { heading() })
         // El consumo guardado se puede ver también sin conexión.
-        if (state.tunnelAvailable) UciIconButton(UciIcons.BarChart, "Consumo", onOpenUsage, bordered = false)
+        if (state.tunnelAvailable) UciIconButton(UciIcons.BarChart, stringResource(Res.string.connection_open_usage), onOpenUsage, bordered = false)
         if (state.tunnelAvailable) {
             val (text, tone) = when (val tunnel = state.tunnel) {
-                TunnelState.Disconnected -> "Sin túnel" to UciTone.Neutral
-                is TunnelState.Connecting -> "Conectando" to UciTone.Active
-                is TunnelState.Connected -> (if (tunnel.vpnDown) "Túnel · sin VPN" else "Túnel activo") to
-                    (if (tunnel.vpnDown) UciTone.Warning else UciTone.Success)
-                is TunnelState.Failed -> "Falló" to UciTone.Danger
+                TunnelState.Disconnected -> Res.string.connection_pill_disconnected to UciTone.Neutral
+                is TunnelState.Connecting -> Res.string.connection_pill_connecting to UciTone.Active
+                is TunnelState.Connected -> when {
+                    tunnel.proxyProblem != null -> Res.string.connection_pill_proxy_failing to UciTone.Danger
+                    tunnel.vpnDown -> Res.string.connection_pill_vpn_down to UciTone.Warning
+                    else -> Res.string.connection_pill_connected to UciTone.Success
+                }
+                is TunnelState.Failed -> Res.string.connection_pill_failed to UciTone.Danger
             }
-            UciStatusPill(text, tone = tone)
+            UciStatusPill(stringResource(text), tone = tone)
         }
     }
 }
@@ -236,7 +249,7 @@ private fun ConnectionScreenPhonePreview() {
 @Preview(widthDp = 412, heightDp = 900)
 @Composable
 private fun ConnectionScreenFailedPreview() {
-    ProxyUciTheme { ConnectionScreen(previewState.copy(tunnel = TunnelState.Failed(TunnelFailure.PROXY_AUTH_FAILED)), wide = false) }
+    ProxyUciTheme { ConnectionScreen(previewState.copy(tunnel = TunnelState.Failed(TunnelFailure.ProxyAuthFailed)), wide = false) }
 }
 
 @Preview(widthDp = 1100, heightDp = 760)

@@ -38,7 +38,7 @@ class OpenVpnClient(
             return withTimeout(handshakeTimeout) { handshake(config, framed, username, password) }
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
             framed.close()
-            throw OpenVpnException("El servidor VPN no respondió a tiempo", e)
+            throw OpenVpnException(VpnHandshakeIssue.TIMEOUT, "El servidor VPN no respondió a tiempo", e)
         } catch (e: Exception) {
             framed.close()
             throw e
@@ -84,7 +84,7 @@ class OpenVpnClient(
                 if (pushRequested) tlsSession.writeApplicationData(PUSH_REQUEST)
                 continue
             }
-            val received = arrival.received ?: throw OpenVpnException("El servidor VPN cerró la conexión durante el handshake")
+            val received = arrival.received ?: throw OpenVpnException(VpnHandshakeIssue.CLOSED, "El servidor VPN cerró la conexión durante el handshake")
             if (received !is Received.Control) continue
             when (received.opcode) {
                 Opcode.CONTROL_HARD_RESET_SERVER_V2 -> {
@@ -125,7 +125,7 @@ class OpenVpnClient(
                         message.startsWith("AUTH_FAILED") ->
                             throw AuthFailedException("El servidor VPN rechazó el usuario o la contraseña")
                         message.startsWith("HALT") || message.startsWith("RESTART") ->
-                            throw OpenVpnException("El servidor VPN terminó la sesión: $message")
+                            throw OpenVpnException(VpnHandshakeIssue.SESSION_ENDED, "El servidor VPN terminó la sesión: $message", subject = message.substringAfter(',', "").trim().ifEmpty { null })
                     }
                 }
             }
@@ -135,7 +135,11 @@ class OpenVpnClient(
         val keyBytes = when {
             push.cipher.startsWith("AES-256-GCM") -> 32
             push.cipher.startsWith("AES-128-GCM") -> 16
-            else -> throw OpenVpnException("El servidor VPN eligió el cifrado ${push.cipher}, que no se admite (sí AES-GCM)")
+            else -> throw OpenVpnException(
+                VpnHandshakeIssue.UNSUPPORTED_CIPHER,
+                "El servidor VPN eligió el cifrado ${push.cipher}, que no se admite (sí AES-GCM)",
+                subject = push.cipher,
+            )
         }
         val keys = deriveDataKeys(
             crypto = crypto,
@@ -145,7 +149,7 @@ class OpenVpnClient(
             serverRandom1 = serverKeys!!.random1,
             serverRandom2 = serverKeys.random2,
             clientSessionId = channel.localSessionId,
-            serverSessionId = channel.remoteSessionId ?: throw OpenVpnException("El servidor no se identificó"),
+            serverSessionId = channel.remoteSessionId ?: throw OpenVpnException(VpnHandshakeIssue.UNSUPPORTED_SERVER, "El servidor no se identificó"),
             cipherKeyBytes = keyBytes,
         )
         logger.log(LogLevel.INFO, TAG, "VPN: sesión establecida (${push.cipher}), dirección ${push.address}")
@@ -176,7 +180,7 @@ class OpenVpnClient(
         val optionsLength = ((bytes[header].toInt() and 0xFF) shl 8) or (bytes[header + 1].toInt() and 0xFF)
         if (stream.size < header + 2 + optionsLength) return null
         val all = stream.take(header + 2 + optionsLength)
-        if (all[4].toInt() != 2) throw OpenVpnException("El servidor VPN usa un método de claves que no se admite")
+        if (all[4].toInt() != 2) throw OpenVpnException(VpnHandshakeIssue.UNSUPPORTED_SERVER, "El servidor VPN usa un método de claves que no se admite", subject = "key-method")
         return ServerKeySource(all.copyOfRange(5, 37), all.copyOfRange(37, 69))
     }
 

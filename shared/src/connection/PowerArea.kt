@@ -17,8 +17,11 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.delay
+import org.jetbrains.compose.resources.stringResource
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.profile.label
+import org.uci.proxy.resources.Res
+import org.uci.proxy.resources.*
 import org.uci.proxy.theme.ProxyUciTheme
 import org.uci.proxy.ui.components.UciInlineAlert
 import org.uci.proxy.ui.components.UciPowerButton
@@ -28,21 +31,21 @@ import org.uci.proxy.ui.components.UciPowerState
 internal fun PowerArea(state: ConnectionUiState, actions: ConnectionActions) {
     if (!state.tunnelAvailable) {
         UciInlineAlert(
-            "En este sistema todavía no se puede crear el túnel. Puedes gestionar los perfiles y probar el proxy.",
-            title = "Túnel no disponible",
+            stringResource(Res.string.connection_unavailable_message),
+            title = stringResource(Res.string.connection_unavailable_title),
         )
         return
     }
     val (powerState, label) = when (state.tunnel) {
-        TunnelState.Disconnected -> UciPowerState.Idle to "Conectar"
-        is TunnelState.Connecting -> UciPowerState.Connecting to "Conectando"
-        is TunnelState.Connected -> UciPowerState.Connected to "Conectado"
-        is TunnelState.Failed -> UciPowerState.Error to "Reintentar"
+        TunnelState.Disconnected -> UciPowerState.Idle to Res.string.connection_power_connect
+        is TunnelState.Connecting -> UciPowerState.Connecting to Res.string.connection_power_connecting
+        is TunnelState.Connected -> UciPowerState.Connected to Res.string.connection_power_connected
+        is TunnelState.Failed -> UciPowerState.Error to Res.string.connection_power_retry
     }
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         UciPowerButton(
             state = powerState,
-            label = label,
+            label = stringResource(label),
             onClick = {
                 when (state.tunnel) {
                     is TunnelState.Connected, is TunnelState.Connecting -> actions.onDisconnect()
@@ -57,13 +60,13 @@ internal fun PowerArea(state: ConnectionUiState, actions: ConnectionActions) {
 @Composable
 private fun StatusLine(state: ConnectionUiState) {
     val text = when (state.tunnel) {
-        TunnelState.Disconnected -> "Sin conexión · pulsa para conectar"
-        is TunnelState.Connecting -> "Conectando con ${state.activeProfile?.host.orEmpty()}…"
+        TunnelState.Disconnected -> stringResource(Res.string.connection_status_disconnected)
+        is TunnelState.Connecting -> stringResource(Res.string.connection_status_connecting, state.activeProfile?.host.orEmpty())
         is TunnelState.Connected -> {
             // Si la VPN está caída lo explica el aviso de debajo; aquí no se repite.
             val since = state.connectedSince
             if (since == null) {
-                "Conectado · pulsa para desconectar"
+                stringResource(Res.string.connection_status_connected)
             } else {
                 var elapsed by remember(since) { mutableStateOf(since.elapsedNow()) }
                 LaunchedEffect(since) {
@@ -72,10 +75,10 @@ private fun StatusLine(state: ConnectionUiState) {
                         delay(1.seconds)
                     }
                 }
-                "Conectado · ${formatElapsed(elapsed)}"
+                stringResource(Res.string.connection_status_connected_for, formatElapsed(elapsed))
             }
         }
-        is TunnelState.Failed -> "No se pudo conectar"
+        is TunnelState.Failed -> stringResource(Res.string.connection_status_failed)
     }
     Text(
         text,

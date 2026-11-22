@@ -1,10 +1,13 @@
 package org.uci.proxy.core.vpn
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
 import org.uci.proxy.core.model.CountryEngineKind
 import org.uci.proxy.core.model.CountryExit
 import org.uci.proxy.core.model.CountryExitSecrets
 import org.uci.proxy.core.model.ProxyProfile
+import org.uci.proxy.core.model.LogLevel
+import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.model.AppSettings
 
@@ -44,21 +47,39 @@ interface CountryEngine {
     suspend fun connect(context: ExitContext, start: CountryExitStart): VpnConnectResult
 
     /** Si un fallo no se arregla reintentando (credenciales o configuración malas): el túnel deja de reintentar. */
-    fun isPermanent(failure: TunnelFailure): Boolean = failure in PERMANENT_FAILURES
+    fun isPermanent(failure: TunnelFailure): Boolean = isPermanentFailure(failure)
 
     companion object {
-        val PERMANENT_FAILURES = setOf(
-            TunnelFailure.VPN_AUTH_FAILED,
-            TunnelFailure.VPN_PROFILE_INVALID,
-            TunnelFailure.PROXY_AUTH_FAILED,
-            TunnelFailure.EXIT_NODE_NOT_FOUND,
-            TunnelFailure.ENGINE_UNAVAILABLE,
+        /** Lo que no cambia por volver a intentarlo: credenciales, configuración o algo que el servidor no admite. */
+        fun isPermanentFailure(failure: TunnelFailure): Boolean = when (failure) {
+            TunnelFailure.VpnAuthFailed,
+            TunnelFailure.TailscaleKeyExpired,
+            TunnelFailure.VpnSecretsMissing,
+            is TunnelFailure.OvpnInvalid,
+            TunnelFailure.TailscaleConfigInvalid,
+            TunnelFailure.ProxyAuthFailed,
+            TunnelFailure.ProxyAuthRequired,
+            is TunnelFailure.ProxyAuthUnsupported,
+            is TunnelFailure.ProxyProtocolMismatch,
+            is TunnelFailure.ExitNodeNotFound,
+            TunnelFailure.ExitNodeNotChosen,
+            TunnelFailure.EngineUnavailable,
+            -> true
+            is TunnelFailure.VpnHandshakeFailed -> failure.issue in PERMANENT_HANDSHAKE_ISSUES
+            else -> false
+        }
+
+        private val PERMANENT_HANDSHAKE_ISSUES = setOf(
+            VpnHandshakeIssue.SERVER_CERTIFICATE,
+            VpnHandshakeIssue.UNSUPPORTED_CIPHER,
+            VpnHandshakeIssue.UNSUPPORTED_SERVER,
+            VpnHandshakeIssue.UNAVAILABLE,
         )
     }
 }
 
 /** Los motores de esta plataforma. */
-class CountryEngines(engines: List<CountryEngine>) {
+class CountryEngines(engines: List<CountryEngine>, private val logger: Logger? = null) {
     private val byKind = engines.associateBy { it.kind }
 
     /** El motor de [kind] si existe y puede usarse aquí. */
@@ -69,14 +90,23 @@ class CountryEngines(engines: List<CountryEngine>) {
 
     /** Abre la sesión con el motor de la salida, o falla con un motivo claro si no está disponible. */
     suspend fun connect(context: ExitContext, start: CountryExitStart): VpnConnectResult {
-        val engine = get(start.exit.kind) ?: return VpnConnectResult.Failed(TunnelFailure.ENGINE_UNAVAILABLE)
-        return engine.connect(context, start)
+        val engine = get(start.exit.kind) ?: return VpnConnectResult.Failed(TunnelFailure.EngineUnavailable)
+        // Un motor que lanza no debe tumbar el túnel: quien llama solo sabe tratar Failed (caer al proxy o reintentar).
+        return try {
+            engine.connect(context, start)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            logger?.log(LogLevel.WARN, TAG, "El motor ${start.exit.kind.tag} falló al conectar: ${e.message}")
+            VpnConnectResult.Failed(TunnelFailure.EngineInternal)
+        }
     }
 
     fun isPermanent(kind: CountryEngineKind, failure: TunnelFailure): Boolean =
-        byKind[kind]?.isPermanent(failure) ?: (failure in CountryEngine.PERMANENT_FAILURES)
+        byKind[kind]?.isPermanent(failure) ?: CountryEngine.isPermanentFailure(failure)
 
     companion object {
+        private const val TAG = "Vpn"
         val None = CountryEngines(emptyList())
     }
 }

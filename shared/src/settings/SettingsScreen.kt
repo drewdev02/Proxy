@@ -37,6 +37,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlin.time.Clock
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.pluralStringResource
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import org.uci.proxy.core.proxy.NameServiceTestResult
 import org.uci.proxy.core.model.AppSettings
@@ -45,6 +48,8 @@ import org.uci.proxy.core.model.NameOutcome
 import org.uci.proxy.core.model.NameServiceStatus
 import org.uci.proxy.core.settings.ServiceError
 import org.uci.proxy.core.settings.ServiceValidation
+import org.uci.proxy.resources.Res
+import org.uci.proxy.resources.*
 import org.uci.proxy.theme.ProxyUciTheme
 import org.uci.proxy.ui.components.UciBottomSheet
 import org.uci.proxy.ui.components.UciButton
@@ -63,6 +68,10 @@ import org.uci.proxy.ui.components.UciTone
 import org.uci.proxy.ui.components.UciTopBar
 import org.uci.proxy.ui.components.colors
 import org.uci.proxy.ui.icons.UciIcons
+import org.koin.compose.koinInject
+import org.uci.proxy.common.proxyReason
+import org.uci.proxy.i18n.AppLanguage
+import org.uci.proxy.i18n.AppLanguageSetting
 
 /** Todo lo que la pantalla de Ajustes puede pedir. Agrupado para no arrastrar una docena de parámetros sueltos. */
 class SettingsActions(
@@ -70,6 +79,7 @@ class SettingsActions(
     val onBack: (() -> Unit)? = null,
     val onAnswerConnectivityChecksChange: (Boolean) -> Unit = {},
     val onIntranetDirectChange: (Boolean) -> Unit = {},
+    val onVpnFallbackToProxyChange: (Boolean) -> Unit = {},
     val onNameByIpChange: (Boolean) -> Unit = {},
     val onTryRawIpChange: (Boolean) -> Unit = {},
     val onServiceEnabledChange: (String, Boolean) -> Unit = { _, _ -> },
@@ -84,6 +94,7 @@ class SettingsActions(
     val onQuotaVerifyCertificateChange: (Boolean) -> Unit = {},
     /** Null fuera del modo desarrollo: entonces no se ofrece cambiar la dirección del servicio. */
     val onQuotaServiceUrlChange: ((String) -> Unit)? = null,
+    val onLanguageChange: (AppLanguage) -> Unit = {},
 )
 
 /** Ajustes a nivel de pantalla: obtiene su ViewModel y pasa solo estado y acciones a la versión sin estado. */
@@ -92,17 +103,21 @@ internal fun SettingsScreen(
     onBack: (() -> Unit)? = null,
     developerMode: Boolean = false,
     viewModel: SettingsViewModel = koinViewModel(),
+    languageSetting: AppLanguageSetting = koinInject(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val language by languageSetting.language.collectAsStateWithLifecycle()
 
     SettingsScreen(
         settings = state.settings,
         statuses = state.statuses,
         tests = state.tests,
+        language = language,
         actions = SettingsActions(
             onBack = onBack,
             onAnswerConnectivityChecksChange = viewModel::setAnswerConnectivityChecks,
             onIntranetDirectChange = viewModel::setIntranetDirect,
+            onVpnFallbackToProxyChange = viewModel::setVpnFallbackToProxy,
             onNameByIpChange = viewModel::setNameByIp,
             onTryRawIpChange = viewModel::setTryRawIp,
             onServiceEnabledChange = viewModel::setServiceEnabled,
@@ -116,6 +131,7 @@ internal fun SettingsScreen(
             onQuotaPauseChange = viewModel::setQuotaPause,
             onQuotaVerifyCertificateChange = viewModel::setQuotaVerifyCertificate,
             onQuotaServiceUrlChange = if (developerMode) viewModel::setQuotaServiceUrl else null,
+            onLanguageChange = languageSetting::set,
         ),
     )
 }
@@ -130,12 +146,17 @@ fun SettingsScreen(
     actions: SettingsActions,
     statuses: Map<String, NameServiceStatus> = emptyMap(),
     tests: Map<String, ServiceTestUi> = emptyMap(),
+    language: AppLanguage = AppLanguage.SYSTEM,
 ) {
     var adding by remember { mutableStateOf(false) }
     val spacing = ProxyUciTheme.spacing
 
     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))) {
-        UciTopBar(title = "Ajustes", subtitle = "Se aplican al conectar la próxima vez", onBack = actions.onBack)
+        UciTopBar(
+            title = stringResource(Res.string.settings_title),
+            subtitle = stringResource(Res.string.settings_subtitle),
+            onBack = actions.onBack,
+        )
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             Column(
                 Modifier
@@ -146,30 +167,34 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(spacing.md),
             ) {
                 UciSectionCard(
-                    title = "Conexión",
-                    subtitle = "Cómo se comporta el túnel con el sistema",
+                    title = stringResource(Res.string.settings_connection_title),
+                    subtitle = stringResource(Res.string.settings_connection_subtitle),
                     icon = UciIcons.CheckCircle,
                 ) {
                     UciSwitchRow(
-                        title = "Contestar las comprobaciones de conexión",
-                        subtitle = "Muchos proxies bloquean las pruebas con las que Android, Windows y macOS detectan si hay " +
-                            "internet, y el sistema muestra «sin internet» aunque lo haya. ProxyUCI las contesta mientras el " +
-                            "proxy funcione; si deja de responder, el aviso aparece.",
+                        title = stringResource(Res.string.settings_connectivity_checks_title),
+                        subtitle = stringResource(Res.string.settings_connectivity_checks_subtitle),
                         checked = settings.answerConnectivityChecks,
                         onCheckedChange = actions.onAnswerConnectivityChecksChange,
                     )
                     UciDivider()
                     UciSwitchRow(
-                        title = "Abrir la red local sin proxy",
-                        subtitle = "Los sitios de la red donde estás (como los de uci.cu) se buscan en el DNS de esa red y, si " +
-                            "son internos, se abren directamente, sin pasar por el proxy ni por Otro País: el proxy no suele " +
-                            "abrirlos. Para otros sitios internos, añade una regla de dominio con salida «Directo».",
+                        title = stringResource(Res.string.settings_intranet_direct_title),
+                        subtitle = stringResource(Res.string.settings_intranet_direct_subtitle),
                         checked = settings.intranetDirect,
                         onCheckedChange = actions.onIntranetDirectChange,
+                    )
+                    UciDivider()
+                    UciSwitchRow(
+                        title = stringResource(Res.string.settings_vpn_fallback_title),
+                        subtitle = stringResource(Res.string.settings_vpn_fallback_subtitle),
+                        checked = settings.vpnFallbackToProxy,
+                        onCheckedChange = actions.onVpnFallbackToProxyChange,
                     )
                 }
                 QuotaCard(settings.quota, actions)
                 NameServicesCard(settings, statuses, tests, actions, onAdd = { adding = true })
+                LanguageCard(language, actions.onLanguageChange)
                 Spacer(Modifier.height(spacing.md))
             }
         }
@@ -180,47 +205,73 @@ fun SettingsScreen(
     }
 }
 
+/** El idioma de la app. Cada idioma se nombra en sí mismo, para que quien no entiende el actual encuentre el suyo. */
+@Composable
+private fun LanguageCard(language: AppLanguage, onChange: (AppLanguage) -> Unit) {
+    UciSectionCard(
+        title = stringResource(Res.string.settings_language_title),
+        subtitle = stringResource(Res.string.settings_language_subtitle),
+        icon = UciIcons.Globe,
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            AppLanguage.entries.forEach { option ->
+                val label = when (option) {
+                    AppLanguage.SYSTEM -> stringResource(Res.string.settings_language_system)
+                    AppLanguage.SPANISH -> "Español"
+                    AppLanguage.ENGLISH -> "English"
+                }
+                UciFilterChip(label, language == option, { onChange(option) })
+            }
+        }
+    }
+}
+
 /** La cuota de navegación de la UCI: avisos, cada cuánto se consulta y la pausa al límite. */
 @Composable
 private fun QuotaCard(quota: QuotaSettings, actions: SettingsActions) {
     val c = ProxyUciTheme.colors
     UciSectionCard(
-        title = "Cuota de la UCI",
-        subtitle = "Los MB de navegación que la UCI da a tu cuenta",
+        title = stringResource(Res.string.settings_quota_title),
+        subtitle = stringResource(Res.string.settings_quota_subtitle),
         icon = UciIcons.DataUsage,
     ) {
         Text(
-            "Con los perfiles de la UCI se consulta la cuota con el usuario y la contraseña del perfil, al abrir la app y " +
-                "cada pocos minutos mientras estás conectado. Se ve en Consumo.",
+            stringResource(Res.string.settings_quota_description),
             style = MaterialTheme.typography.bodySmall,
             color = c.onSurfaceMuted,
         )
-        Text("Avisar al llegar al", style = MaterialTheme.typography.labelLarge)
+        Text(stringResource(Res.string.settings_quota_alert_label), style = MaterialTheme.typography.labelLarge)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             QuotaSettings.ALERT_THRESHOLDS.forEach { threshold ->
                 val on = threshold in quota.alerts
-                UciFilterChip("$threshold %", on, { actions.onQuotaAlertChange(threshold, !on) })
+                UciFilterChip(
+                    stringResource(Res.string.settings_quota_alert_threshold, threshold),
+                    on,
+                    { actions.onQuotaAlertChange(threshold, !on) },
+                )
             }
         }
-        Text("Consultar cada", style = MaterialTheme.typography.labelLarge)
+        Text(stringResource(Res.string.settings_quota_check_label), style = MaterialTheme.typography.labelLarge)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             QuotaSettings.CHECK_INTERVALS.forEach { minutes ->
-                UciFilterChip("$minutes min", quota.checkMinutes == minutes, { actions.onQuotaCheckMinutesChange(minutes) })
+                UciFilterChip(
+                    pluralStringResource(Res.plurals.settings_quota_check_minutes, minutes, minutes),
+                    quota.checkMinutes == minutes,
+                    { actions.onQuotaCheckMinutesChange(minutes) },
+                )
             }
         }
         UciDivider()
         UciSwitchRow(
-            title = "Pausar el túnel al ${QuotaSettings.PAUSE_THRESHOLD} %",
-            subtitle = "Al llegar, se desconecta para no agotar la cuota sin darte cuenta. Puedes conectar igual: no vuelve " +
-                "a pausar hasta que tu consumo baje del ${QuotaSettings.PAUSE_THRESHOLD - 5} %.",
+            title = stringResource(Res.string.settings_quota_pause_title, QuotaSettings.PAUSE_THRESHOLD),
+            subtitle = stringResource(Res.string.settings_quota_pause_subtitle, QuotaSettings.PAUSE_THRESHOLD - 5),
             checked = quota.pauseAtLimit,
             onCheckedChange = actions.onQuotaPauseChange,
         )
         UciDivider()
         UciSwitchRow(
-            title = "Verificar el certificado del servicio",
-            subtitle = "Apagado, como en UCIProxy: el certificado del servicio de cuotas lo firma una autoridad de la UCI " +
-                "que los sistemas no reconocen, y con la verificación encendida la consulta falla.",
+            title = stringResource(Res.string.settings_quota_verify_title),
+            subtitle = stringResource(Res.string.settings_quota_verify_subtitle),
             checked = quota.verifyCertificate,
             onCheckedChange = actions.onQuotaVerifyCertificateChange,
         )
@@ -235,9 +286,9 @@ private fun QuotaCard(quota: QuotaSettings, actions: SettingsActions) {
                     url = it
                     onChange(it)
                 },
-                label = "Servicio de cuotas (desarrollo)",
+                label = stringResource(Res.string.settings_quota_service_url_label),
                 placeholder = "https://cuotas.uci.cu/servicios/v1/InetCuotasWS.php",
-                supportingText = "Para probar con tools/test_cuotas.py. Vacío: el de la UCI.",
+                supportingText = stringResource(Res.string.settings_quota_service_url_supporting),
                 mono = true,
             )
         }
@@ -254,15 +305,19 @@ private fun NameServicesCard(
     onAdd: () -> Unit,
 ) {
     UciSectionCard(
-        title = "Servicios de nombres",
-        subtitle = "Para pedir al proxy las IP públicas por un nombre",
+        title = stringResource(Res.string.settings_names_title),
+        subtitle = stringResource(Res.string.settings_names_subtitle),
         icon = UciIcons.Dns,
-        trailing = { UciSwitch(settings.nameByIp, actions.onNameByIpChange, contentDescription = "Usar servicios de nombres") },
+        trailing = {
+            UciSwitch(
+                settings.nameByIp,
+                actions.onNameByIpChange,
+                contentDescription = stringResource(Res.string.settings_names_switch),
+            )
+        },
     ) {
         Text(
-            "El proxy de la UCI rechaza las conexiones a una IP escrita como número, pero acepta el mismo destino con un " +
-                "nombre. Estos servicios dan un nombre a cualquier IP. Se prueban en este orden (arrastra para cambiarlo), " +
-                "empezando por el que funcionó la última vez; uno que el proxy rechaza varias veces seguidas se aparta unos minutos.",
+            stringResource(Res.string.settings_names_description),
             style = MaterialTheme.typography.bodySmall,
             color = ProxyUciTheme.colors.onSurfaceMuted,
         )
@@ -285,17 +340,28 @@ private fun NameServicesCard(
         }
         UciDivider()
         UciSwitchRow(
-            title = "Probar también la IP tal cual",
-            subtitle = "Si ningún nombre sirve, se intenta la IP sin nombre como último recurso.",
+            title = stringResource(Res.string.settings_try_raw_ip_title),
+            subtitle = stringResource(Res.string.settings_try_raw_ip_subtitle),
             checked = settings.tryRawIp,
             onCheckedChange = actions.onTryRawIpChange,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            UciButton("Añadir servicio", onAdd, variant = UciButtonVariant.Secondary, icon = UciIcons.Add, modifier = Modifier.weight(1f))
-            UciButton("Restaurar", actions.onResetServices, variant = UciButtonVariant.Text, icon = UciIcons.Refresh)
+            UciButton(
+                stringResource(Res.string.settings_add_service),
+                onAdd,
+                variant = UciButtonVariant.Secondary,
+                icon = UciIcons.Add,
+                modifier = Modifier.weight(1f),
+            )
+            UciButton(
+                stringResource(Res.string.settings_reset_services),
+                actions.onResetServices,
+                variant = UciButtonVariant.Text,
+                icon = UciIcons.Refresh,
+            )
         }
         UciInlineAlert(
-            "Quien da el nombre se entera de qué IP se piden: no uses servicios en los que no confíes.",
+            stringResource(Res.string.settings_names_warning),
             tone = UciTone.Warning,
         )
     }
@@ -318,48 +384,70 @@ private fun RowScope.ServiceContent(
                 Text(service.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(service.template, style = ProxyUciTheme.mono.code, color = ProxyUciTheme.colors.onSurfaceMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
+            val useDescription = stringResource(Res.string.settings_service_use, service.name)
             UciSwitch(
                 checked = service.enabled,
                 onCheckedChange = { actions.onServiceEnabledChange(service.id, it) },
-                modifier = Modifier.semantics { contentDescription = "Usar ${service.name}" },
+                modifier = Modifier.semantics { contentDescription = useDescription },
             )
         }
         // La prueba que se acaba de hacer manda sobre lo anotado de usos anteriores.
-        val (line, tone) = test?.message() ?: status?.message(nowMillis) ?: ("Sin datos todavía" to UciTone.Neutral)
+        val (line, tone) = test?.message() ?: status?.message(nowMillis)
+            ?: (stringResource(Res.string.settings_service_no_data) to UciTone.Neutral)
         Text(line, style = MaterialTheme.typography.bodySmall, color = if (tone == UciTone.Neutral) ProxyUciTheme.colors.onSurfaceFaint else tone.colors().content)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             UciButton(
-                if (test == ServiceTestUi.Running) "Probando…" else "Probar",
+                stringResource(if (test == ServiceTestUi.Running) Res.string.settings_service_testing else Res.string.settings_service_test),
                 { actions.onServiceTest(service.id) },
                 variant = UciButtonVariant.Text,
                 icon = UciIcons.Speed,
                 loading = test == ServiceTestUi.Running,
             )
             if (service.builtIn) {
-                UciStatusPill("De fábrica")
+                UciStatusPill(stringResource(Res.string.settings_service_built_in))
             } else {
-                UciButton("Eliminar", { actions.onServiceRemove(service.id) }, variant = UciButtonVariant.Text, icon = UciIcons.Delete)
+                UciButton(
+                    stringResource(Res.string.settings_service_remove),
+                    { actions.onServiceRemove(service.id) },
+                    variant = UciButtonVariant.Text,
+                    icon = UciIcons.Delete,
+                )
             }
         }
     }
 }
 
-private fun NameServiceStatus.message(nowMillis: Long): Pair<String, UciTone> = when (outcome) {
-    NameOutcome.WORKED -> "Funcionó ${timeAgo(atMillis, nowMillis)}" to UciTone.Success
-    NameOutcome.REFUSED -> "El proxy lo rechazó ${timeAgo(atMillis, nowMillis)}" to UciTone.Danger
+@Composable
+private fun NameServiceStatus.message(nowMillis: Long): Pair<String, UciTone> {
+    val ago = timeAgo(atMillis, nowMillis)
+    return when (outcome) {
+        NameOutcome.WORKED -> when (ago) {
+            TimeAgo.Seconds -> stringResource(Res.string.settings_status_worked_seconds)
+            is TimeAgo.Minutes -> pluralStringResource(Res.plurals.settings_status_worked_minutes, ago.count, ago.count)
+            is TimeAgo.Hours -> pluralStringResource(Res.plurals.settings_status_worked_hours, ago.count, ago.count)
+            is TimeAgo.Days -> pluralStringResource(Res.plurals.settings_status_worked_days, ago.count, ago.count)
+        } to UciTone.Success
+        NameOutcome.REFUSED -> when (ago) {
+            TimeAgo.Seconds -> stringResource(Res.string.settings_status_refused_seconds)
+            is TimeAgo.Minutes -> pluralStringResource(Res.plurals.settings_status_refused_minutes, ago.count, ago.count)
+            is TimeAgo.Hours -> pluralStringResource(Res.plurals.settings_status_refused_hours, ago.count, ago.count)
+            is TimeAgo.Days -> pluralStringResource(Res.plurals.settings_status_refused_days, ago.count, ago.count)
+        } to UciTone.Danger
+    }
 }
 
+@Composable
 private fun ServiceTestUi.message(): Pair<String, UciTone> = when (this) {
-    ServiceTestUi.Running -> "Probando con el proxy…" to UciTone.Active
-    ServiceTestUi.NoProfile -> "Crea un perfil de proxy para poder probar." to UciTone.Warning
-    ServiceTestUi.LocalNetworkDenied -> "La app necesita permiso para acceder a la red local y alcanzar el proxy." to UciTone.Warning
+    ServiceTestUi.Running -> stringResource(Res.string.settings_test_running) to UciTone.Active
+    ServiceTestUi.NoProfile -> stringResource(Res.string.settings_test_no_profile) to UciTone.Warning
+    // El mismo texto que cuando falla el túnel por lo mismo.
+    ServiceTestUi.LocalNetworkDenied -> stringResource(Res.string.error_tunnel_local_network_denied) to UciTone.Warning
     is ServiceTestUi.Done -> when (val result = result) {
-        NameServiceTestResult.Works -> "El proxy acepta este servicio." to UciTone.Success
-        is NameServiceTestResult.Refused -> "El proxy lo rechaza: ${result.detail}" to UciTone.Danger
-        NameServiceTestResult.ProxyAuth -> "El proxy rechazó el usuario o la contraseña del perfil: la prueba no vale." to UciTone.Warning
-        is NameServiceTestResult.Unreachable ->
-            "No se pudo llegar al proxy. ${result.detail} Si el túnel está activo, desconéctalo y prueba otra vez." to UciTone.Danger
-        NameServiceTestResult.Timeout -> "El proxy no respondió a tiempo." to UciTone.Warning
+        NameServiceTestResult.Works -> stringResource(Res.string.settings_test_works) to UciTone.Success
+        is NameServiceTestResult.Refused -> stringResource(Res.string.settings_test_refused, result.detail) to UciTone.Danger
+        NameServiceTestResult.ProxyAuth -> stringResource(Res.string.settings_test_proxy_auth) to UciTone.Warning
+        is NameServiceTestResult.Unreachable -> stringResource(Res.string.settings_test_unreachable, stringResource(result.kind.proxyReason)) to UciTone.Danger
+        NameServiceTestResult.Timeout -> stringResource(Res.string.error_proxy_test_timeout) to UciTone.Warning
     }
 }
 
@@ -373,32 +461,31 @@ private fun AddServiceSheet(
     var template by remember { mutableStateOf("") }
     var errors by remember { mutableStateOf(emptySet<ServiceError>()) }
 
-    UciBottomSheet("Añadir servicio", onDismiss = onDismiss) {
+    UciBottomSheet(stringResource(Res.string.settings_add_service), onDismiss = onDismiss) {
         UciTextField(
             value = name,
             onValueChange = { name = it; errors = errors - ServiceError.NAME_EMPTY },
-            label = "Nombre",
-            placeholder = "p. ej. Mi dominio",
-            error = ServiceError.NAME_EMPTY.message().takeIf { ServiceError.NAME_EMPTY in errors },
+            label = stringResource(Res.string.settings_add_name_label),
+            placeholder = stringResource(Res.string.settings_add_name_placeholder),
+            error = ServiceError.NAME_EMPTY.takeIf { it in errors }?.let { stringResource(it.message) },
         )
         UciTextField(
             value = template,
             onValueChange = { template = it; errors = errors - TEMPLATE_ERRORS },
-            label = "Plantilla",
+            label = stringResource(Res.string.settings_add_template_label),
             placeholder = "{ip-}.mi-dominio.com",
             mono = true,
-            supportingText = "{ip} es la IP con puntos (149.22.82.28) y {ip-} con guiones (149-22-82-28).",
-            error = errors.firstOrNull { it in TEMPLATE_ERRORS }?.message(),
+            supportingText = stringResource(Res.string.settings_add_template_supporting),
+            error = errors.firstOrNull { it in TEMPLATE_ERRORS }?.let { stringResource(it.message) },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
         )
         UciInlineAlert(
-            "Solo añade servicios en los que confíes: quien da el nombre se entera de qué IP se piden, y uno malicioso " +
-                "podría desviar el tráfico que no va cifrado.",
+            stringResource(Res.string.settings_add_warning),
             tone = UciTone.Warning,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End), modifier = Modifier.fillMaxWidth()) {
-            UciButton("Cancelar", onDismiss, variant = UciButtonVariant.Text)
-            UciButton("Añadir", {
+            UciButton(stringResource(Res.string.settings_add_cancel), onDismiss, variant = UciButtonVariant.Text)
+            UciButton(stringResource(Res.string.settings_add_confirm), {
                 when (val result = onAdd(name, template)) {
                     is ServiceValidation.Valid -> onDismiss()
                     is ServiceValidation.Invalid -> errors = result.errors
@@ -412,13 +499,15 @@ private val TEMPLATE_ERRORS = setOf(
     ServiceError.NO_PLACEHOLDER, ServiceError.INVALID_HOST, ServiceError.LOCAL_DOMAIN, ServiceError.DUPLICATE,
 )
 
-private fun ServiceError.message(): String = when (this) {
-    ServiceError.NAME_EMPTY -> "Escribe un nombre (máximo 40 letras)."
-    ServiceError.NO_PLACEHOLDER -> "La plantilla debe llevar {ip} o {ip-}, donde irá la IP."
-    ServiceError.INVALID_HOST -> "Con una IP puesta, no da un nombre de dominio válido (letras, cifras, guiones y puntos)."
-    ServiceError.LOCAL_DOMAIN -> "Ese dominio es local o reservado: el proxy no podría resolverlo."
-    ServiceError.DUPLICATE -> "Ya hay un servicio con esa plantilla."
-}
+/** Por qué no vale el servicio, para mostrarlo bajo el campo que lo causa. */
+private val ServiceError.message: StringResource
+    get() = when (this) {
+        ServiceError.NAME_EMPTY -> Res.string.settings_error_name_empty
+        ServiceError.NO_PLACEHOLDER -> Res.string.settings_error_no_placeholder
+        ServiceError.INVALID_HOST -> Res.string.settings_error_invalid_host
+        ServiceError.LOCAL_DOMAIN -> Res.string.settings_error_local_domain
+        ServiceError.DUPLICATE -> Res.string.settings_error_duplicate
+    }
 
 @Preview
 @Composable

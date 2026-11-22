@@ -25,11 +25,26 @@ internal fun assertOnlyOwnerCanAccess(file: Path) {
     assertTrue(entries.isNotEmpty(), "la lista de acceso no puede estar vacía")
     assertTrue(entries.all { it.type() == AclEntryType.ALLOW })
     // Nadie más que el dueño y los administradores: ni «Usuarios» ni «Todos».
+    val administrators = WindowsAccounts.administrators(file.fileSystem.userPrincipalLookupService)
     val others = entries.map { it.principal() }.filter { it != owner }
-    assertTrue(others.all { it.name.endsWith("Administrators") || it.name.endsWith("Administradores") }, "acceso para: $others")
+    assertTrue(others.all { it == administrators }, "acceso para: $others")
 }
 
 class PrivateFileTest {
+    @Test
+    fun `on Windows the administrators group can open the file, so an engine run by another administrator reads the token`() {
+        if (!System.getProperty("os.name").orEmpty().startsWith("Windows")) return
+        val file = PrivateFile.createTemp("proxyuci-test-", ".token")
+        try {
+            val administrators = WindowsAccounts.administrators(file.fileSystem.userPrincipalLookupService)
+            val acl = Files.getFileAttributeView(file, AclFileAttributeView::class.java).acl
+
+            assertTrue(acl.any { it.principal() == administrators }, "sin entrada para Administradores: $acl")
+        } finally {
+            Files.deleteIfExists(file)
+        }
+    }
+
     @Test
     fun `a private temp file can be written and read by its owner and nobody else`() {
         val file = PrivateFile.createTemp("proxyuci-test-", ".token")

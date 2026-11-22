@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="usage_title">Usage</string>
+    <string name="usage_subtitle">What went through the tunnel on this device</string>
+    <string name="usage_period_today">Today</string>
+    <string name="usage_period_week">7 days</string>
+    <string name="usage_period_month">30 days</string>
+
+    <string name="usage_empty_today">No usage today yet</string>
+    <string name="usage_empty">No usage yet</string>
+    <string name="usage_empty_message">Connect and browse: here you'll see each day what goes through the proxy and through Other Country.</string>
+    <string name="usage_on_this_device">On this device</string>
+
+    <string name="usage_summary_today">TODAY</string>
+    <string name="usage_summary_week">LAST 7 DAYS</string>
+    <string name="usage_summary_month">LAST 30 DAYS</string>
+    <string name="usage_down_up">↓ %1$s received · ↑ %2$s sent</string>
+
+    <string name="usage_daily_title">By day</string>
+    <string name="usage_daily_description">Usage for each day of the period; today, %1$s</string>
+    <string name="usage_daily_today">Today: %1$s</string>
+    <string name="usage_weekday_monday">Mo</string>
+    <string name="usage_weekday_tuesday">Tu</string>
+    <string name="usage_weekday_wednesday">We</string>
+    <string name="usage_weekday_thursday">Th</string>
+    <string name="usage_weekday_friday">Fr</string>
+    <string name="usage_weekday_saturday">Sa</string>
+    <string name="usage_weekday_sunday">Su</string>
+
+    <string name="usage_hosts_title">Destinations</string>
+    <string name="usage_hosts_subtitle">The sites that used the most</string>
+    <string name="usage_hosts_unknown">No details (all through Other Country)</string>
+    <string name="usage_apps_title">Apps</string>
+    <string name="usage_apps_subtitle">What they opened through the proxy</string>
+
+    <string name="usage_footnote">This counts what goes through the tunnel on this device: what goes through the proxy and through Other Country. What goes out directly (the local network, “Direct” rules) doesn't go through it and isn't counted. The last 90 days are kept.</string>
+</resources>

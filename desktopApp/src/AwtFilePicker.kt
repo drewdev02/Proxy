@@ -2,8 +2,11 @@ package org.uci.proxy
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.jetbrains.compose.resources.getString
 import org.uci.proxy.files.FilePicker
 import org.uci.proxy.files.PickedFile
+import org.uci.proxy.resources.Res
+import org.uci.proxy.resources.*
 import java.awt.FileDialog
 import java.awt.Frame
 import java.io.File
@@ -12,7 +15,8 @@ import java.io.IOException
 /** El selector de archivos nativo de macOS y Windows, a través de AWT. */
 class AwtFilePicker : FilePicker {
     override suspend fun pickText(): PickedFile? = withContext(Dispatchers.IO) {
-        val dialog = FileDialog(null as Frame?, "Elegir archivo .ovpn", FileDialog.LOAD).apply {
+        val title = getString(Res.string.ui_pick_ovpn_title)
+        val dialog = FileDialog(null as Frame?, title, FileDialog.LOAD).apply {
             // Windows usa el nombre como filtro; macOS, el filtro de nombres.
             file = "*.ovpn"
             setFilenameFilter { _, name -> name.endsWith(".ovpn", ignoreCase = true) }

@@ -237,7 +237,7 @@ class TailscaleEngineLiveTest {
             CountryExitStart(CountryExit.Tailscale(net.controlUrl, net.exitNode), CountryExitSecrets.Tailscale(net.authKey), Files.createTempDirectory("ts").toString()),
         )
 
-        assertEquals(VpnConnectResult.Failed(TunnelFailure.PROXY_AUTH_FAILED), result)
+        assertEquals(VpnConnectResult.Failed(TunnelFailure.ProxyAuthFailed), result)
     }
 
     /** Una conexión TCP mínima hecha a mano sobre la sesión: SYN, ACK, la petición, y lo que llegue hasta el FIN. */

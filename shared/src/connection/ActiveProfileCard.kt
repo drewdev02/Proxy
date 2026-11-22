@@ -12,13 +12,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import org.jetbrains.compose.resources.stringResource
+import org.uci.proxy.common.code
+import org.uci.proxy.common.percentText
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.logs.tone
 import org.uci.proxy.profile.label
 import org.uci.proxy.profile.tone
-import org.uci.proxy.core.quota.percentText
 import org.uci.proxy.quota.tone
+import org.uci.proxy.core.quota.wholePercent
+import org.uci.proxy.resources.Res
+import org.uci.proxy.resources.*
 import org.uci.proxy.theme.ProxyUciTheme
 import org.uci.proxy.ui.components.UciCard
 import org.uci.proxy.ui.components.UciIconBox
@@ -26,6 +31,7 @@ import org.uci.proxy.ui.components.UciIconButton
 import org.uci.proxy.ui.components.UciStatusPill
 import org.uci.proxy.ui.components.UciTone
 import org.uci.proxy.ui.icons.UciIcons
+import org.uci.proxy.core.port.code
 
 @Composable
 internal fun ActiveProfileCard(state: ConnectionUiState, profile: ProxyProfile, onChange: () -> Unit, onEdit: () -> Unit) {
@@ -35,7 +41,7 @@ internal fun ActiveProfileCard(state: ConnectionUiState, profile: ProxyProfile, 
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             UciIconBox(UciIcons.Badge, tone = if (connected) UciTone.Success else UciTone.Neutral)
             Column(Modifier.weight(1f)) {
-                Text("PERFIL", style = ProxyUciTheme.mono.badge, color = ProxyUciTheme.colors.onSurfaceFaint)
+                Text(stringResource(Res.string.connection_profile_label), style = ProxyUciTheme.mono.badge, color = ProxyUciTheme.colors.onSurfaceFaint)
                 Text(profile.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
                     profile.address(),
@@ -48,7 +54,7 @@ internal fun ActiveProfileCard(state: ConnectionUiState, profile: ProxyProfile, 
             if (state.profiles.size > 1) {
                 UciIconButton(
                     UciIcons.Swap,
-                    if (state.canChangeProfile) "Cambiar de perfil" else "Desconecta para cambiar de perfil",
+                    stringResource(if (state.canChangeProfile) Res.string.connection_change_profile else Res.string.connection_change_profile_disconnect),
                     onChange,
                     enabled = state.canChangeProfile,
                 )
@@ -58,11 +64,11 @@ internal fun ActiveProfileCard(state: ConnectionUiState, profile: ProxyProfile, 
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             UciStatusPill(profile.protocol.name)
             // El motor importa: OpenVPN y Tailscale fallan y se configuran distinto.
-            profile.countryExit?.let { UciStatusPill("Otro País · ${it.kind.label}", tone = UciTone.Routing) }
-            if (profile.routing.enabled) UciStatusPill("Reglas", tone = UciTone.Routing)
+            profile.countryExit?.let { UciStatusPill(stringResource(Res.string.connection_pill_country, it.kind.label), tone = UciTone.Routing) }
+            if (profile.routing.enabled) UciStatusPill(stringResource(Res.string.connection_pill_rules), tone = UciTone.Routing)
             // La cuota de la UCI, si este perfil la consulta y ya se sabe.
             state.quota.quota?.takeIf { state.quota.enabled && state.quota.profileId == profile.id }?.let { quota ->
-                UciStatusPill("Cuota ${percentText(quota)}", tone = quota.tone)
+                UciStatusPill(stringResource(Res.string.connection_pill_quota, percentText(quota.wholePercent)), tone = quota.tone)
             }
         }
     }

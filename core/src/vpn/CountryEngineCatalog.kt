@@ -36,7 +36,7 @@ interface CountryEngineCatalog {
             settings: AppSettings,
             exit: CountryExit.Tailscale,
             secrets: CountryExitSecrets.Tailscale,
-        ): ExitNodeListing = ExitNodeListing.Failed(TunnelFailure.ENGINE_UNAVAILABLE, "Tailscale no está disponible")
+        ): ExitNodeListing = ExitNodeListing.Failed(TunnelFailure.EngineUnavailable, "Tailscale no está disponible")
     }
 }
 
@@ -59,7 +59,7 @@ class EngineCatalog(
         exit: CountryExit.Tailscale,
         secrets: CountryExitSecrets.Tailscale,
     ): ExitNodeListing {
-        val engine = tailscale ?: return ExitNodeListing.Failed(TunnelFailure.ENGINE_UNAVAILABLE, "Tailscale no está disponible en este equipo")
+        val engine = tailscale ?: return ExitNodeListing.Failed(TunnelFailure.EngineUnavailable, "Tailscale no está disponible en este equipo")
         return engine.listExitNodes(ExitContext(proxy, proxyPassword, settings), exit, secrets)
     }
 }

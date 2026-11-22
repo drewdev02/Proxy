@@ -127,9 +127,9 @@ class ConnectionViewModelTest : MainDispatcherTest() {
     fun `a failure stays visible and the profile can be changed again`() {
         val vm = viewModel()
 
-        tunnel.emit(TunnelState.Failed(TunnelFailure.PROXY_AUTH_FAILED))
+        tunnel.emit(TunnelState.Failed(TunnelFailure.ProxyAuthFailed))
 
-        assertEquals(TunnelState.Failed(TunnelFailure.PROXY_AUTH_FAILED), vm.uiState.value.tunnel)
+        assertEquals(TunnelState.Failed(TunnelFailure.ProxyAuthFailed), vm.uiState.value.tunnel)
         assertTrue(vm.uiState.value.canChangeProfile)
     }
 

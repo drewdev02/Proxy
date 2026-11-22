@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Los textos de la lista de perfiles, del editor de perfil y de sus reglas de salida. -->
+<resources>
+    <string name="profile_cancel">Cancelar</string>
+
+    <!-- Lista de perfiles. -->
+    <!-- Al pie de la lista: la plataforma (Android, iOS, Windows…) y la versión del sistema. -->
+    <string name="profile_list_platform">ProxyUCI en %1$s %2$s</string>
+    <string name="profile_list_title">Perfiles</string>
+    <string name="profile_list_none_saved">Ninguno guardado</string>
+    <!-- Con cero se usa profile_list_none_saved. -->
+    <plurals name="profile_list_saved_count">
+        <item quantity="one">%1$d perfil guardado</item>
+        <item quantity="many">%1$d perfiles guardados</item>
+        <item quantity="other">%1$d perfiles guardados</item>
+    </plurals>
+    <string name="profile_list_open_catalog">Catálogo de componentes</string>
+    <string name="profile_list_new">Nuevo</string>
+    <string name="profile_list_delete_failed_title">No se pudo eliminar</string>
+    <string name="profile_list_delete_failed">El perfil no se pudo eliminar. Inténtalo de nuevo.</string>
+    <string name="profile_list_empty_title">Aún no hay perfiles</string>
+    <string name="profile_list_empty_message">Un perfil guarda los datos de un proxy: servidor, usuario y, si quieres, Otro País y reglas de salida.</string>
+    <string name="profile_list_add">Añadir perfil</string>
+    <!-- %1$s: el nombre del perfil. -->
+    <string name="profile_list_delete_title">¿Eliminar «%1$s»?</string>
+    <string name="profile_list_delete_message">Se eliminan también su contraseña y lo guardado de Otro País. No se puede deshacer.</string>
+    <string name="profile_list_delete_confirm">Eliminar</string>
+    <!-- Las etiquetas de cada perfil. %1$s: el motor de Otro País (OpenVPN, Tailscale). -->
+    <string name="profile_list_tag_country_exit">Otro País · %1$s</string>
+    <string name="profile_list_tag_rules">Reglas</string>
+    <string name="profile_list_tag_vpn_down">Sin Otro País</string>
+    <string name="profile_list_tag_connected">Conectado</string>
+    <string name="profile_list_tag_connecting">Conectando</string>
+    <!-- Para lectores de pantalla, en los botones de cada perfil. %1$s: el nombre del perfil. -->
+    <string name="profile_list_disconnect_profile">Desconectar %1$s</string>
+    <string name="profile_list_connecting_profile">Conectando %1$s</string>
+    <string name="profile_list_connect_profile">Conectar %1$s</string>
+    <string name="profile_list_delete_profile">Eliminar %1$s</string>
+
+    <!-- Editor de perfil. -->
+    <string name="profile_editor_title_new">Nuevo perfil</string>
+    <string name="profile_editor_title_edit">Editar perfil</string>
+    <string name="profile_editor_save">Guardar</string>
+    <string name="profile_editor_save_failed_title">Sin guardar</string>
+    <string name="profile_editor_save_failed">No se pudo guardar el perfil. Inténtalo de nuevo.</string>
+
+    <!-- Sección del servidor. -->
+    <string name="profile_server_title">Servidor proxy</string>
+    <string name="profile_server_subtitle">A qué proxy se conecta este perfil</string>
+    <string name="profile_name_label">Nombre</string>
+    <string name="profile_name_placeholder">p. ej. UCI Docente</string>
+    <string name="profile_name_error">Escribe un nombre para el perfil.</string>
+    <string name="profile_host_label">Servidor</string>
+    <string name="profile_host_placeholder">p. ej. proxy.uci.cu</string>
+    <string name="profile_host_error">Solo el nombre o la IP, sin http:// ni espacios.</string>
+    <string name="profile_port_label">Puerto</string>
+    <string name="profile_port_error">Entre 1 y 65535.</string>
+    <string name="profile_protocol_label">Protocolo</string>
+
+    <!-- Sección de autenticación. -->
+    <string name="profile_auth_title">Autenticación</string>
+    <string name="profile_auth_subtitle">Opcional. Se usa NTLM si el proxy lo ofrece, si no Basic</string>
+    <string name="profile_username_label">Usuario</string>
+    <string name="profile_username_placeholder">nombre.apellido</string>
+    <string name="profile_password_label">Contraseña</string>
+    <string name="profile_password_supporting">Se guarda en el almacén seguro del sistema</string>
+    <string name="profile_test_running">Probando…</string>
+    <string name="profile_test_button">Probar proxy</string>
+    <string name="profile_uci_quota_title">Consultar mi cuota de la UCI</string>
+    <string name="profile_uci_quota_subtitle">Con este usuario y contraseña se pregunta al servicio de cuotas de la UCI cuántos MB te quedan este mes. Se ve en Consumo.</string>
+
+    <!-- Sección «Otro País». -->
+    <string name="profile_country_exit_title">Otro País</string>
+    <string name="profile_country_exit_subtitle">El tráfico sale por un servidor en otro país, pasando por el proxy</string>
+    <string name="profile_country_exit_toggle">Activar Otro País</string>
+    <!-- Bajo el nombre de cada motor, en el selector. -->
+    <string name="profile_engine_openvpn_description">archivo .ovpn</string>
+    <string name="profile_engine_tailscale_description">nodo de salida</string>
+    <string name="profile_ovpn_detail">OpenVPN sobre TCP</string>
+    <string name="profile_ovpn_empty">Ningún archivo .ovpn elegido</string>
+    <string name="profile_ovpn_choose">Elegir .ovpn</string>
+    <string name="profile_ovpn_change">Cambiar</string>
+    <string name="profile_vpn_username_label">Usuario de la VPN</string>
+    <string name="profile_vpn_username_error">Escribe el usuario de la VPN.</string>
+    <string name="profile_vpn_password_label">Contraseña de la VPN</string>
+    <string name="profile_tailscale_description">Sale por un nodo de salida de tu red de Tailscale (o de un servidor Headscale). Detrás del proxy todo va por los relés de Tailscale: funciona, con algo más de latencia.</string>
+    <string name="profile_tailscale_control_url_label">Servidor de control</string>
+    <string name="profile_tailscale_control_url_error">Escribe una dirección http:// o https://.</string>
+    <string name="profile_tailscale_auth_key_label">Clave de autenticación</string>
+    <string name="profile_tailscale_auth_key_supporting">Créala en la consola de Tailscale (Configuración → Claves). Mejor reutilizable.</string>
+    <string name="profile_tailscale_auth_key_error">Escribe la clave de autenticación.</string>
+    <string name="profile_tailscale_exit_node_label">Nodo de salida</string>
+    <string name="profile_tailscale_exit_node_placeholder">Vacío: el único de la red</string>
+    <string name="profile_tailscale_searching">Buscando nodos…</string>
+    <string name="profile_tailscale_search">Buscar nodos de salida</string>
+    <string name="profile_tailscale_hostname_label">Nombre de este equipo en la red</string>
+
+    <!-- Sección «Reglas de salida». -->
+    <string name="routing_title">Reglas de salida</string>
+    <string name="routing_subtitle">Qué sale por el proxy, por Otro País, directo o se bloquea</string>
+    <string name="routing_toggle">Activar reglas de salida</string>
+    <string name="routing_vpn_disabled_warning">Activa «Otro País» para usar esa salida; mientras tanto, lo suyo sale por el proxy.</string>
+    <string name="routing_default_exit_label">Lo que no coincida con ninguna regla sale por</string>
+    <string name="routing_default_exit_hint">Activa «Otro País» para poder elegirlo también como salida.</string>
+    <string name="routing_no_rules">Sin reglas</string>
+    <string name="routing_rules_header">Reglas · gana la primera que coincide</string>
+    <string name="routing_help">Un dominio incluye sus subdominios. «Directo» sale sin proxy: en un dominio, solo si su dirección es de la red local (si es pública, sale por el proxy). Una app que sale por Otro País puede tardar un segundo más en su primera conexión. Si Otro País se cae, su tráfico sale por el proxy hasta que vuelva.</string>
+    <!-- %1$s: el identificador del paquete de la app (com.example.app). -->
+    <string name="routing_rule_app">App · %1$s</string>
+    <string name="routing_kind_domain">Dominio y subdominios</string>
+    <string name="routing_kind_ip">IP o rango</string>
+    <string name="routing_kind_app">App</string>
+    <string name="routing_move_up">Subir regla</string>
+    <string name="routing_remove">Quitar regla</string>
+    <string name="routing_new_rule_label">Nueva regla: dominio, IP o rango</string>
+    <string name="routing_new_rule_error">Escribe un dominio (netflix.com), una IP o un rango (1.2.3.0/24).</string>
+    <string name="routing_add_rule">Añadir regla</string>
+    <string name="routing_pick_app">Elegir app</string>
+    <!-- Para lectores de pantalla, en la etiqueta que abre el menú de salidas. %1$s: la salida elegida. -->
+    <string name="routing_exit_description">Salida: %1$s</string>
+    <!-- Título de la lista de apps. %1$s: la salida de la regla (Proxy, Otro País…). -->
+    <string name="routing_app_picker_title">App que sale por %1$s</string>
+    <string name="routing_app_search">Buscar por nombre o paquete</string>
+    <string name="routing_apps_loading">Cargando apps…</string>
+    <string name="routing_no_app_matches">Ninguna app coincide</string>
+    <!-- Las salidas de una regla. -->
+    <string name="routing_exit_proxy">Proxy</string>
+    <string name="routing_exit_vpn">Otro País</string>
+    <string name="routing_exit_direct">Directo</string>
+    <string name="routing_exit_block">Bloquear</string>
+    <string name="profile_editor_save_failed_secure_storage">El almacén seguro del sistema no pudo cifrar la contraseña. Reinicia la app e inténtalo de nuevo; si se repite, borra el perfil y créalo otra vez.</string>
+    <string name="profile_list_delete_failed_secure_storage">El almacén seguro del sistema no pudo borrar la contraseña del perfil. Reinicia la app e inténtalo de nuevo.</string>
+</resources>

@@ -12,6 +12,7 @@ import kotlinx.coroutines.withContext
 import org.uci.proxy.core.port.TcpConnection
 import org.uci.proxy.core.port.TcpConnector
 import org.uci.proxy.core.port.TcpException
+import org.uci.proxy.core.port.classifyNetworkError
 import org.uci.proxy.core.common.AppDispatchers
 
 /** Sockets TCP reales mediante ktor-network, igual en JVM, Android e iOS. */
@@ -65,5 +66,5 @@ private inline fun <T> guarded(message: String, block: () -> T): T = try {
 } catch (e: CancellationException) {
     throw e
 } catch (e: Exception) {
-    throw TcpException("$message: ${e.message ?: e::class.simpleName}", e)
+    throw TcpException(classifyNetworkError(e), "$message: ${e.message ?: e::class.simpleName}", e)
 }

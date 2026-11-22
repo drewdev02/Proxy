@@ -1,14 +1,11 @@
 package org.uci.proxy.core.quota
 
-import org.uci.proxy.core.port.QuotaStore
+import org.uci.proxy.core.model.QuotaAlert
 import org.uci.proxy.core.model.UciQuota
 import org.uci.proxy.core.port.QuotaFetch
 import org.uci.proxy.core.port.QuotaNotifier
+import org.uci.proxy.core.port.QuotaStore
 import org.uci.proxy.core.port.UciQuotaService
-import kotlin.math.floor
-import kotlin.time.Clock
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.minutes
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -25,21 +22,46 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import org.uci.proxy.core.common.AppDispatchers
-import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.model.ProxyProfile
-import org.uci.proxy.core.model.QuotaSettings
-import org.uci.proxy.core.port.ActiveProfileStore
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.port.Logger
-import org.uci.proxy.core.port.ProfileRepository
-import org.uci.proxy.core.port.SettingsRepository
 import org.uci.proxy.core.port.TunnelControl
 import org.uci.proxy.core.port.TunnelMonitor
 import org.uci.proxy.core.port.TunnelState
+import org.uci.proxy.core.port.ActiveProfileStore
+import org.uci.proxy.core.common.AppDispatchers
+import org.uci.proxy.core.port.ProfileRepository
 import org.uci.proxy.core.profile.resolveActiveProfileId
+import org.uci.proxy.core.model.QuotaSettings
+import org.uci.proxy.core.port.SettingsRepository
+import kotlin.math.floor
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.minutes
+import org.uci.proxy.core.port.NetFailure
 
 /** Por qué no se pudo consultar la cuota la última vez. */
-enum class QuotaProblem { WRONG_CREDENTIALS, UNREACHABLE, UNTRUSTED_CERTIFICATE, SERVICE_CHANGED }
+enum class QuotaProblem {
+    WRONG_CREDENTIALS,
+
+    /** El nombre del servicio no existe: solo lo resuelve el DNS de la red de la UCI. */
+    NOT_ON_UCI_NETWORK,
+
+    /** El equipo no tiene red. */
+    NO_NETWORK,
+
+    /** El servicio no contestó a tiempo. */
+    TIMEOUT,
+
+    /** No se llegó al servicio por otro motivo. */
+    UNREACHABLE,
+    UNTRUSTED_CERTIFICATE,
+    SERVICE_CHANGED,
+    ;
+
+    /** Un problema de red: se arregla solo cuando se llega al servicio, y se reintenta sin avisar con urgencia. */
+    val isNetwork: Boolean get() = this == NOT_ON_UCI_NETWORK || this == NO_NETWORK || this == TIMEOUT || this == UNREACHABLE
+}
 
 /** La cuota de la UCI del perfil activo, tal como la ve la interfaz. */
 data class QuotaStatus(
@@ -197,7 +219,12 @@ class QuotaMonitor(
                 null
             }
             is QuotaFetch.WrongCredentials -> QuotaProblem.WRONG_CREDENTIALS
-            is QuotaFetch.Unreachable -> QuotaProblem.UNREACHABLE
+            is QuotaFetch.Unreachable -> when (result.kind) {
+                NetFailure.NAME_NOT_FOUND -> QuotaProblem.NOT_ON_UCI_NETWORK
+                NetFailure.NO_NETWORK -> QuotaProblem.NO_NETWORK
+                NetFailure.TIMEOUT -> QuotaProblem.TIMEOUT
+                else -> QuotaProblem.UNREACHABLE
+            }
             is QuotaFetch.UntrustedCertificate -> QuotaProblem.UNTRUSTED_CERTIFICATE
             is QuotaFetch.ServiceChanged -> QuotaProblem.SERVICE_CHANGED
         }
@@ -225,21 +252,25 @@ class QuotaMonitor(
         if (fresh.isNotEmpty()) {
             // Solo el más alto: si la primera consulta ya da un 92 %, un aviso, no tres.
             val top = fresh.max()
-            val message = "Llevas el ${percentText(quota)} de tu cuota: ${mbText(quota.usedMb)} de ${quota.assignedMb} MB." +
+            // El registro va en español, como todo el diagnóstico; la notificación, en el idioma del sistema.
+            val message = "Llevas el ${quota.wholePercent} % de tu cuota: ${mbText(quota.usedMb, ',')} de ${quota.assignedMb} MB." +
                 when {
-                    quota.usedMb > quota.assignedMb -> " Te pasaste ${mbText(quota.usedMb - quota.assignedMb)}."
-                    top >= QuotaSettings.PAUSE_THRESHOLD -> " Te quedan ${mbText(quota.remainingMb)}."
+                    quota.usedMb > quota.assignedMb -> " Te pasaste ${mbText(quota.usedMb - quota.assignedMb, ',')}."
+                    top >= QuotaSettings.PAUSE_THRESHOLD -> " Te quedan ${mbText(quota.remainingMb, ',')}."
                     else -> ""
                 }
             logger.log(if (top >= QuotaSettings.PAUSE_THRESHOLD) LogLevel.WARN else LogLevel.INFO, TAG, message)
-            notifier.notify("Cuota de la UCI al $top %", message)
+            notifier.notify(QuotaAlert.Threshold(top, quota))
         }
         val pause = isPaused(account, quota, target.settings)
         mutableStatus.update { if (it.account == account) it.copy(paused = pause) else it }
         if (pause && tunnel.state.value is TunnelState.Connected) {
-            val message = "Llegaste al ${percentText(quota)} de tu cuota: se desconectó el túnel para no agotarla. Puedes conectar igual desde Conexión."
-            logger.log(LogLevel.WARN, TAG, message)
-            notifier.notify("Túnel en pausa por la cuota", message)
+            logger.log(
+                LogLevel.WARN,
+                TAG,
+                "Llegaste al ${quota.wholePercent} % de tu cuota: se desconectó el túnel para no agotarla. Puedes conectar igual desde Conexión.",
+            )
+            notifier.notify(QuotaAlert.Paused(quota))
             control.disconnect()
         }
     }
@@ -249,6 +280,9 @@ class QuotaMonitor(
 
     private fun describe(problem: QuotaProblem) = when (problem) {
         QuotaProblem.WRONG_CREDENTIALS -> "el servicio no aceptó el usuario o la contraseña"
+        QuotaProblem.NOT_ON_UCI_NETWORK -> "su nombre no existe fuera de la red de la UCI"
+        QuotaProblem.NO_NETWORK -> "no hay red"
+        QuotaProblem.TIMEOUT -> "no respondió a tiempo"
         QuotaProblem.UNREACHABLE -> "no se llegó al servicio (¿fuera de la red de la UCI?)"
         QuotaProblem.UNTRUSTED_CERTIFICATE -> "su certificado no se pudo verificar"
         QuotaProblem.SERVICE_CHANGED -> "contestó algo que no se entiende"
@@ -273,11 +307,11 @@ class QuotaMonitor(
     }
 }
 
-/** «71 %». */
-fun percentText(quota: UciQuota): String = "${floor(quota.percent).toInt()} %"
+/** El porcentaje usado, sin decimales y hacia abajo: 71,9 es 71. En la interfaz se escribe con `percentText`. */
+val UciQuota.wholePercent: Int get() = floor(percent).toInt()
 
-/** «1420,5 MB». */
-fun mbText(mb: Double): String {
+/** «1420,5 MB», con el separador decimal del idioma. */
+fun mbText(mb: Double, decimalSeparator: Char): String {
     val tenths = kotlin.math.round(mb * 10).toLong()
-    return if (tenths % 10 == 0L) "${tenths / 10} MB" else "${tenths / 10},${tenths % 10} MB"
+    return if (tenths % 10 == 0L) "${tenths / 10} MB" else "${tenths / 10}$decimalSeparator${tenths % 10} MB"
 }

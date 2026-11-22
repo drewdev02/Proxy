@@ -1,5 +1,6 @@
 package org.uci.proxy.quota
 
+import org.uci.proxy.core.model.QuotaAlert
 import org.uci.proxy.core.port.QuotaNotifier
 import android.app.Notification
 import android.app.NotificationChannel
@@ -12,8 +13,11 @@ import org.uci.proxy.R
 
 /** Los avisos de la cuota como notificaciones de Android, en su propio canal para que se puedan silenciar aparte. */
 class AndroidQuotaNotifier(private val context: Context) : QuotaNotifier {
-    override fun notify(title: String, message: String) {
+    override suspend fun notify(alert: QuotaAlert) {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
+        // Los textos, en el idioma del sistema, de los recursos de Compose del módulo compartido.
+        val title = alert.title()
+        val message = alert.message()
         manager.createNotificationChannel(
             NotificationChannel(CHANNEL_ID, context.getString(R.string.quota_channel_name), NotificationManager.IMPORTANCE_DEFAULT),
         )

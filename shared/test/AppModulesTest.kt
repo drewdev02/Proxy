@@ -48,7 +48,7 @@ class AppModulesTest {
 
     @Test
     fun `profile view models resolve from the app modules`() {
-        assertTrue(koin.get<ProfileListViewModel>().uiState.value.platformLabel.startsWith("ProxyUCI en "))
+        assertTrue(koin.get<ProfileListViewModel>().uiState.value.platformName.isNotEmpty())
         assertNotNull(koin.get<ProfileEditorViewModel>())
     }
 

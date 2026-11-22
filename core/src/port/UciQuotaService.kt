@@ -7,8 +7,8 @@ sealed interface QuotaFetch {
     /** El servicio rechazó el usuario o la contraseña. */
     data class WrongCredentials(val message: String) : QuotaFetch
 
-    /** No se llegó al servicio: fuera de la red de la UCI, sin red, o no contestó a tiempo. */
-    data class Unreachable(val message: String) : QuotaFetch
+    /** No se llegó al servicio; [kind] dice por qué (fuera de la red de la UCI, sin red, sin respuesta a tiempo…). */
+    data class Unreachable(val kind: NetFailure, val message: String) : QuotaFetch
 
     /** El certificado del servicio no se pudo verificar: quizá es de una autoridad interna de la UCI. */
     data class UntrustedCertificate(val message: String) : QuotaFetch

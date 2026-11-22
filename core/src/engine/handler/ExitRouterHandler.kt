@@ -58,10 +58,7 @@ class ExitRouterHandler(
 
         return when (exit) {
             RouteExit.VPN -> sendThroughVpn(packet, host, fake, opening, target)
-            RouteExit.BLOCK -> {
-                if (opening) logger.log(LogLevel.DEBUG, TAG, "Bloqueado: $target")
-                listOfNotNull(if (segment != null) reset(packet, segment) else buildIcmpPortUnreachable(packet))
-            }
+            RouteExit.BLOCK -> blocked(packet, opening, target)
             RouteExit.PROXY -> null
             // Lo directo de verdad (rangos, apps, y dominios con dirección interna) ni entra en la interfaz. Llega aquí un
             // dominio «Directo» que el DNS de la red no dio como interno: no hay otro camino que el proxy.
@@ -75,9 +72,9 @@ class ExitRouterHandler(
     /** @return lo que se devuelve a la app (nada), o null si la conexión debe seguir por el proxy. */
     private suspend fun sendThroughVpn(packet: Ipv4Packet, host: String?, fake: Boolean, opening: Boolean, target: String): List<ByteArray>? {
         val link = routing.link
-        if (!link.isUp) return null
+        if (!link.isUp) return whileVpnDown(packet)
         if (!fake) {
-            if (!link.send(packet)) return null
+            if (!link.send(packet)) return whileVpnDown(packet)
             countSent(packet, host)
             if (opening) logger.log(LogLevel.DEBUG, TAG, "Otro País: $target")
             return emptyList()
@@ -86,14 +83,29 @@ class ExitRouterHandler(
         val name = host ?: return null
         val real = link.addressFor(name)
         if (real != null) {
-            if (!link.send(packet, destination = real)) return null
+            if (!link.send(packet, destination = real)) return whileVpnDown(packet)
             countSent(packet, name)
             if (opening) logger.log(LogLevel.DEBUG, TAG, "Otro País: $target (${formatIpv4(real)})")
             return emptyList()
         }
-        if (link.isUnresolvable(name) || scope == null) return null
+        // Sin dirección por la VPN: por el proxy, o bloqueado como una regla «Bloquear» si el ajuste no deja usar el proxy.
+        if (link.isUnresolvable(name) || scope == null) return if (routing.fallbackToProxy) null else blocked(packet, opening, target)
         scope.launch { link.resolve(name) }
         return emptyList()
+    }
+
+    /** RST en TCP e ICMP de puerto inalcanzable en UDP: la app se entera enseguida en vez de esperar. */
+    private fun blocked(packet: Ipv4Packet, opening: Boolean, target: String): List<ByteArray> {
+        if (opening) logger.log(LogLevel.DEBUG, TAG, "Bloqueado: $target")
+        val segment = TcpSegment.parse(packet)
+        return listOfNotNull(if (segment != null) reset(packet, segment) else buildIcmpPortUnreachable(packet))
+    }
+
+    /** Sin VPN: por el proxy (null), o bloqueado si el ajuste lo pide (RST en TCP, nada en UDP). */
+    private fun whileVpnDown(packet: Ipv4Packet): List<ByteArray>? {
+        if (routing.fallbackToProxy) return null
+        val segment = TcpSegment.parse(packet) ?: return emptyList()
+        return listOfNotNull(reset(packet, segment))
     }
 
     private suspend fun countSent(packet: Ipv4Packet, host: String?) {

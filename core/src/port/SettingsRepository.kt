@@ -12,6 +12,8 @@ interface SettingsRepository {
 
     fun setIntranetDirect(enabled: Boolean)
 
+    fun setVpnFallbackToProxy(enabled: Boolean)
+
     fun setNameByIp(enabled: Boolean)
 
     fun setTryRawIp(enabled: Boolean)

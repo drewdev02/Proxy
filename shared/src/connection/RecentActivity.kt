@@ -12,12 +12,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import org.jetbrains.compose.resources.stringResource
 import org.uci.proxy.common.message
 import org.uci.proxy.core.model.LogEntry
 import org.uci.proxy.logs.formatLogTime
 import org.uci.proxy.logs.tone
 import org.uci.proxy.profile.tone
 import org.uci.proxy.quota.tone
+import org.uci.proxy.resources.Res
+import org.uci.proxy.resources.*
 import org.uci.proxy.theme.ProxyUciTheme
 import org.uci.proxy.ui.components.UciButton
 import org.uci.proxy.ui.components.UciButtonVariant
@@ -28,10 +31,10 @@ import org.uci.proxy.ui.components.UciStatusDot
 
 @Composable
 internal fun RecentActivity(entries: List<LogEntry>, onOpenLogs: () -> Unit) {
-    UciSectionHeader("Actividad reciente", trailing = { UciButton("Ver todo", onOpenLogs, variant = UciButtonVariant.Text) })
+    UciSectionHeader(stringResource(Res.string.connection_recent_activity), trailing = { UciButton(stringResource(Res.string.connection_see_all), onOpenLogs, variant = UciButtonVariant.Text) })
     UciCard(Modifier.fillMaxWidth()) {
         if (entries.isEmpty()) {
-            Text("Sin actividad todavía.", style = MaterialTheme.typography.bodyMedium, color = ProxyUciTheme.colors.onSurfaceMuted)
+            Text(stringResource(Res.string.connection_no_activity), style = MaterialTheme.typography.bodyMedium, color = ProxyUciTheme.colors.onSurfaceMuted)
         }
         entries.forEachIndexed { index, entry ->
             if (index > 0) UciDivider()

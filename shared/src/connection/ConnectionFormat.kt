@@ -3,14 +3,14 @@ package org.uci.proxy.connection
 import kotlin.time.Duration
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.RuleKind
+import org.uci.proxy.resources.*
 
-/** «El DNS de Otro País no resolvió a.com, b.com y 3 más: …», con los primeros nombres y cuántos quedan. */
-internal fun viaProxyMessage(hosts: List<String>, shown: Int = 3): String {
-    val names = hosts.takeLast(shown).asReversed().joinToString(", ")
-    val rest = hosts.size - minOf(hosts.size, shown)
-    val more = if (rest > 0) " y $rest más" else ""
-    return "El DNS de Otro País no resolvió $names$more: sus conexiones salen por el proxy, no por Otro País."
-}
+/** Los nombres que no resolvió el DNS de Otro País, para el aviso: los últimos [ViaProxyHosts.names] y cuántos más hay. */
+internal data class ViaProxyHosts(val names: List<String>, val rest: Int)
+
+/** Los [shown] nombres más recientes, del último al primero, y cuántos quedan sin nombrar. */
+internal fun viaProxyHosts(hosts: List<String>, shown: Int = 3): ViaProxyHosts =
+    ViaProxyHosts(hosts.takeLast(shown).asReversed(), hosts.size - minOf(hosts.size, shown))
 
 /** `usuario@host:puerto`, o `host:puerto` si el perfil no tiene usuario. */
 internal fun ProxyProfile.address(): String =
@@ -23,13 +23,6 @@ internal fun formatElapsed(duration: Duration): String {
     return "${two(total / 3600)}:${two(total % 3600 / 60)}:${two(total % 60)}"
 }
 
-/** «2 sitios, 1 app» a partir de cuántas reglas hay de cada tipo. */
-internal fun Map<RuleKind, Int>.describe(): String = RuleKind.entries.mapNotNull { kind ->
-    val count = this[kind] ?: return@mapNotNull null
-    val (one, many) = when (kind) {
-        RuleKind.DOMAIN -> "sitio" to "sitios"
-        RuleKind.IP -> "red" to "redes"
-        RuleKind.APP -> "app" to "apps"
-    }
-    "$count ${if (count == 1) one else many}"
-}.joinToString(", ")
+/** Cuántas reglas hay de cada tipo, siempre en el mismo orden (sitios, redes, apps) y sin los tipos que no tienen. */
+internal fun Map<RuleKind, Int>.inOrder(): List<Pair<RuleKind, Int>> =
+    RuleKind.entries.mapNotNull { kind -> this[kind]?.let { kind to it } }

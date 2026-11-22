@@ -48,6 +48,11 @@ data class AppSettings(
      * si su dirección es interna, van directos, sin proxy ni Otro País: el proxy institucional no suele abrirlos.
      */
     val intranetDirect: Boolean = true,
+    /**
+     * Mientras Otro País está caído (o no llega a conectar), lo que iba por él sale por el proxy. Apagado, se bloquea hasta
+     * que vuelva, para quien prefiere no salir nunca por el proxy con lo que manda fuera.
+     */
+    val vpnFallbackToProxy: Boolean = true,
     /** Pedir al proxy las IP públicas por un nombre de [nameServices], en vez de por la IP tal cual. */
     val nameByIp: Boolean = true,
     /** Si ningún nombre sirve, probar por último la IP tal cual. */

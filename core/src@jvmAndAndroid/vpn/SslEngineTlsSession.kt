@@ -45,7 +45,7 @@ class SslEngineTlsSession(caPem: String) : TlsSession {
         val input = ByteBuffer.wrap(plaintext)
         while (input.hasRemaining()) {
             val result = wrap(input)
-            if (result.status == SSLEngineResult.Status.CLOSED) throw OpenVpnException("La conexión TLS se cerró")
+            if (result.status == SSLEngineResult.Status.CLOSED) throw OpenVpnException(VpnHandshakeIssue.CLOSED, "La conexión TLS se cerró")
         }
     }
 
@@ -63,7 +63,10 @@ class SslEngineTlsSession(caPem: String) : TlsSession {
                 }
             }
         } catch (e: SSLException) {
-            throw OpenVpnException("Falló el TLS con el servidor VPN: ${e.message}", e)
+            // Si la cadena del servidor no lleva a la autoridad del archivo, no es el servidor que se espera.
+            val untrusted = generateSequence<Throwable>(e) { it.cause }.any { it is java.security.cert.CertificateException || it is java.security.cert.CertPathValidatorException }
+            val issue = if (untrusted) VpnHandshakeIssue.SERVER_CERTIFICATE else VpnHandshakeIssue.TLS_FAILED
+            throw OpenVpnException(issue, "Falló el TLS con el servidor VPN: ${e.message}", e)
         }
     }
 

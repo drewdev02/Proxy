@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Idiomas de la app. Desde Android 13, el sistema los ofrece en Ajustes > Apps > ProxyUCI > Idioma, y la app los usa
+  para su selector. El primero es el de values/ (español). Al añadir un idioma: su carpeta values-xx aquí y en
+  shared/composeResources, y una línea en esta lista.
+-->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="es" />
+    <locale android:name="en" />
+</locale-config>

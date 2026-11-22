@@ -33,11 +33,11 @@ class AndroidTunnelController(
 
     override suspend fun connect(profileId: String) {
         if (!localNetworkPermission.request()) {
-            stateStore.set(TunnelState.Failed(TunnelFailure.LOCAL_NETWORK_DENIED))
+            stateStore.set(TunnelState.Failed(TunnelFailure.LocalNetworkDenied))
             return
         }
         if (!vpnConsent.request()) {
-            stateStore.set(TunnelState.Failed(TunnelFailure.VPN_PERMISSION_DENIED))
+            stateStore.set(TunnelState.Failed(TunnelFailure.VpnPermissionDenied))
             return
         }
         stateStore.set(TunnelState.Connecting(profileId))

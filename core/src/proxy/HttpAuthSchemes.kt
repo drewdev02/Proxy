@@ -29,7 +29,7 @@ interface HttpProxyAuthScheme {
 
 internal fun HttpResponseHead.toFailure(): ProxyFailure = when (statusCode) {
     407, 401 -> ProxyFailure.AuthRejected
-    else -> ProxyFailure.Refused(statusLine)
+    else -> ProxyFailure.Refused(RefusalReason.ofHttp(statusCode), statusLine)
 }
 
 class BasicAuthScheme : HttpProxyAuthScheme {
@@ -56,14 +56,14 @@ class NtlmAuthScheme(
         val challengeToken = negotiate.values("Proxy-Authenticate")
             .firstOrNull { it.startsWith("NTLM ", ignoreCase = true) }
             ?.substring(5)?.trim()
-            ?: return ProxyFailure.ProtocolError("El proxy no envió el desafío NTLM")
+            ?: return ProxyFailure.ProtocolError(ProtocolIssue.BAD_NTLM_CHALLENGE, "El proxy no envió el desafío NTLM")
 
         val challenge = try {
             NtlmMessages.parseType2(Base64.decode(challengeToken))
         } catch (_: IllegalArgumentException) {
-            return ProxyFailure.ProtocolError("El desafío NTLM no es Base64 válido")
+            return ProxyFailure.ProtocolError(ProtocolIssue.BAD_NTLM_CHALLENGE, "El desafío NTLM no es Base64 válido")
         } catch (e: NtlmFormatException) {
-            return ProxyFailure.ProtocolError(e.message.orEmpty())
+            return ProxyFailure.ProtocolError(ProtocolIssue.BAD_NTLM_CHALLENGE, e.message.orEmpty())
         }
 
         val authenticate = NtlmMessages.type3(

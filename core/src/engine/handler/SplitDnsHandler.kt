@@ -21,10 +21,10 @@ class SplitDnsHandler(
         if (datagram.destinationPort != DNS_PORT) return null
         val question = DnsResponder.parseQuestionOf(datagram.payload)
         if (question != null && question.type == DnsResponder.TYPE_A && !hasOverride(question.name) &&
-            routing.rules.exitFor(question.name, address = null) == RouteExit.VPN &&
-            routing.link.sendDnsQuery(packet, datagram, question.name)
+            routing.rules.exitFor(question.name, address = null) == RouteExit.VPN
         ) {
-            return emptyList()
+            // Sin VPN y sin vuelta al proxy no se contesta: un DNS falso llevaría la conexión al proxy.
+            if (routing.link.sendDnsQuery(packet, datagram, question.name) || !routing.fallbackToProxy) return emptyList()
         }
         return fallback.handle(packet)
     }

@@ -2,6 +2,7 @@ package org.uci.proxy.core.proxy
 
 import kotlinx.coroutines.withTimeoutOrNull
 import org.uci.proxy.core.model.ProxyProfile
+import org.uci.proxy.core.port.NetFailure
 import org.uci.proxy.core.model.IpNameService
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -11,13 +12,13 @@ sealed interface NameServiceTestResult {
     data object Works : NameServiceTestResult
 
     /** El proxy respondió pero no dejó pasar el nombre. */
-    data class Refused(val detail: String) : NameServiceTestResult
+    data class Refused(val reason: RefusalReason, val detail: String) : NameServiceTestResult
 
     /** El proxy rechazó el usuario o la contraseña del perfil: la prueba no dice nada del servicio. */
     data object ProxyAuth : NameServiceTestResult
 
     /** No se llegó al proxy o se cortó. */
-    data class Unreachable(val detail: String) : NameServiceTestResult
+    data class Unreachable(val kind: NetFailure, val detail: String) : NameServiceTestResult
 
     data object Timeout : NameServiceTestResult
 }
@@ -38,7 +39,7 @@ class ConnectingNameServiceTester(
 ) : NameServiceTester {
     override suspend fun test(service: IpNameService, profile: ProxyProfile, password: String): NameServiceTestResult {
         val connector = connectors.firstOrNull { it.protocol == profile.protocol }
-            ?: return NameServiceTestResult.Unreachable("El perfil usa un protocolo sin conector")
+            ?: return NameServiceTestResult.Unreachable(NetFailure.PROTOCOL, "El perfil usa un protocolo sin conector")
         val target = ProxyTarget(service.nameFor(testIp), TEST_PORT)
         return when (val result = withTimeoutOrNull(timeout) { connector.connect(profile, password, target) }) {
             null -> NameServiceTestResult.Timeout
@@ -47,10 +48,10 @@ class ConnectingNameServiceTester(
                 NameServiceTestResult.Works
             }
             is ProxyConnectResult.Failed -> when (val failure = result.failure) {
-                is ProxyFailure.Refused -> NameServiceTestResult.Refused(failure.detail)
+                is ProxyFailure.Refused -> NameServiceTestResult.Refused(failure.reason, failure.detail)
                 ProxyFailure.AuthRequired, ProxyFailure.AuthRejected, is ProxyFailure.UnsupportedAuth -> NameServiceTestResult.ProxyAuth
-                is ProxyFailure.Unreachable -> NameServiceTestResult.Unreachable(failure.detail)
-                is ProxyFailure.ProtocolError -> NameServiceTestResult.Unreachable(failure.detail)
+                is ProxyFailure.Unreachable -> NameServiceTestResult.Unreachable(failure.kind, failure.detail)
+                is ProxyFailure.ProtocolError -> NameServiceTestResult.Unreachable(NetFailure.PROTOCOL, failure.detail)
             }
         }
     }

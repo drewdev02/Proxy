@@ -1,5 +1,6 @@
 package org.uci.proxy.core.vpn
 
+import kotlinx.coroutines.CancellationException
 import org.uci.proxy.core.model.CountryEngineKind
 import org.uci.proxy.core.model.CountryExitSecrets
 import org.uci.proxy.core.model.CountryExit
@@ -27,13 +28,13 @@ class OpenVpnEngine(
         val username = (start.exit as? CountryExit.OpenVpn)?.username
         if (secrets == null || username == null) {
             logger.log(LogLevel.ERROR, TAG, "La salida no es de OpenVPN")
-            return VpnConnectResult.Failed(TunnelFailure.VPN_PROFILE_INVALID)
+            return VpnConnectResult.Failed(TunnelFailure.VpnSecretsMissing)
         }
         val config = try {
             parseOvpn(secrets.ovpn)
         } catch (e: OvpnConfigException) {
             logger.log(LogLevel.ERROR, TAG, "El archivo .ovpn no sirve: ${e.message}")
-            return VpnConnectResult.Failed(TunnelFailure.VPN_PROFILE_INVALID)
+            return VpnConnectResult.Failed(TunnelFailure.OvpnInvalid(e.error))
         }
 
         // El 443 primero: es el único puerto que los proxies institucionales dejan pasar con seguridad (SuperProxy usa solo
@@ -43,7 +44,7 @@ class OpenVpnEngine(
 
         val dial = dialer.session(context)
         var proxyRefused = false
-        var handshakeFailed = false
+        var handshakeFailure: TunnelFailure.VpnHandshakeFailed? = null
         for (remote in remotes.take(MAX_ATTEMPTS)) {
             logger.log(LogLevel.INFO, TAG, "Conectando con el servidor VPN ${remote.host}:${remote.port} a través del proxy")
             val connection = when (val result = dial.dial(remote.host, remote.port)) {
@@ -51,7 +52,7 @@ class OpenVpnEngine(
                 is ProxyDialResult.Failed -> {
                     logger.log(LogLevel.WARN, TAG, "El proxy no abrió ${remote.host}:${remote.port}: ${result.detail}")
                     when (result.reason) {
-                        ProxyDialResult.Reason.PROXY_AUTH -> return VpnConnectResult.Failed(TunnelFailure.PROXY_AUTH_FAILED)
+                        ProxyDialResult.Reason.PROXY_AUTH -> return VpnConnectResult.Failed(TunnelFailure.ProxyAuthFailed)
                         ProxyDialResult.Reason.REFUSED -> proxyRefused = true
                         ProxyDialResult.Reason.UNREACHABLE -> Unit
                     }
@@ -62,20 +63,32 @@ class OpenVpnEngine(
                 return VpnConnectResult.Connected(client.connect(config, connection, username, secrets.password))
             } catch (e: AuthFailedException) {
                 logger.log(LogLevel.ERROR, TAG, e.message.orEmpty())
-                return VpnConnectResult.Failed(TunnelFailure.VPN_AUTH_FAILED)
+                return VpnConnectResult.Failed(TunnelFailure.VpnAuthFailed)
             } catch (e: InvalidCertificateException) {
                 logger.log(LogLevel.ERROR, TAG, e.message.orEmpty())
-                return VpnConnectResult.Failed(TunnelFailure.VPN_PROFILE_INVALID)
+                return VpnConnectResult.Failed(TunnelFailure.OvpnInvalid(OvpnConfigError.InvalidCa))
             } catch (e: OpenVpnException) {
                 logger.log(LogLevel.WARN, TAG, "Falló el handshake con ${remote.host}:${remote.port}: ${e.message}")
-                handshakeFailed = true
+                if (e.issue == VpnHandshakeIssue.UNAVAILABLE) return VpnConnectResult.Failed(TunnelFailure.EngineUnavailable)
+                // Lo que no depende del servidor concreto no cambia probando el siguiente.
+                if (CountryEngine.isPermanentFailure(TunnelFailure.VpnHandshakeFailed(e.issue))) {
+                    return VpnConnectResult.Failed(TunnelFailure.VpnHandshakeFailed(e.issue, e.subject))
+                }
+                handshakeFailure = handshakeFailure ?: TunnelFailure.VpnHandshakeFailed(e.issue, e.subject)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // También un corte del proxy a mitad (TcpException): otro servidor puede responder, y si ninguno lo hace
+                // el túnel debe caer al proxy en vez de romperse.
+                logger.log(LogLevel.WARN, TAG, "Se cortó la conexión con ${remote.host}:${remote.port}: ${e.message}")
+                handshakeFailure = handshakeFailure ?: TunnelFailure.VpnHandshakeFailed(VpnHandshakeIssue.CLOSED)
             }
         }
         // Lo más informativo primero: si algún servidor llegó a responder, el problema es de la VPN y no del proxy.
         val failure = when {
-            handshakeFailed -> TunnelFailure.VPN_HANDSHAKE_FAILED
-            proxyRefused -> TunnelFailure.VPN_SERVER_BLOCKED
-            else -> TunnelFailure.VPN_SERVER_UNREACHABLE
+            handshakeFailure != null -> handshakeFailure
+            proxyRefused -> TunnelFailure.VpnServerBlocked
+            else -> TunnelFailure.VpnServerUnreachable
         }
         return VpnConnectResult.Failed(failure)
     }

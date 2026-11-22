@@ -27,12 +27,16 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.jetbrains.compose.resources.pluralStringResource
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import org.uci.proxy.common.message
 import org.uci.proxy.connection.address
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.ProxyProtocol
 import org.uci.proxy.core.port.TunnelState
+import org.uci.proxy.resources.*
+import org.uci.proxy.resources.Res
 import org.uci.proxy.theme.ProxyUciTheme
 import org.uci.proxy.ui.components.UciButton
 import org.uci.proxy.ui.components.UciConfirmDialog
@@ -44,6 +48,7 @@ import org.uci.proxy.ui.components.UciStatusPill
 import org.uci.proxy.ui.components.UciTone
 import org.uci.proxy.ui.components.UciTopBar
 import org.uci.proxy.ui.icons.UciIcons
+import org.uci.proxy.common.StorageFailure
 
 /** Lo que la lista necesita saber del túnel. */
 data class TunnelUiModel(
@@ -72,8 +77,9 @@ internal fun ProfileListScreen(
 
     ProfileListScreen(
         profiles = state.profiles,
-        platformLabel = state.platformLabel,
+        platformLabel = stringResource(Res.string.profile_list_platform, state.platformName, state.osVersion),
         deleteFailed = state.deleteFailed,
+        deleteFailure = state.deleteFailure,
         tunnel = state.tunnel,
         onAdd = onAdd,
         onEdit = onEdit,
@@ -95,6 +101,7 @@ fun ProfileListScreen(
     platformLabel: String,
     deleteFailed: Boolean,
     tunnel: TunnelUiModel,
+    deleteFailure: StorageFailure? = null,
     onAdd: () -> Unit,
     onEdit: (String) -> Unit,
     onDelete: (String) -> Unit,
@@ -109,15 +116,16 @@ fun ProfileListScreen(
 
     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))) {
         UciTopBar(
-            title = "Perfiles",
+            title = stringResource(Res.string.profile_list_title),
             subtitle = when (profiles.size) {
-                0 -> "Ninguno guardado"
-                1 -> "1 perfil guardado"
-                else -> "${profiles.size} perfiles guardados"
+                0 -> stringResource(Res.string.profile_list_none_saved)
+                else -> pluralStringResource(Res.plurals.profile_list_saved_count, profiles.size, profiles.size)
             },
             actions = {
-                if (onOpenCatalog != null) UciIconButton(UciIcons.Widgets, "Catálogo de componentes", onOpenCatalog, bordered = false)
-                UciButton("Nuevo", onAdd, icon = UciIcons.Add)
+                if (onOpenCatalog != null) {
+                    UciIconButton(UciIcons.Widgets, stringResource(Res.string.profile_list_open_catalog), onOpenCatalog, bordered = false)
+                }
+                UciButton(stringResource(Res.string.profile_list_new), onAdd, icon = UciIcons.Add)
             },
         )
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
@@ -134,8 +142,14 @@ fun ProfileListScreen(
                 if (deleteFailed) {
                     item(key = "delete-failed") {
                         UciInlineAlert(
-                            "El perfil no se pudo eliminar. Inténtalo de nuevo.",
-                            title = "No se pudo eliminar",
+                            stringResource(
+                                if (deleteFailure == StorageFailure.SECURE_STORAGE) {
+                                    Res.string.profile_list_delete_failed_secure_storage
+                                } else {
+                                    Res.string.profile_list_delete_failed
+                                },
+                            ),
+                            title = stringResource(Res.string.profile_list_delete_failed_title),
                             tone = UciTone.Danger,
                             onDismiss = onDismissDeleteError,
                         )
@@ -144,10 +158,10 @@ fun ProfileListScreen(
                 if (profiles.isEmpty()) {
                     item(key = "empty") {
                         UciEmptyState(
-                            title = "Aún no hay perfiles",
+                            title = stringResource(Res.string.profile_list_empty_title),
                             icon = UciIcons.Badge,
-                            message = "Un perfil guarda los datos de un proxy: servidor, usuario y, si quieres, Otro País y reglas de salida.",
-                            action = { UciButton("Añadir perfil", onAdd, icon = UciIcons.Add) },
+                            message = stringResource(Res.string.profile_list_empty_message),
+                            action = { UciButton(stringResource(Res.string.profile_list_add), onAdd, icon = UciIcons.Add) },
                         )
                     }
                 }
@@ -176,9 +190,10 @@ fun ProfileListScreen(
 
     pendingDelete?.let { profile ->
         UciConfirmDialog(
-            title = "¿Eliminar «${profile.name}»?",
-            message = "Se eliminan también su contraseña y lo guardado de Otro País. No se puede deshacer.",
-            confirmLabel = "Eliminar",
+            title = stringResource(Res.string.profile_list_delete_title, profile.name),
+            message = stringResource(Res.string.profile_list_delete_message),
+            confirmLabel = stringResource(Res.string.profile_list_delete_confirm),
+            dismissLabel = stringResource(Res.string.profile_cancel),
             destructive = true,
             onConfirm = {
                 pendingDelete = null
@@ -215,24 +230,49 @@ private fun ProfileCard(
         onClick = onEdit.takeIf { !isActive },
         tags = {
             UciStatusPill(profile.protocol.label)
-            profile.countryExit?.let { UciStatusPill("Otro País · ${it.kind.label}", tone = UciTone.Routing) }
-            if (profile.routing.enabled) UciStatusPill("Reglas", tone = UciTone.Routing)
+            profile.countryExit?.let {
+                UciStatusPill(stringResource(Res.string.profile_list_tag_country_exit, it.kind.label), tone = UciTone.Routing)
+            }
+            if (profile.routing.enabled) UciStatusPill(stringResource(Res.string.profile_list_tag_rules), tone = UciTone.Routing)
             when {
-                connected?.vpnDown == true -> UciStatusPill("Sin Otro País", tone = UciTone.Warning)
-                connected != null -> UciStatusPill("Conectado", tone = UciTone.Success)
-                connecting -> UciStatusPill("Conectando", tone = UciTone.Active)
+                connected?.vpnDown == true -> UciStatusPill(stringResource(Res.string.profile_list_tag_vpn_down), tone = UciTone.Warning)
+                connected != null -> UciStatusPill(stringResource(Res.string.profile_list_tag_connected), tone = UciTone.Success)
+                connecting -> UciStatusPill(stringResource(Res.string.profile_list_tag_connecting), tone = UciTone.Active)
             }
         },
         trailing = {
             if (tunnel.isAvailable) {
                 when {
-                    connected != null -> UciIconButton(UciIcons.Power, "Desconectar ${profile.name}", onDisconnect, tone = UciTone.Success)
-                    connecting -> UciIconButton(UciIcons.Power, "Conectando ${profile.name}", {}, tone = UciTone.Active, enabled = false)
+                    connected != null -> UciIconButton(
+                        UciIcons.Power,
+                        stringResource(Res.string.profile_list_disconnect_profile, profile.name),
+                        onDisconnect,
+                        tone = UciTone.Success,
+                    )
+                    connecting -> UciIconButton(
+                        UciIcons.Power,
+                        stringResource(Res.string.profile_list_connecting_profile, profile.name),
+                        {},
+                        tone = UciTone.Active,
+                        enabled = false,
+                    )
                     // Mientras otro perfil está en uso, primero hay que desconectarlo.
-                    else -> UciIconButton(UciIcons.Power, "Conectar ${profile.name}", onConnect, enabled = tunnel.activeProfileId == null)
+                    else -> UciIconButton(
+                        UciIcons.Power,
+                        stringResource(Res.string.profile_list_connect_profile, profile.name),
+                        onConnect,
+                        enabled = tunnel.activeProfileId == null,
+                    )
                 }
             }
-            UciIconButton(UciIcons.Delete, "Eliminar ${profile.name}", onDelete, bordered = false, tone = UciTone.Danger, enabled = !isActive)
+            UciIconButton(
+                UciIcons.Delete,
+                stringResource(Res.string.profile_list_delete_profile, profile.name),
+                onDelete,
+                bordered = false,
+                tone = UciTone.Danger,
+                enabled = !isActive,
+            )
         },
     )
 }

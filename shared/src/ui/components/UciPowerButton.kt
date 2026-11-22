@@ -36,6 +36,9 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.clickable
+import org.jetbrains.compose.resources.stringResource
+import org.uci.proxy.resources.Res
+import org.uci.proxy.resources.*
 import org.uci.proxy.theme.ProxyUciTheme
 import org.uci.proxy.ui.icons.UciIcons
 
@@ -61,6 +64,14 @@ fun UciPowerButton(
     diameter: Dp = 140.dp,
 ) {
     val colors = ProxyUciTheme.colors
+    val stateText = stringResource(
+        when (state) {
+            UciPowerState.Idle -> Res.string.ui_power_idle
+            UciPowerState.Connecting -> Res.string.ui_power_connecting
+            UciPowerState.Connected -> Res.string.ui_power_connected
+            UciPowerState.Error -> Res.string.ui_power_error
+        },
+    )
     val accent by animateColorAsState(
         when (state) {
             UciPowerState.Idle -> colors.idle
@@ -140,12 +151,7 @@ fun UciPowerButton(
                 .semantics(mergeDescendants = true) {
                     role = Role.Button
                     contentDescription = label
-                    stateDescription = when (state) {
-                        UciPowerState.Idle -> "Desconectado"
-                        UciPowerState.Connecting -> "Conectando"
-                        UciPowerState.Connected -> "Conectado"
-                        UciPowerState.Error -> "Error"
-                    }
+                    stateDescription = stateText
                 },
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,

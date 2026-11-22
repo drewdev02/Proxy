@@ -1,6 +1,7 @@
 package org.uci.proxy.core.engine
 
 import org.uci.proxy.core.engine.handler.ExitRouterHandler
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withTimeoutOrNull
@@ -22,6 +23,9 @@ import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.traffic.TrafficMeter
 import org.uci.proxy.core.vpn.VpnSession
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 
 /**
  * La VPN tal como la usa el motor con reglas de salida: puede no estar, caerse y volver.
@@ -38,7 +42,9 @@ import org.uci.proxy.core.vpn.VpnSession
  *
  * @param appAddress la dirección de la interfaz, desde la que salen las apps.
  * @param onViaProxy se llama con cada nombre que el DNS de la VPN no resolvió: sus conexiones salen por el proxy, y la
- *   interfaz debe poder decirlo en vez de mostrar que todo va por Otro País.
+ *   interfaz debe poder decirlo en vez de mostrar que todo va por Otro País. Con [fallbackToProxy] apagado no se llama:
+ *   esas conexiones se bloquean.
+ * @param fallbackToProxy si lo que debía ir por la VPN y no puede (caída, o nombre sin dirección) sale por el proxy.
  */
 class VpnLink(
     private val appAddress: Int,
@@ -46,8 +52,14 @@ class VpnLink(
     private val onViaProxy: (String) -> Unit = {},
     /** Dónde se cuenta lo que llega por la VPN; lo que sale lo cuenta [ExitRouterHandler]. */
     private val meter: TrafficMeter? = null,
+    val fallbackToProxy: Boolean = true,
+    /** Para que caduque un nombre sin dirección cuando se bloquea; el del motor, para poder probarlo con tiempo virtual. */
+    private val timeSource: TimeSource = TimeSource.Monotonic,
 ) {
     private val lock = Mutex()
+
+    /** Qué pasa con lo que no puede ir por la VPN, para el registro. */
+    private val instead get() = if (fallbackToProxy) "sale por el proxy" else "se bloquea"
     private var session: VpnSession? = null
     private var vpnAddress = 0
     private var vpnDns = 0
@@ -65,8 +77,12 @@ class VpnLink(
     private val resolving = HashMap<Int, Pair<String, CompletableDeferred<Unit>>>()
     private val resolvingHosts = HashSet<String>()
 
-    /** Nombres que el DNS de la VPN no supo resolver: sus conexiones van por el proxy. */
-    private val unresolvable = HashSet<String>()
+    /**
+     * Nombres que el DNS de la VPN no supo resolver, con cuándo se vuelve a preguntar. Si salen por el proxy, hasta que la
+     * VPN se reconecte (null); si se bloquean, poco tiempo: un fallo pasajero del DNS no debe dejar un sitio sin abrir toda
+     * la sesión.
+     */
+    private val unresolvable = HashMap<String, TimeMark?>()
     private var nextId = 1
 
     /** Conexiones cuyo destino se cambió de la dirección inventada a la real, para devolverles la inventada. */
@@ -84,12 +100,33 @@ class VpnLink(
         unresolvable.clear()
     }
 
-    suspend fun detach() = lock.withLock {
+    suspend fun detach() = lock.withLock { forget() }
+
+    private fun forget() {
         session = null
         pendingDns.clear()
         resolving.values.forEach { it.second.complete(Unit) }
         resolving.clear()
         resolvingHosts.clear()
+    }
+
+    /**
+     * Escribe en [current]; si la sesión murió, la suelta y la cierra (así el supervisor ve la caída y reintenta) para
+     * que lo que iba por ella salga por el proxy en vez de tumbar el bucle del motor.
+     */
+    private suspend fun write(current: VpnSession, bytes: ByteArray): Boolean {
+        try {
+            current.writePacket(bytes)
+            return true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            logger.log(LogLevel.WARN, TAG, "No se pudo escribir en la VPN: ${e.message}. Su tráfico $instead")
+            // Solo si sigue siendo la misma: el supervisor pudo haber puesto ya otra.
+            val dropped = lock.withLock { (session === current).also { if (it) forget() } }
+            if (dropped) current.close()
+            return false
+        }
     }
 
     /** Cierra la sesión en curso sin esperar al cerrojo, para despertar su lectura al detener el túnel. */
@@ -103,7 +140,17 @@ class VpnLink(
     suspend fun addressFor(host: String): Int? = lock.withLock { addressByHost[host.lowercase()] }
 
     /** Si el DNS de la VPN ya dijo que [host] no existe o no contestó. */
-    suspend fun isUnresolvable(host: String): Boolean = lock.withLock { host.lowercase() in unresolvable }
+    suspend fun isUnresolvable(host: String): Boolean = lock.withLock {
+        val name = host.lowercase()
+        if (name !in unresolvable) return@withLock false
+        val retryAt = unresolvable[name]
+        if (retryAt != null && retryAt.hasPassedNow()) {
+            unresolvable.remove(name)
+            false
+        } else {
+            true
+        }
+    }
 
     /**
      * Manda [packet] por la VPN, hacia [destination] (la IP real, si la app conectó a una inventada).
@@ -121,8 +168,7 @@ class VpnLink(
             }
             current to rewriteAddresses(packet, vpnAddress, destination)
         }
-        current.writePacket(translated)
-        return true
+        return write(current, translated)
     }
 
     /**
@@ -137,8 +183,7 @@ class VpnLink(
             current to rewriteAddresses(packet, vpnAddress, vpnDns)
         }
         logger.log(LogLevel.DEBUG, TAG, "DNS por Otro País: $host")
-        current.writePacket(translated)
-        return true
+        return write(current, translated)
     }
 
     /**
@@ -157,20 +202,28 @@ class VpnLink(
             Triple(current, buildUdpPacket(vpnAddress, vpnDns, RESOLVER_PORT, DNS_PORT, buildDnsQuery(name, id)), done)
         }
         logger.log(LogLevel.DEBUG, TAG, "Resolviendo por Otro País: $name")
-        current.writePacket(query)
+        if (!write(current, query)) {
+            lock.withLock {
+                resolvingHosts.remove(name)
+                resolving.entries.removeAll { it.value.first == name }
+            }
+            return
+        }
         val answered = withTimeoutOrNull(timeoutMs) { done.await() } != null
         val failed = lock.withLock {
             resolvingHosts.remove(name)
             resolving.entries.removeAll { it.value.first == name }
             val failed = !answered || name !in addressByHost
-            if (failed) unresolvable += name
+            if (failed) unresolvable[name] = if (fallbackToProxy) null else timeSource.markNow() + (if (answered) NO_ADDRESS_RETRY else NO_ANSWER_RETRY)
             failed
         }
-        // A la vista en el registro: sin esto, la conexión sale por el proxy en silencio y parece que va por Otro País.
+        // A la vista en el registro: sin esto, la conexión sale por el proxy (o se bloquea) en silencio y parece que va por
+        // Otro País.
         if (failed) {
             val why = if (answered) "no tiene dirección para" else "no contestó por"
-            logger.log(LogLevel.WARN, TAG, "El DNS de Otro País $why $name: sus conexiones salen por el proxy")
-            onViaProxy(name)
+            val conexiones = if (fallbackToProxy) "sus conexiones salen por el proxy" else "sus conexiones se bloquean"
+            logger.log(LogLevel.WARN, TAG, "El DNS de Otro País $why $name: $conexiones")
+            if (fallbackToProxy) onViaProxy(name)
         }
     }
 
@@ -240,6 +293,10 @@ class VpnLink(
         // Puerto propio para las resoluciones del motor: fuera del rango efímero que usan las apps.
         const val RESOLVER_PORT = 1053
         const val RESOLVE_TIMEOUT_MS = 5_000L
+
+        // Con el bloqueo, cuándo se vuelve a preguntar por un nombre sin dirección o sin respuesta.
+        val NO_ADDRESS_RETRY = 60.seconds
+        val NO_ANSWER_RETRY = 10.seconds
         const val MAX_HOSTS = 8192
         const val MAX_PENDING_DNS = 1024
         const val MAX_TRANSLATED = 8192

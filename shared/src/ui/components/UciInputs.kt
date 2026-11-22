@@ -41,6 +41,9 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import org.jetbrains.compose.resources.stringResource
+import org.uci.proxy.resources.Res
+import org.uci.proxy.resources.*
 import org.uci.proxy.theme.ProxyUciTheme
 import org.uci.proxy.ui.icons.UciIcons
 
@@ -137,7 +140,7 @@ fun UciPasswordField(
         trailing = {
             UciIconButton(
                 icon = if (visible) UciIcons.VisibilityOff else UciIcons.Visibility,
-                contentDescription = if (visible) "Ocultar contraseña" else "Mostrar contraseña",
+                contentDescription = stringResource(if (visible) Res.string.ui_password_hide else Res.string.ui_password_show),
                 onClick = { visible = !visible },
                 bordered = false,
             )
@@ -164,7 +167,7 @@ fun UciSearchField(
         leadingIcon = { Icon(UciIcons.Search, contentDescription = null, modifier = Modifier.size(20.dp)) },
         trailingIcon = when {
             query.isNotEmpty() -> {
-                { UciIconButton(UciIcons.Close, "Borrar búsqueda", { onQueryChange("") }, bordered = false) }
+                { UciIconButton(UciIcons.Close, stringResource(Res.string.ui_search_clear), { onQueryChange("") }, bordered = false) }
             }
             else -> trailing
         },
@@ -284,9 +287,9 @@ fun UciFileField(
     onPick: () -> Unit,
     modifier: Modifier = Modifier,
     detail: String? = null,
-    emptyText: String = "Ningún archivo elegido",
-    chooseLabel: String = "Elegir archivo",
-    changeLabel: String = "Cambiar",
+    emptyText: String = stringResource(Res.string.ui_file_none),
+    chooseLabel: String = stringResource(Res.string.ui_file_choose),
+    changeLabel: String = stringResource(Res.string.ui_file_change),
     enabled: Boolean = true,
 ) {
     val c = ProxyUciTheme.colors

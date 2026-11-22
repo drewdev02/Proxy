@@ -27,6 +27,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
+import org.jetbrains.compose.resources.stringResource
+import org.uci.proxy.resources.Res
+import org.uci.proxy.resources.*
 import org.uci.proxy.theme.ProxyUciTheme
 
 enum class UciButtonVariant {
@@ -61,7 +64,8 @@ fun UciButton(
     val shape = MaterialTheme.shapes.medium
     val padding = PaddingValues(horizontal = 20.dp, vertical = 12.dp)
     val clickable = enabled && !loading
-    val loadingModifier = if (loading) Modifier.semantics { stateDescription = "Cargando" } else Modifier
+    val loadingText = stringResource(Res.string.ui_loading)
+    val loadingModifier = if (loading) Modifier.semantics { stateDescription = loadingText } else Modifier
     val minSize = Modifier.defaultMinSize(minHeight = 48.dp)
 
     val content: @Composable (Color) -> Unit = { tint ->

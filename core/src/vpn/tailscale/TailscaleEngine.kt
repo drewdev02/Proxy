@@ -80,12 +80,12 @@ class TailscaleEngine(
         val secrets = start.secrets as? CountryExitSecrets.Tailscale
         if (exit == null || secrets == null) {
             logger.log(LogLevel.ERROR, TAG, "La salida no es de Tailscale")
-            return VpnConnectResult.Failed(TunnelFailure.VPN_PROFILE_INVALID)
+            return VpnConnectResult.Failed(TunnelFailure.VpnSecretsMissing)
         }
         val stateDir = start.stateDir
         if (stateDir == null) {
             logger.log(LogLevel.ERROR, TAG, "Esta plataforma no dio un directorio para la identidad del nodo")
-            return VpnConnectResult.Failed(TunnelFailure.ENGINE_UNAVAILABLE)
+            return VpnConnectResult.Failed(TunnelFailure.EngineUnavailable)
         }
         val proxy = LocalConnectProxy(selector, dialer.session(context), logger, random, io)
         proxy.start()
@@ -100,14 +100,21 @@ class TailscaleEngine(
             tempDir = bridge.tempDir,
             timeoutMs = startTimeoutMs,
         )
-        val started = parse<StartReply>(startBridge(config, proxy))
+        val reply = try {
+            startBridge(config, proxy)
+        } catch (e: Exception) {
+            // Sin esto el proxy local quedaría abierto; el fallo lo trata CountryEngines.
+            proxy.close()
+            throw e
+        }
+        val started = parse<StartReply>(reply)
         drainLogs()
         val handle = started?.handle
         val network = started?.network
         if (handle == null || network == null) {
             proxy.close()
             val error = started?.error ?: BridgeError("INTERNAL", "respuesta ilegible de la librería")
-            val failure = failureOf(error, proxy)
+            val failure = failureOf(error, proxy, exit.exitNode)
             logger.log(LogLevel.WARN, TAG, "Tailscale no conectó: ${error.message}")
             return VpnConnectResult.Failed(failure)
         }
@@ -133,7 +140,7 @@ class TailscaleEngine(
      * puede ofrecerlos sin dejar un equipo registrado por cada búsqueda.
      */
     suspend fun listExitNodes(context: ExitContext, exit: CountryExit.Tailscale, secrets: CountryExitSecrets.Tailscale): ExitNodeListing {
-        if (!bridge.isAvailable) return ExitNodeListing.Failed(TunnelFailure.ENGINE_UNAVAILABLE, "Tailscale no está disponible en este equipo")
+        if (!bridge.isAvailable) return ExitNodeListing.Failed(TunnelFailure.EngineUnavailable, "Tailscale no está disponible en este equipo")
         val proxy = LocalConnectProxy(selector, dialer.session(context), logger, random, io)
         proxy.start()
         try {
@@ -153,7 +160,7 @@ class TailscaleEngine(
             if (handle == null) {
                 val error = started?.error ?: BridgeError("INTERNAL", "respuesta ilegible de la librería")
                 logger.log(LogLevel.WARN, TAG, "No se pudieron buscar los nodos de salida (${error.code}): ${error.message}")
-                return ExitNodeListing.Failed(failureOf(error, proxy), error.message)
+                return ExitNodeListing.Failed(failureOf(error, proxy, exit.exitNode), error.message)
             }
             try {
                 val listed = parse<ExitNodesReply>(withContext(io) { bridge.exitNodes(handle) })
@@ -161,7 +168,7 @@ class TailscaleEngine(
                 return if (listed?.exitNodes != null && error == null) {
                     ExitNodeListing.Found(listed.exitNodes.sortedWith(compareBy({ !it.online }, { it.name })))
                 } else {
-                    ExitNodeListing.Failed(TunnelFailure.VPN_HANDSHAKE_FAILED, error?.message ?: "respuesta ilegible")
+                    ExitNodeListing.Failed(TunnelFailure.EngineInternal, error?.message ?: "respuesta ilegible")
                 }
             } finally {
                 withContext(io) { bridge.close(handle) }
@@ -197,17 +204,20 @@ class TailscaleEngine(
         }
     }
 
-    private fun failureOf(error: BridgeError, proxy: LocalConnectProxy): TunnelFailure = when (error.code) {
-        "AUTH_FAILED" -> TunnelFailure.VPN_AUTH_FAILED
-        "EXIT_NODE_NOT_FOUND" -> TunnelFailure.EXIT_NODE_NOT_FOUND
-        "CONFIG_INVALID" -> TunnelFailure.VPN_PROFILE_INVALID
+    private fun failureOf(error: BridgeError, proxy: LocalConnectProxy, exitNode: String): TunnelFailure = when (error.code) {
+        "AUTH_FAILED" -> TunnelFailure.VpnAuthFailed
+        "AUTH_EXPIRED" -> TunnelFailure.TailscaleKeyExpired
+        "EXIT_NODE_NOT_FOUND" -> TunnelFailure.ExitNodeNotFound(exitNode)
+        "EXIT_NODE_NOT_CHOSEN" -> TunnelFailure.ExitNodeNotChosen
+        "CONFIG_INVALID" -> TunnelFailure.TailscaleConfigInvalid
+        "BUSY" -> TunnelFailure.TailscaleBusy
         // Sin llegar al control, lo que dijo el proxy del perfil explica por qué.
         "CONTROL_UNREACHABLE" -> when (proxy.worstFailure) {
-            ProxyDialResult.Reason.PROXY_AUTH -> TunnelFailure.PROXY_AUTH_FAILED
-            ProxyDialResult.Reason.REFUSED -> if (proxy.connected == 0) TunnelFailure.VPN_SERVER_BLOCKED else TunnelFailure.VPN_SERVER_UNREACHABLE
-            else -> TunnelFailure.VPN_SERVER_UNREACHABLE
+            ProxyDialResult.Reason.PROXY_AUTH -> TunnelFailure.ProxyAuthFailed
+            ProxyDialResult.Reason.REFUSED -> if (proxy.connected == 0) TunnelFailure.VpnServerBlocked else TunnelFailure.VpnServerUnreachable
+            else -> TunnelFailure.VpnServerUnreachable
         }
-        else -> TunnelFailure.VPN_HANDSHAKE_FAILED
+        else -> TunnelFailure.EngineInternal
     }
 
     /** Pasa al registro de la app lo que la librería haya contado. */

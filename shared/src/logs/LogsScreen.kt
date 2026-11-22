@@ -35,9 +35,13 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.jetbrains.compose.resources.pluralStringResource
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import org.uci.proxy.core.model.LogEntry
 import org.uci.proxy.core.model.LogLevel
+import org.uci.proxy.resources.Res
+import org.uci.proxy.resources.*
 import org.uci.proxy.theme.ProxyUciTheme
 import org.uci.proxy.ui.components.UciCard
 import org.uci.proxy.ui.components.UciConfirmDialog
@@ -53,10 +57,10 @@ import org.uci.proxy.ui.icons.UciIcons
 
 /** Los niveles que se pueden elegir como filtro, con el nombre que se muestra. */
 private val levelFilters = listOf(
-    LogLevel.DEBUG to "Todo",
-    LogLevel.INFO to "Info",
-    LogLevel.WARN to "Avisos",
-    LogLevel.ERROR to "Errores",
+    LogLevel.DEBUG to Res.string.logs_filter_all,
+    LogLevel.INFO to Res.string.logs_filter_info,
+    LogLevel.WARN to Res.string.logs_filter_warnings,
+    LogLevel.ERROR to Res.string.logs_filter_errors,
 )
 
 /** El registro a nivel de pantalla: obtiene su ViewModel y pasa solo estado y acciones a la versión sin estado. */
@@ -102,18 +106,18 @@ fun LogsScreen(
 
     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))) {
         UciTopBar(
-            title = "Registro",
+            title = stringResource(Res.string.logs_title),
             subtitle = summary(state),
             onBack = onBack,
             actions = {
                 UciIconButton(
                     if (state.paused) UciIcons.Play else UciIcons.Pause,
-                    if (state.paused) "Reanudar" else "Pausar",
+                    stringResource(if (state.paused) Res.string.logs_resume else Res.string.logs_pause),
                     onTogglePause,
                     tone = if (state.paused) UciTone.Warning else UciTone.Neutral,
                 )
-                UciIconButton(UciIcons.Copy, "Copiar lo que se ve", onCopy, enabled = state.entries.isNotEmpty())
-                UciIconButton(UciIcons.Delete, "Limpiar el registro", { confirmingClear = true }, tone = UciTone.Danger, enabled = state.total > 0)
+                UciIconButton(UciIcons.Copy, stringResource(Res.string.logs_copy), onCopy, enabled = state.entries.isNotEmpty())
+                UciIconButton(UciIcons.Delete, stringResource(Res.string.logs_clear_log), { confirmingClear = true }, tone = UciTone.Danger, enabled = state.total > 0)
             },
         )
         // Filtros y lista en la misma columna centrada, para que en escritorio queden alineados.
@@ -129,15 +133,19 @@ fun LogsScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     levelFilters.forEach { (level, name) ->
-                        UciFilterChip(name, state.minLevel == level, { onLevelChange(level) }, dot = level.tone.takeIf { level != LogLevel.DEBUG })
+                        UciFilterChip(stringResource(name), state.minLevel == level, { onLevelChange(level) }, dot = level.tone.takeIf { level != LogLevel.DEBUG })
                     }
                 }
 
                 if (state.entries.isEmpty()) {
                     UciEmptyState(
-                        title = if (state.total == 0) "Todavía no hay mensajes" else "Ningún mensaje con este filtro",
+                        title = stringResource(if (state.total == 0) Res.string.logs_empty_title else Res.string.logs_filtered_empty_title),
                         icon = UciIcons.Logs,
-                        message = if (state.total == 0) "Aquí aparece lo que hace el túnel mientras está conectado." else "Elige «Todo» para ver los ${state.total} mensajes.",
+                        message = if (state.total == 0) {
+                            stringResource(Res.string.logs_empty_message)
+                        } else {
+                            pluralStringResource(Res.plurals.logs_filtered_empty_message, state.total, state.total)
+                        },
                         modifier = Modifier.padding(top = spacing.xl),
                     )
                 } else {
@@ -163,9 +171,9 @@ fun LogsScreen(
 
     if (confirmingClear) {
         UciConfirmDialog(
-            title = "¿Limpiar el registro?",
-            message = "Se borran los ${state.total} mensajes, también los guardados en el equipo. No se puede deshacer.",
-            confirmLabel = "Limpiar",
+            title = stringResource(Res.string.logs_clear_title),
+            message = pluralStringResource(Res.plurals.logs_clear_message, state.total, state.total),
+            confirmLabel = stringResource(Res.string.logs_clear_confirm),
             destructive = true,
             onConfirm = {
                 confirmingClear = false
@@ -176,9 +184,17 @@ fun LogsScreen(
     }
 }
 
+/** «En vivo · 12 mensajes», o «En pausa · 3 de 12 mensajes» con un filtro. */
+@Composable
 private fun summary(state: LogsUiState): String {
-    val shown = if (state.entries.size == state.total) "${state.total} mensajes" else "${state.entries.size} de ${state.total} mensajes"
-    return if (state.paused) "En pausa · $shown" else "En vivo · $shown"
+    val all = state.entries.size == state.total
+    val plural = when {
+        state.paused && all -> Res.plurals.logs_summary_paused
+        state.paused -> Res.plurals.logs_summary_paused_filtered
+        all -> Res.plurals.logs_summary_live
+        else -> Res.plurals.logs_summary_live_filtered
+    }
+    return if (all) pluralStringResource(plural, state.total, state.total) else pluralStringResource(plural, state.total, state.entries.size, state.total)
 }
 
 /** Una línea del registro: nivel, hora, origen y mensaje. */

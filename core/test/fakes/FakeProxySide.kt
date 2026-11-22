@@ -4,6 +4,7 @@ import kotlinx.coroutines.channels.Channel
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.ProxyProtocol
 import org.uci.proxy.core.port.TcpConnection
+import org.uci.proxy.core.port.NetFailure
 import org.uci.proxy.core.port.TcpException
 import org.uci.proxy.core.proxy.ProxyConnectResult
 import org.uci.proxy.core.proxy.ProxyConnector
@@ -33,7 +34,7 @@ class FakeTunnelConnection : TcpConnection {
 
     /** La conexión con el proxy se rompe. */
     fun fail() {
-        incoming.trySend(Result.failure(TcpException("conexión con el proxy perdida")))
+        incoming.trySend(Result.failure(TcpException(NetFailure.RESET, "conexión con el proxy perdida")))
     }
 
     override suspend fun read(maxBytes: Int): ByteArray? = incoming.receiveCatching().getOrNull()?.getOrThrow()

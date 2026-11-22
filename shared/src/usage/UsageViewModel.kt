@@ -19,12 +19,13 @@ import org.uci.proxy.quota.QuotaCardUi
 import org.uci.proxy.core.quota.QuotaStatus
 import org.uci.proxy.core.quota.QuotaTracker
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.milliseconds
 
 /** Qué días se suman en la pantalla. */
-enum class UsagePeriod(val label: String, val days: Int) {
-    TODAY("Hoy", 1),
-    WEEK("7 días", 7),
-    MONTH("30 días", 30),
+enum class UsagePeriod(val days: Int) {
+    TODAY(1),
+    WEEK(7),
+    MONTH(30),
 }
 
 /** Lo de un día, por salida. [day] es el día local contado desde el 1 de enero de 1970. */
@@ -92,22 +93,11 @@ class UsageViewModel(
 
     private fun quotaUi(status: QuotaStatus) = QuotaCardUi(
         status = status,
-        checkedAgo = status.quota?.let { agoText(clock.now().toEpochMilliseconds() - it.checkedAtMillis) },
+        checkedAgo = status.quota?.let { (clock.now().toEpochMilliseconds() - it.checkedAtMillis).milliseconds },
     )
 
     private companion object {
         const val TOP = 8
-    }
-}
-
-/** «ahora mismo», «hace 3 min», «hace 2 h», «hace 4 d». */
-internal fun agoText(millis: Long): String {
-    val minutes = millis / 60_000
-    return when {
-        minutes < 1 -> "ahora mismo"
-        minutes < 60 -> "hace $minutes min"
-        minutes < 24 * 60 -> "hace ${minutes / 60} h"
-        else -> "hace ${minutes / (24 * 60)} d"
     }
 }
 

@@ -45,6 +45,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import org.jetbrains.compose.resources.stringResource
+import org.uci.proxy.resources.Res
+import org.uci.proxy.resources.*
 import org.uci.proxy.theme.ProxyUciTheme
 import org.uci.proxy.ui.icons.UciIcons
 
@@ -72,7 +75,7 @@ fun UciTopBar(
             }
         },
         navigationIcon = {
-            if (onBack != null) UciIconButton(UciIcons.Back, "Volver", onBack, bordered = false)
+            if (onBack != null) UciIconButton(UciIcons.Back, stringResource(Res.string.ui_back), onBack, bordered = false)
         },
         actions = {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically, content = actions)
@@ -211,7 +214,7 @@ fun UciConfirmDialog(
     confirmLabel: String,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
-    dismissLabel: String = "Cancelar",
+    dismissLabel: String = stringResource(Res.string.ui_cancel),
     destructive: Boolean = false,
 ) {
     AlertDialog(
