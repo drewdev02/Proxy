@@ -94,4 +94,38 @@
     <string name="profile_tailscale_searching">Buscando nodos…</string>
     <string name="profile_tailscale_search">Buscar nodos de salida</string>
     <string name="profile_tailscale_hostname_label">Nombre de este equipo en la red</string>
+
+    <!-- Sección «Reglas de salida». -->
+    <string name="routing_title">Reglas de salida</string>
+    <string name="routing_subtitle">Qué sale por el proxy, por Otro País, directo o se bloquea</string>
+    <string name="routing_toggle">Activar reglas de salida</string>
+    <string name="routing_vpn_disabled_warning">Activa «Otro País» para usar esa salida; mientras tanto, lo suyo sale por el proxy.</string>
+    <string name="routing_default_exit_label">Lo que no coincida con ninguna regla sale por</string>
+    <string name="routing_default_exit_hint">Activa «Otro País» para poder elegirlo también como salida.</string>
+    <string name="routing_no_rules">Sin reglas</string>
+    <string name="routing_rules_header">Reglas · gana la primera que coincide</string>
+    <string name="routing_help">Un dominio incluye sus subdominios. «Directo» sale sin proxy: en un dominio, solo si su dirección es de la red local (si es pública, sale por el proxy). Una app que sale por Otro País puede tardar un segundo más en su primera conexión. Si Otro País se cae, su tráfico sale por el proxy hasta que vuelva.</string>
+    <!-- %1$s: el identificador del paquete de la app (com.example.app). -->
+    <string name="routing_rule_app">App · %1$s</string>
+    <string name="routing_kind_domain">Dominio y subdominios</string>
+    <string name="routing_kind_ip">IP o rango</string>
+    <string name="routing_kind_app">App</string>
+    <string name="routing_move_up">Subir regla</string>
+    <string name="routing_remove">Quitar regla</string>
+    <string name="routing_new_rule_label">Nueva regla: dominio, IP o rango</string>
+    <string name="routing_new_rule_error">Escribe un dominio (netflix.com), una IP o un rango (1.2.3.0/24).</string>
+    <string name="routing_add_rule">Añadir regla</string>
+    <string name="routing_pick_app">Elegir app</string>
+    <!-- Para lectores de pantalla, en la etiqueta que abre el menú de salidas. %1$s: la salida elegida. -->
+    <string name="routing_exit_description">Salida: %1$s</string>
+    <!-- Título de la lista de apps. %1$s: la salida de la regla (Proxy, Otro País…). -->
+    <string name="routing_app_picker_title">App que sale por %1$s</string>
+    <string name="routing_app_search">Buscar por nombre o paquete</string>
+    <string name="routing_apps_loading">Cargando apps…</string>
+    <string name="routing_no_app_matches">Ninguna app coincide</string>
+    <!-- Las salidas de una regla. -->
+    <string name="routing_exit_proxy">Proxy</string>
+    <string name="routing_exit_vpn">Otro País</string>
+    <string name="routing_exit_direct">Directo</string>
+    <string name="routing_exit_block">Bloquear</string>
 </resources>

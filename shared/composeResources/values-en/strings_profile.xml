@@ -86,4 +86,34 @@
     <string name="profile_tailscale_searching">Searching for nodes…</string>
     <string name="profile_tailscale_search">Search for exit nodes</string>
     <string name="profile_tailscale_hostname_label">This device's name on the network</string>
+
+    <!-- Exit rules section. -->
+    <string name="routing_title">Exit rules</string>
+    <string name="routing_subtitle">What goes through the proxy, through Other Country, direct, or is blocked</string>
+    <string name="routing_toggle">Turn on exit rules</string>
+    <string name="routing_vpn_disabled_warning">Turn on “Other Country” to use that exit; until then, its traffic goes through the proxy.</string>
+    <string name="routing_default_exit_label">Anything that matches no rule exits through</string>
+    <string name="routing_default_exit_hint">Turn on “Other Country” to be able to choose it as an exit too.</string>
+    <string name="routing_no_rules">No rules</string>
+    <string name="routing_rules_header">Rules · the first match wins</string>
+    <string name="routing_help">A domain includes its subdomains. “Direct” bypasses the proxy: for a domain, only if its address is on the local network (if it's public, it goes through the proxy). An app that exits through Other Country may take an extra second on its first connection. If Other Country goes down, its traffic goes through the proxy until it's back.</string>
+    <string name="routing_rule_app">App · %1$s</string>
+    <string name="routing_kind_domain">Domain and subdomains</string>
+    <string name="routing_kind_ip">IP or range</string>
+    <string name="routing_kind_app">App</string>
+    <string name="routing_move_up">Move rule up</string>
+    <string name="routing_remove">Remove rule</string>
+    <string name="routing_new_rule_label">New rule: domain, IP or range</string>
+    <string name="routing_new_rule_error">Enter a domain (netflix.com), an IP or a range (1.2.3.0/24).</string>
+    <string name="routing_add_rule">Add rule</string>
+    <string name="routing_pick_app">Choose app</string>
+    <string name="routing_exit_description">Exit: %1$s</string>
+    <string name="routing_app_picker_title">App that exits through %1$s</string>
+    <string name="routing_app_search">Search by name or package</string>
+    <string name="routing_apps_loading">Loading apps…</string>
+    <string name="routing_no_app_matches">No app matches</string>
+    <string name="routing_exit_proxy">Proxy</string>
+    <string name="routing_exit_vpn">Other Country</string>
+    <string name="routing_exit_direct">Direct</string>
+    <string name="routing_exit_block">Block</string>
 </resources>
