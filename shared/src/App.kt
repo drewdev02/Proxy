@@ -36,6 +36,11 @@ import org.uci.proxy.ui.components.UciNavItem
 import org.uci.proxy.ui.components.UciNavigationScaffold
 import org.uci.proxy.ui.icons.UciIcons
 import org.uci.proxy.usage.UsageScreen
+import org.koin.compose.koinInject
+import org.uci.proxy.i18n.AppLanguageEnvironment
+import org.uci.proxy.i18n.AppLanguageSetting
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.getValue
 
 /** Requiere que la app haya llamado antes a [org.uci.proxy.di.initKoin]. */
 @Composable
@@ -60,76 +65,81 @@ fun App(
     LocalFilePicker provides filePicker,
     LocalAppCatalog provides appCatalog,
 ) {
+    val languageSetting = koinInject<AppLanguageSetting>()
+    val language by languageSetting.composeOverride.collectAsStateWithLifecycle()
     ProxyUciTheme {
         val backStack = rememberNavBackStack(routesConfiguration, Route.Connection)
-        val tabs = listOf<UciNavItem<Route>>(
-            UciNavItem(Route.Connection, stringResource(Res.string.nav_connection), UciIcons.Shield),
-            UciNavItem(Route.Logs, stringResource(Res.string.nav_logs), UciIcons.Logs),
-            UciNavItem(Route.ProfileList, stringResource(Res.string.nav_profiles), UciIcons.Badge),
-            UciNavItem(Route.Settings, stringResource(Res.string.nav_settings), UciIcons.Tune),
-        )
+        // El idioma va por debajo de la navegación: al cambiarlo se releen los textos sin perder la pantalla en la que se está.
+        AppLanguageEnvironment(language) {
+            val tabs = listOf<UciNavItem<Route>>(
+                UciNavItem(Route.Connection, stringResource(Res.string.nav_connection), UciIcons.Shield),
+                UciNavItem(Route.Logs, stringResource(Res.string.nav_logs), UciIcons.Logs),
+                UciNavItem(Route.ProfileList, stringResource(Res.string.nav_profiles), UciIcons.Badge),
+                UciNavItem(Route.Settings, stringResource(Res.string.nav_settings), UciIcons.Tune),
+            )
 
-        Surface(color = MaterialTheme.colorScheme.background) {
-            UciNavigationScaffold(
-                items = tabs,
-                selected = backStack.currentTab(),
-                onSelect = { backStack.selectTab(it) },
-                // Las pantallas de detalle (editor, catálogo) ocupan todo, sin barra.
-                showNavigation = backStack.isOnTab(),
-                topInset = titleBarInset,
-            ) { wide ->
-                NavDisplay(
-                    backStack = backStack,
-                    // También atiende el botón y el gesto de atrás del sistema.
-                    onBack = { backStack.removeLastOrNull() },
-                    // Un ViewModel por pantalla: se descarta al salir de ella, y no se arrastra el estado de la vez anterior.
-                    entryDecorators = listOf(
-                        rememberSaveableStateHolderNavEntryDecorator(),
-                        rememberViewModelStoreNavEntryDecorator(),
-                    ),
-                    entryProvider = entryProvider {
-                        entry<Route.Connection> {
-                            ConnectionScreen(
-                                wide = wide,
-                                navigation = ConnectionNavigation(
+            Surface(color = MaterialTheme.colorScheme.background) {
+                UciNavigationScaffold(
+                    items = tabs,
+                    selected = backStack.currentTab(),
+                    onSelect = { backStack.selectTab(it) },
+                    // Las pantallas de detalle (editor, catálogo) ocupan todo, sin barra.
+                    showNavigation = backStack.isOnTab(),
+                    topInset = titleBarInset,
+                ) { wide ->
+                    NavDisplay(
+                        backStack = backStack,
+                        // También atiende el botón y el gesto de atrás del sistema.
+                        onBack = { backStack.removeLastOrNull() },
+                        // Un ViewModel por pantalla: se descarta al salir de ella, y no se arrastra el estado de la vez anterior.
+                        entryDecorators = listOf(
+                            rememberSaveableStateHolderNavEntryDecorator(),
+                            rememberViewModelStoreNavEntryDecorator(),
+                        ),
+                        entryProvider = entryProvider {
+                            entry<Route.Connection> {
+                                ConnectionScreen(
+                                    wide = wide,
+                                    navigation = ConnectionNavigation(
+                                        onEditProfile = { backStack.add(Route.ProfileEditor(profileId = it)) },
+                                        onAddProfile = { backStack.add(Route.ProfileEditor(profileId = null)) },
+                                        onOpenLogs = { backStack.selectTab(Route.Logs) },
+                                        onOpenUsage = { backStack.add(Route.Usage) },
+                                    ),
+                                )
+                            }
+                            entry<Route.ProfileList> {
+                                ProfileListScreen(
+                                    onAdd = { backStack.add(Route.ProfileEditor(profileId = null)) },
+                                    onEdit = { backStack.add(Route.ProfileEditor(profileId = it)) },
+                                    onOpenCatalog = if (developerMode) {
+                                        { backStack.add(Route.Catalog) }
+                                    } else {
+                                        null
+                                    },
+                                )
+                            }
+                            entry<Route.Usage> {
+                                UsageScreen(
+                                    onBack = { backStack.removeLastOrNull() },
                                     onEditProfile = { backStack.add(Route.ProfileEditor(profileId = it)) },
-                                    onAddProfile = { backStack.add(Route.ProfileEditor(profileId = null)) },
-                                    onOpenLogs = { backStack.selectTab(Route.Logs) },
-                                    onOpenUsage = { backStack.add(Route.Usage) },
-                                ),
-                            )
-                        }
-                        entry<Route.ProfileList> {
-                            ProfileListScreen(
-                                onAdd = { backStack.add(Route.ProfileEditor(profileId = null)) },
-                                onEdit = { backStack.add(Route.ProfileEditor(profileId = it)) },
-                                onOpenCatalog = if (developerMode) {
-                                    { backStack.add(Route.Catalog) }
-                                } else {
-                                    null
-                                },
-                            )
-                        }
-                        entry<Route.Usage> {
-                            UsageScreen(
-                                onBack = { backStack.removeLastOrNull() },
-                                onEditProfile = { backStack.add(Route.ProfileEditor(profileId = it)) },
-                            )
-                        }
-                        entry<Route.Catalog> {
-                            ComponentCatalogScreen(onBack = { backStack.removeLastOrNull() })
-                        }
-                        // Pestañas: no tienen «Volver»; atrás lleva a Conexión.
-                        entry<Route.Settings> { SettingsScreen(developerMode = developerMode) }
-                        entry<Route.Logs> { LogsScreen() }
-                        entry<Route.ProfileEditor> { route ->
-                            ProfileEditorScreen(
-                                profileId = route.profileId,
-                                onClose = { backStack.removeLastOrNull() },
-                            )
-                        }
-                    },
-                )
+                                )
+                            }
+                            entry<Route.Catalog> {
+                                ComponentCatalogScreen(onBack = { backStack.removeLastOrNull() })
+                            }
+                            // Pestañas: no tienen «Volver»; atrás lleva a Conexión.
+                            entry<Route.Settings> { SettingsScreen(developerMode = developerMode) }
+                            entry<Route.Logs> { LogsScreen() }
+                            entry<Route.ProfileEditor> { route ->
+                                ProfileEditorScreen(
+                                    profileId = route.profileId,
+                                    onClose = { backStack.removeLastOrNull() },
+                                )
+                            }
+                        },
+                    )
+                }
             }
         }
     }
