@@ -31,6 +31,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringArrayResource
+import org.jetbrains.compose.resources.stringResource
+import org.uci.proxy.resources.Res
+import org.uci.proxy.resources.*
 import org.uci.proxy.theme.ProxyUciTheme
 import org.uci.proxy.ui.components.UciBottomNavBar
 import org.uci.proxy.ui.components.UciBottomSheet
@@ -84,22 +89,24 @@ import org.uci.proxy.ui.icons.UciIcons
  */
 
 /** Una sección del catálogo. El orden es el de la pantalla. */
-enum class CatalogSection(val title: String, val content: @Composable ColumnScope.() -> Unit) {
-    Foundations("Colores y tipografía", { FoundationsSection() }),
-    Containers("Contenedores", { ContainersSection() }),
-    Buttons("Botones", { ButtonsSection() }),
-    Power("Botón de conexión", { PowerSection() }),
-    Status("Estado", { StatusSection() }),
-    Forms("Formularios", { FormsSection() }),
-    Lists("Listas", { ListsSection() }),
-    Navigation("Navegación", { NavigationSection() }),
-    Data("Datos", { DataSection() }),
+enum class CatalogSection(val title: StringResource, val content: @Composable ColumnScope.() -> Unit) {
+    Foundations(Res.string.catalog_section_foundations, { FoundationsSection() }),
+    Containers(Res.string.catalog_section_containers, { ContainersSection() }),
+    Buttons(Res.string.catalog_section_buttons, { ButtonsSection() }),
+    Power(Res.string.catalog_section_power, { PowerSection() }),
+    Status(Res.string.catalog_section_status, { StatusSection() }),
+    Forms(Res.string.catalog_section_forms, { FormsSection() }),
+    Lists(Res.string.catalog_section_lists, { ListsSection() }),
+    Navigation(Res.string.catalog_section_navigation, { NavigationSection() }),
+    Data(Res.string.catalog_section_data, { DataSection() }),
 }
 
 @Composable
 fun ComponentCatalogScreen(onBack: () -> Unit) {
     Scaffold(
-        topBar = { UciTopBar("Catálogo de componentes", subtitle = "Solo en modo desarrollo", onBack = onBack) },
+        topBar = {
+            UciTopBar(stringResource(Res.string.catalog_title), subtitle = stringResource(Res.string.catalog_subtitle), onBack = onBack)
+        },
         containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
         LazyColumn(
@@ -119,36 +126,48 @@ fun ComponentCatalogScreen(onBack: () -> Unit) {
 @Composable
 fun CatalogSectionView(section: CatalogSection, modifier: Modifier = Modifier) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(ProxyUciTheme.spacing.md)) {
-        Text(section.title, style = MaterialTheme.typography.headlineSmall)
+        Text(stringResource(section.title), style = MaterialTheme.typography.headlineSmall)
         section.content(this)
     }
 }
 
 @Composable
-private fun Sub(text: String) = UciSectionHeader(text)
+private fun Sub(text: StringResource) = UciSectionHeader(stringResource(text))
+
+/** Abreviatura de [stringResource]: el catálogo tiene muchos textos de ejemplo y así las líneas siguen siendo legibles. */
+@Composable
+private fun s(resource: StringResource): String = stringResource(resource)
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun FoundationsSection() {
     val c = ProxyUciTheme.colors
     val scheme = MaterialTheme.colorScheme
-    Sub("Superficies")
-    Swatches(listOf("Fondo" to c.canvas, "Tarjeta" to c.card, "Borde" to c.cardBorder, "Control" to c.control, "Borde ctrl." to c.controlBorder))
-    Sub("Significado")
+    Sub(Res.string.catalog_surfaces)
     Swatches(
         listOf(
-            "Activo" to c.active, "Conectado" to c.connected, "Otro País" to c.routing, "Reposo" to c.idle,
-            "Aviso" to c.warning, "Error" to c.danger, "Primario" to scheme.primary,
+            s(Res.string.catalog_swatch_background) to c.canvas, s(Res.string.catalog_swatch_card) to c.card,
+            s(Res.string.catalog_swatch_border) to c.cardBorder, s(Res.string.catalog_swatch_control) to c.control,
+            s(Res.string.catalog_swatch_control_border) to c.controlBorder,
         ),
     )
-    Sub("Tipografía")
+    Sub(Res.string.catalog_meaning)
+    Swatches(
+        listOf(
+            s(Res.string.catalog_swatch_active) to c.active, s(Res.string.catalog_connected) to c.connected,
+            s(Res.string.catalog_other_country) to c.routing, s(Res.string.catalog_swatch_idle) to c.idle,
+            s(Res.string.catalog_swatch_warning) to c.warning, s(Res.string.catalog_error) to c.danger,
+            s(Res.string.catalog_swatch_primary) to scheme.primary,
+        ),
+    )
+    Sub(Res.string.catalog_typography)
     val t = MaterialTheme.typography
     val m = ProxyUciTheme.mono
     listOf<Pair<String, TextStyle>>(
         "Display 32" to t.displayMedium,
         "Headline 20" to t.headlineSmall,
         "Title 16" to t.titleMedium,
-        "Body 14 — texto normal de la interfaz" to t.bodyMedium,
+        s(Res.string.catalog_type_body) to t.bodyMedium,
         "Label 12" to t.labelMedium,
     ).forEach { (text, style) -> Text(text, style = style) }
     Text("4.82", style = m.metricLarge)
@@ -176,26 +195,26 @@ private fun Swatches(colors: List<Pair<String, Color>>) {
 
 @Composable
 private fun ContainersSection() {
-    Sub("Tarjetas por tono")
-    UciCard(Modifier.fillMaxWidth()) { Text("Normal") }
-    UciCard(Modifier.fillMaxWidth(), tone = UciTone.Success) { Text("Conectado") }
-    UciCard(Modifier.fillMaxWidth(), tone = UciTone.Routing, onClick = {}) { Text("Otro País (se puede pulsar)") }
-    Sub("Tarjeta de sección")
+    Sub(Res.string.catalog_cards_by_tone)
+    UciCard(Modifier.fillMaxWidth()) { Text(s(Res.string.catalog_card_normal)) }
+    UciCard(Modifier.fillMaxWidth(), tone = UciTone.Success) { Text(s(Res.string.catalog_connected)) }
+    UciCard(Modifier.fillMaxWidth(), tone = UciTone.Routing, onClick = {}) { Text(s(Res.string.catalog_card_clickable)) }
+    Sub(Res.string.catalog_section_card)
     var on by remember { mutableStateOf(true) }
     UciSectionCard(
-        title = "Otro País",
-        subtitle = "Canadá · OpenVPN tras el proxy",
+        title = s(Res.string.catalog_other_country),
+        subtitle = s(Res.string.catalog_other_country_subtitle),
         icon = UciIcons.Globe,
         tone = UciTone.Routing,
-        trailing = { UciSwitch(on, { on = it }, contentDescription = "Activar Otro País") },
+        trailing = { UciSwitch(on, { on = it }, contentDescription = s(Res.string.catalog_enable_other_country)) },
     ) {
         Text(
-            "El tráfico pasa primero por el proxy para autenticarse y luego sale por la VPN.",
+            s(Res.string.catalog_other_country_body),
             style = MaterialTheme.typography.bodyMedium,
             color = ProxyUciTheme.colors.onSurfaceMuted,
         )
     }
-    Sub("Caja de icono")
+    Sub(Res.string.catalog_icon_box)
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         UciTone.entries.forEach { UciIconBox(UciIcons.Shield, tone = it) }
     }
@@ -203,23 +222,23 @@ private fun ContainersSection() {
 
 @Composable
 private fun ButtonsSection() {
-    Sub("Variantes")
+    Sub(Res.string.catalog_variants)
     UciButtonVariant.entries.forEach { variant ->
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             UciButton(variant.name, {}, variant = variant, icon = UciIcons.Refresh)
-            UciButton("Inactivo", {}, variant = variant, enabled = false)
+            UciButton(s(Res.string.catalog_disabled), {}, variant = variant, enabled = false)
         }
     }
-    Sub("Cargando y ancho completo")
-    UciButton("Probando conexión", {}, loading = true, modifier = Modifier.fillMaxWidth())
-    UciButton("Guardar cambios", {}, icon = UciIcons.Check, modifier = Modifier.fillMaxWidth())
-    Sub("Solo icono")
+    Sub(Res.string.catalog_loading_full_width)
+    UciButton(s(Res.string.catalog_testing_connection), {}, loading = true, modifier = Modifier.fillMaxWidth())
+    UciButton(s(Res.string.catalog_save_changes), {}, icon = UciIcons.Check, modifier = Modifier.fillMaxWidth())
+    Sub(Res.string.catalog_icon_only)
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-        UciIconButton(UciIcons.Swap, "Cambiar perfil", {})
-        UciIconButton(UciIcons.Copy, "Copiar", {}, tone = UciTone.Active)
-        UciIconButton(UciIcons.Delete, "Borrar", {}, tone = UciTone.Danger)
-        UciIconButton(UciIcons.Terminal, "Registros", {}, bordered = false)
-        UciIconButton(UciIcons.Edit, "Editar", {}, enabled = false)
+        UciIconButton(UciIcons.Swap, s(Res.string.catalog_switch_profile), {})
+        UciIconButton(UciIcons.Copy, s(Res.string.catalog_copy), {}, tone = UciTone.Active)
+        UciIconButton(UciIcons.Delete, s(Res.string.catalog_delete), {}, tone = UciTone.Danger)
+        UciIconButton(UciIcons.Terminal, s(Res.string.catalog_logs), {}, bordered = false)
+        UciIconButton(UciIcons.Edit, s(Res.string.catalog_edit), {}, enabled = false)
     }
 }
 
@@ -228,29 +247,29 @@ private fun ButtonsSection() {
 private fun PowerSection() {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         listOf(
-            UciPowerState.Idle to "Conectar",
-            UciPowerState.Connecting to "Conectando",
-            UciPowerState.Connected to "Conectado",
-            UciPowerState.Error to "Reintentar",
-        ).forEach { (state, label) -> UciPowerButton(state, label, {}, diameter = 110.dp) }
+            UciPowerState.Idle to Res.string.catalog_connect,
+            UciPowerState.Connecting to Res.string.catalog_connecting,
+            UciPowerState.Connected to Res.string.catalog_connected,
+            UciPowerState.Error to Res.string.catalog_retry,
+        ).forEach { (state, label) -> UciPowerButton(state, s(label), {}, diameter = 110.dp) }
     }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun StatusSection() {
-    Sub("Etiquetas")
+    Sub(Res.string.catalog_tags)
     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         UciStatusPill("Direct")
         UciStatusPill("Tunnel", tone = UciTone.Active)
         UciStatusPill("NTLMv2", tone = UciTone.Success, icon = UciIcons.Lock)
-        UciStatusPill("Otro País", tone = UciTone.Routing)
-        UciStatusPill("Aislado", tone = UciTone.Warning)
-        UciStatusPill("Falla", tone = UciTone.Danger)
+        UciStatusPill(s(Res.string.catalog_other_country), tone = UciTone.Routing)
+        UciStatusPill(s(Res.string.catalog_pill_isolated), tone = UciTone.Warning)
+        UciStatusPill(s(Res.string.catalog_pill_failure), tone = UciTone.Danger)
         UciStatusPill("HTTP 200", tone = UciTone.Success, pill = false)
         UciStatusPill("DNS:INTERCEPT", tone = UciTone.Routing, pill = false)
     }
-    Sub("Puntos y latencia")
+    Sub(Res.string.catalog_dots_latency)
     Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
         UciStatusDot(UciTone.Success)
         UciStatusDot(UciTone.Active, pulsing = true)
@@ -261,23 +280,26 @@ private fun StatusSection() {
         UciLatencyBadge(420)
         UciLatencyBadge(null)
     }
-    Sub("Filtros")
-    var selected by remember { mutableStateOf("Todos") }
+    Sub(Res.string.catalog_filters)
+    val all = s(Res.string.catalog_filter_all)
+    var selected by remember { mutableStateOf(all) }
     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        listOf(Triple("Todos", 142, null), Triple("DNS", 68, UciTone.Routing), Triple("Proxy", 45, UciTone.Active), Triple("Errores", 3, UciTone.Danger))
+        listOf(Triple(all, 142, null), Triple("DNS", 68, UciTone.Routing), Triple("Proxy", 45, UciTone.Active), Triple(s(Res.string.catalog_filter_errors), 3, UciTone.Danger))
             .forEach { (label, count, dot) -> UciFilterChip(label, selected == label, { selected = label }, count = count, dot = dot) }
     }
-    Sub("Avisos")
-    UciInlineAlert("Los servicios de nombres se probarán al conectar.")
-    UciInlineAlert("Conectado por sslip.io (42 ms).", tone = UciTone.Success)
-    UciInlineAlert("nip.io falló 3 veces y queda aislado 10 minutos.", tone = UciTone.Warning, title = "Servicio aislado", onDismiss = {})
+    Sub(Res.string.catalog_alerts)
+    UciInlineAlert(s(Res.string.catalog_alert_info))
+    UciInlineAlert(s(Res.string.catalog_alert_success), tone = UciTone.Success)
+    UciInlineAlert(s(Res.string.catalog_alert_warning), tone = UciTone.Warning, title = s(Res.string.catalog_alert_warning_title), onDismiss = {})
     UciInlineAlert(
-        "El proxy rechazó el usuario o la contraseña.",
+        s(Res.string.catalog_alert_error),
         tone = UciTone.Danger,
-        title = "No se pudo conectar",
-        action = { UciButton("Reintentar", {}, variant = UciButtonVariant.Text) },
+        title = s(Res.string.catalog_alert_error_title),
+        action = { UciButton(s(Res.string.catalog_retry), {}, variant = UciButtonVariant.Text) },
     )
 }
+
+private enum class CatalogMode { Inclusive, Exclusive }
 
 @Composable
 private fun FormsSection() {
@@ -287,54 +309,63 @@ private fun FormsSection() {
     var pass by remember { mutableStateOf("secreto") }
     var query by remember { mutableStateOf("") }
     var auth by remember { mutableStateOf("NTLMv2") }
-    var mode by remember { mutableStateOf("Inclusivo") }
+    var mode by remember { mutableStateOf(CatalogMode.Inclusive) }
     var s1 by remember { mutableStateOf(true) }
     var s2 by remember { mutableStateOf(false) }
     var cidr1 by remember { mutableStateOf(true) }
     var cidr2 by remember { mutableStateOf(false) }
 
-    Sub("Campos")
-    UciTextField(host, { host = it }, "Servidor", leadingIcon = UciIcons.Dns, mono = true, supportingText = "Nombre o IP del proxy")
-    UciTextField(port, { port = it }, "Puerto", mono = true, error = "Debe ser un número entre 1 y 65535")
-    UciTextField(user, { user = it }, "Usuario", placeholder = "nombre.apellido", leadingIcon = UciIcons.Person)
-    UciPasswordField(pass, { pass = it }, "Contraseña", supportingText = "Se guarda en el almacén seguro del sistema")
-    UciTextField("solo lectura", {}, "Inactivo", enabled = false)
-    UciSearchField(query, { query = it }, "Buscar dominio, IP o etiqueta")
-    Sub("Selector")
-    UciSegmentedControl(listOf("NTLMv2", "Basic", "Sin auth"), auth, { auth = it }, label = { it })
+    Sub(Res.string.catalog_fields)
+    UciTextField(host, { host = it }, s(Res.string.catalog_server), leadingIcon = UciIcons.Dns, mono = true, supportingText = s(Res.string.catalog_server_hint))
+    UciTextField(port, { port = it }, s(Res.string.catalog_port), mono = true, error = s(Res.string.catalog_port_error))
+    UciTextField(user, { user = it }, s(Res.string.catalog_user), placeholder = s(Res.string.catalog_user_placeholder), leadingIcon = UciIcons.Person)
+    UciPasswordField(pass, { pass = it }, s(Res.string.catalog_password), supportingText = s(Res.string.catalog_password_hint))
+    UciTextField(s(Res.string.catalog_read_only), {}, s(Res.string.catalog_disabled), enabled = false)
+    UciSearchField(query, { query = it }, s(Res.string.catalog_search_placeholder))
+    Sub(Res.string.catalog_selector)
+    UciSegmentedControl(listOf("NTLMv2", "Basic", s(Res.string.catalog_no_auth)), auth, { auth = it }, label = { it })
+    val inclusive = s(Res.string.catalog_mode_inclusive)
+    val exclusive = s(Res.string.catalog_mode_exclusive)
+    val inclusiveDescription = s(Res.string.catalog_mode_inclusive_description)
+    val exclusiveDescription = s(Res.string.catalog_mode_exclusive_description)
     UciSegmentedControl(
-        listOf("Inclusivo", "Exclusivo"),
+        CatalogMode.entries,
         mode,
         { mode = it },
-        label = { if (it == "Inclusivo") "Solo seleccionadas" else "Todas excepto" },
-        description = { "Modo $it" },
+        label = { if (it == CatalogMode.Inclusive) inclusive else exclusive },
+        description = { if (it == CatalogMode.Inclusive) inclusiveDescription else exclusiveDescription },
     )
-    Sub("Interruptores y casillas")
+    Sub(Res.string.catalog_switches_checkboxes)
     UciCard(Modifier.fillMaxWidth()) {
-        UciSwitchRow("Responder comprobaciones de red", s1, { s1 = it }, subtitle = "El túnel contesta en local", icon = UciIcons.CheckCircle)
+        UciSwitchRow(
+            s(Res.string.catalog_answer_network_checks), s1, { s1 = it },
+            subtitle = s(Res.string.catalog_answer_network_checks_hint), icon = UciIcons.CheckCircle,
+        )
         UciDivider()
-        UciSwitchRow("Protección de fugas de DNS", s2, { s2 = it }, icon = UciIcons.Shield)
+        UciSwitchRow(s(Res.string.catalog_dns_leak_protection), s2, { s2 = it }, icon = UciIcons.Shield)
         UciDivider()
-        UciSwitchRow("No disponible aquí", false, {}, enabled = false)
+        UciSwitchRow(s(Res.string.catalog_unavailable_here), false, {}, enabled = false)
         UciDivider()
-        UciCheckboxRow("10.0.0.0/8", cidr1, { cidr1 = it }, subtitle = "Redes de la universidad", mono = true)
+        UciCheckboxRow("10.0.0.0/8", cidr1, { cidr1 = it }, subtitle = s(Res.string.catalog_university_networks), mono = true)
         UciDivider()
-        UciCheckboxRow("192.168.0.0/16", cidr2, { cidr2 = it }, subtitle = "Redes domésticas", mono = true)
+        UciCheckboxRow("192.168.0.0/16", cidr2, { cidr2 = it }, subtitle = s(Res.string.catalog_home_networks), mono = true)
     }
-    Sub("Archivo")
-    UciFileField("canada_udp.ovpn", {}, detail = "14,2 KB · importado")
+    Sub(Res.string.catalog_file)
+    UciFileField("canada_udp.ovpn", {}, detail = s(Res.string.catalog_file_detail))
     UciFileField(null, {})
 }
 
 @Composable
 private fun ListsSection() {
-    Sub("Filas de ajuste")
+    Sub(Res.string.catalog_setting_rows)
     UciCard(Modifier.fillMaxWidth()) {
-        UciSettingRow("Servicios de nombres", subtitle = "sslip.io, nip.io", icon = UciIcons.Dns, onClick = {})
+        UciSettingRow(s(Res.string.catalog_name_services), subtitle = "sslip.io, nip.io", icon = UciIcons.Dns, onClick = {})
         UciDivider()
-        UciSettingRow("Versión", icon = UciIcons.Info) { Text("0.9.4", style = ProxyUciTheme.mono.metricSmall, color = ProxyUciTheme.colors.onSurfaceMuted) }
+        UciSettingRow(s(Res.string.catalog_version), icon = UciIcons.Info) {
+            Text("0.9.4", style = ProxyUciTheme.mono.metricSmall, color = ProxyUciTheme.colors.onSurfaceMuted)
+        }
     }
-    Sub("Perfiles")
+    Sub(Res.string.catalog_profiles)
     UciProfileRow(
         name = "UCI Docente",
         address = "proxy.uci.cu:8080",
@@ -344,9 +375,9 @@ private fun ListsSection() {
         tags = {
             UciStatusPill("HTTP")
             UciStatusPill("NTLMv2", tone = UciTone.Success)
-            UciStatusPill("Otro País", tone = UciTone.Routing)
+            UciStatusPill(s(Res.string.catalog_other_country), tone = UciTone.Routing)
         },
-        trailing = { UciIconButton(UciIcons.Edit, "Editar perfil", {}, bordered = false) },
+        trailing = { UciIconButton(UciIcons.Edit, s(Res.string.catalog_edit_profile), {}, bordered = false) },
     )
     UciProfileRow(
         name = "Residencia",
@@ -356,19 +387,19 @@ private fun ListsSection() {
         onClick = {},
         tags = { UciStatusPill("SOCKS5") },
     )
-    Sub("Lista ordenable")
+    Sub(Res.string.catalog_reorderable_list)
     val services = remember { mutableStateListOf("sslip.io", "nip.io", "propio.example.cu") }
     UciReorderableList(services, onMove = { from, to -> services.add(to, services.removeAt(from)) }) { name ->
         Text(name, style = ProxyUciTheme.mono.metricSmall, modifier = Modifier.weight(1f))
         UciLatencyBadge(if (name == "sslip.io") 42 else if (name == "nip.io") 58 else null)
     }
-    Sub("Vacío")
+    Sub(Res.string.catalog_empty)
     UciCard(Modifier.fillMaxWidth()) {
         UciEmptyState(
-            title = "Aún no hay perfiles",
+            title = s(Res.string.catalog_empty_title),
             icon = UciIcons.Badge,
-            message = "Añade el proxy de tu facultad para empezar.",
-            action = { UciButton("Añadir perfil", {}, icon = UciIcons.Add) },
+            message = s(Res.string.catalog_empty_message),
+            action = { UciButton(s(Res.string.catalog_add_profile), {}, icon = UciIcons.Add) },
         )
     }
 }
@@ -378,68 +409,75 @@ private enum class Dest { Connection, Logs, Profiles, Settings }
 @Composable
 private fun NavigationSection() {
     val items = listOf(
-        UciNavItem(Dest.Connection, "Conexión", UciIcons.Shield),
-        UciNavItem(Dest.Logs, "Registros", UciIcons.Logs, badge = 12),
-        UciNavItem(Dest.Profiles, "Perfiles", UciIcons.Badge),
-        UciNavItem(Dest.Settings, "Ajustes", UciIcons.Tune),
+        UciNavItem(Dest.Connection, s(Res.string.nav_connection), UciIcons.Shield),
+        UciNavItem(Dest.Logs, s(Res.string.nav_logs), UciIcons.Logs, badge = 12),
+        UciNavItem(Dest.Profiles, s(Res.string.nav_profiles), UciIcons.Badge),
+        UciNavItem(Dest.Settings, s(Res.string.nav_settings), UciIcons.Tune),
     )
     var dest by remember { mutableStateOf(Dest.Connection) }
     var dialog by remember { mutableStateOf(false) }
     var sheet by remember { mutableStateOf(false) }
 
-    Sub("Cabecera")
+    Sub(Res.string.catalog_header)
     UciCard(Modifier.fillMaxWidth(), contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
-        UciTopBar("Editar perfil", subtitle = "UCI Docente", onBack = {}, actions = { UciStatusPill("Tunnel", tone = UciTone.Success) })
+        UciTopBar(s(Res.string.catalog_edit_profile), subtitle = "UCI Docente", onBack = {}, actions = { UciStatusPill("Tunnel", tone = UciTone.Success) })
     }
-    Sub("Barra inferior (móvil)")
+    Sub(Res.string.catalog_bottom_bar)
     UciBottomNavBar(items, dest, { dest = it })
-    Sub("Barra lateral (tableta y escritorio)")
+    Sub(Res.string.catalog_side_rail)
     Box(Modifier.height(320.dp).border(1.dp, ProxyUciTheme.colors.cardBorder, MaterialTheme.shapes.medium)) {
         UciNavigationRail(items, dest, { dest = it })
     }
-    Sub("Diálogo y hoja inferior")
+    Sub(Res.string.catalog_dialog_sheet)
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        UciButton("Borrar perfil", { dialog = true }, variant = UciButtonVariant.Danger)
-        UciButton("Elegir país", { sheet = true }, variant = UciButtonVariant.Secondary)
+        UciButton(s(Res.string.catalog_delete_profile), { dialog = true }, variant = UciButtonVariant.Danger)
+        UciButton(s(Res.string.catalog_choose_country), { sheet = true }, variant = UciButtonVariant.Secondary)
     }
     if (dialog) {
         UciConfirmDialog(
-            title = "¿Borrar «UCI Docente»?",
-            message = "Se borran también su contraseña y su VPN guardadas.",
-            confirmLabel = "Borrar",
+            title = stringResource(Res.string.catalog_delete_profile_title, "UCI Docente"),
+            message = s(Res.string.catalog_delete_profile_message),
+            confirmLabel = s(Res.string.catalog_delete),
             destructive = true,
             onConfirm = { dialog = false },
             onDismiss = { dialog = false },
         )
     }
     if (sheet) {
-        UciBottomSheet("Elegir país", onDismiss = { sheet = false }) {
-            listOf("Canadá", "Países Bajos", "Japón").forEach { UciSettingRow(it, icon = UciIcons.Globe, onClick = { sheet = false }) }
+        UciBottomSheet(s(Res.string.catalog_choose_country), onDismiss = { sheet = false }) {
+            stringArrayResource(Res.array.catalog_countries).forEach { UciSettingRow(it, icon = UciIcons.Globe, onClick = { sheet = false }) }
         }
     }
 }
 
 @Composable
 private fun DataSection() {
-    Sub("Cifras")
+    Sub(Res.string.catalog_figures)
     Row(horizontalArrangement = Arrangement.spacedBy(ProxyUciTheme.spacing.gutterSmall)) {
         UciMetricTile(
-            "Descarga", "4.8", Modifier.weight(1f), unit = "MB/s", icon = UciIcons.ArrowDown, accent = UciTone.Active,
+            s(Res.string.catalog_download), "4.8", Modifier.weight(1f), unit = "MB/s", icon = UciIcons.ArrowDown, accent = UciTone.Active,
             chart = { UciSparkline(listOf(1f, 3f, 2f, 5f, 4f, 6f, 4.8f)) },
         )
         UciMetricTile(
-            "Subida", "820", Modifier.weight(1f), unit = "KB/s", icon = UciIcons.ArrowUp, accent = UciTone.Success,
+            s(Res.string.catalog_upload), "820", Modifier.weight(1f), unit = "KB/s", icon = UciIcons.ArrowUp, accent = UciTone.Success,
             chart = { UciSparkline(listOf(2f, 2f, 3f, 2.5f, 4f, 3f, 3.5f), color = ProxyUciTheme.colors.connected) },
         )
     }
     Row(horizontalArrangement = Arrangement.spacedBy(ProxyUciTheme.spacing.gutterSmall)) {
-        UciMetricTile("Conexiones", "34", Modifier.weight(1f), icon = UciIcons.Hub, caption = "TCP activas")
-        UciMetricTile("Sesión", "02:45", Modifier.weight(1f), unit = "h", icon = UciIcons.Schedule, caption = "desde las 14:30")
+        UciMetricTile(
+            s(Res.string.catalog_connections), "34", Modifier.weight(1f), icon = UciIcons.Hub,
+            caption = s(Res.string.catalog_connections_caption),
+        )
+        UciMetricTile(
+            s(Res.string.catalog_session), "02:45", Modifier.weight(1f), unit = "h", icon = UciIcons.Schedule,
+            caption = s(Res.string.catalog_session_caption),
+        )
     }
-    Sub("Consumo")
+    Sub(Res.string.catalog_usage)
     val colors = ProxyUciTheme.colors
+    val days = stringArrayResource(Res.array.catalog_days)
     UciBarChart(
-        bars = listOf("Ju" to 3f, "Vi" to 5f, "Sá" to 4f, "Do" to 1f, "Lu" to 0f, "Ma" to 4.5f, "Mi" to 3.2f).mapIndexed { i, (day, value) ->
+        bars = days.zip(listOf(3f, 5f, 4f, 1f, 0f, 4.5f, 3.2f)).mapIndexed { i, (day, value) ->
             UciBar(day, listOf(UciBarSegment(value * 0.7f, colors.active), UciBarSegment(value * 0.3f, colors.routing)), highlighted = i == 6)
         },
     )
@@ -449,13 +487,13 @@ private fun DataSection() {
         UciQuotaRing(0.71f, color = colors.connected) { Text("594 MB", style = ProxyUciTheme.mono.metricSmall) }
         UciQuotaRing(0.92f, color = colors.danger) { Text("158 MB", style = ProxyUciTheme.mono.metricSmall) }
     }
-    Sub("Registro")
+    Sub(Res.string.catalog_log)
     UciLogEntryCard(
         time = "14:32:05.124",
         title = "github.com:443",
         tags = listOf(UciLogTag("Relay:connect", UciTone.Active), UciLogTag("HTTP 200", UciTone.Success)),
-        message = "Túnel HTTP CONNECT abierto",
-        details = listOf("Ruta" to "10.0.0.45:52410 → proxy.uci.cu:8080", "Auth" to "NTLMv2"),
+        message = s(Res.string.catalog_log_tunnel_open),
+        details = listOf(s(Res.string.catalog_log_route) to "10.0.0.45:52410 → proxy.uci.cu:8080", "Auth" to "NTLMv2"),
         trailing = "32 ms",
         trailingTone = UciTone.Success,
         icon = UciIcons.Lock,
@@ -464,14 +502,14 @@ private fun DataSection() {
         time = "14:31:58.112",
         title = "198-51-100-24.sslip.io",
         tags = listOf(UciLogTag("DNS:resolver", UciTone.Routing), UciLogTag("Fallback", UciTone.Warning)),
-        message = "Resuelto por el servicio de nombres",
+        message = s(Res.string.catalog_log_resolved),
         icon = UciIcons.Dns,
     )
     UciLogEntryCard(
         time = "14:31:45.890",
         title = "proxy.uci.cu:8080",
         tags = listOf(UciLogTag("Proxy:auth", UciTone.Danger)),
-        message = "407: el proxy rechazó las credenciales",
+        message = s(Res.string.catalog_log_auth_rejected),
         trailing = "ERROR",
         trailingTone = UciTone.Danger,
         icon = UciIcons.Error,
