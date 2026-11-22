@@ -1,0 +1,13 @@
+product:
+  type: kmp/lib
+  platforms: [ jvm, android, iosArm64, iosSimulatorArm64 ]
+
+# Dobles de prueba de core (red, túnel, almacenes en memoria): código normal de un módulo porque Amper no tiene
+# «test fixtures» para compartir código de prueba entre módulos.
+dependencies:
+  - //core: exported
+
+settings:
+  android:
+    namespace: org.uci.proxy.core.testing
+    minSdk: 26

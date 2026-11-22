@@ -21,6 +21,7 @@ dependencies@jvm:
   - $libs.jna.platform
 
 test-dependencies:
+  - //coreTesting
   - $libs.koin.test
   - $libs.kotlinx.coroutines.test
 
