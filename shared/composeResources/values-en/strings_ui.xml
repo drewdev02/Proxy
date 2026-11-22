@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ui_loading">Loading</string>
+    <string name="ui_password_hide">Hide password</string>
+    <string name="ui_password_show">Show password</string>
+    <string name="ui_search_clear">Clear search</string>
+    <string name="ui_file_none">No file chosen</string>
+    <string name="ui_file_choose">Choose file</string>
+    <string name="ui_file_change">Change</string>
+    <string name="ui_move_up">Move up</string>
+    <string name="ui_move_down">Move down</string>
+    <string name="ui_alert_dismiss">Dismiss notice</string>
+    <string name="ui_back">Back</string>
+    <string name="ui_cancel">Cancel</string>
+    <string name="ui_power_idle">Disconnected</string>
+    <string name="ui_power_connecting">Connecting</string>
+    <string name="ui_power_connected">Connected</string>
+    <string name="ui_power_error">Error</string>
+</resources>

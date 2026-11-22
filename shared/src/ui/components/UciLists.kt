@@ -41,6 +41,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import org.jetbrains.compose.resources.stringResource
+import org.uci.proxy.resources.Res
+import org.uci.proxy.resources.*
 import org.uci.proxy.theme.ProxyUciTheme
 import org.uci.proxy.ui.icons.UciIcons
 
@@ -197,6 +200,9 @@ fun <T> UciReorderableList(
     var offset by remember { mutableStateOf(0f) }
     val target = dragging?.let { reorderTarget(it, offset, heights, spacingPx) }
 
+    val moveUp = stringResource(Res.string.ui_move_up)
+    val moveDown = stringResource(Res.string.ui_move_down)
+
     Column(modifier, verticalArrangement = Arrangement.spacedBy(spacing)) {
         items.forEachIndexed { index, item ->
             val isDragging = dragging == index
@@ -208,8 +214,8 @@ fun <T> UciReorderableList(
             }
             val animatedShift by animateFloatAsState(shift)
             val actions = buildList {
-                if (index > 0) add(CustomAccessibilityAction("Subir") { onMove(index, index - 1); true })
-                if (index < items.lastIndex) add(CustomAccessibilityAction("Bajar") { onMove(index, index + 1); true })
+                if (index > 0) add(CustomAccessibilityAction(moveUp) { onMove(index, index - 1); true })
+                if (index < items.lastIndex) add(CustomAccessibilityAction(moveDown) { onMove(index, index + 1); true })
             }
             UciCard(
                 modifier = Modifier
