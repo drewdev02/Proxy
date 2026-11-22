@@ -1,5 +1,6 @@
 package org.uci.proxy.core.vpn
 
+import org.uci.proxy.core.model.VpnHandshakeIssue
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
 import org.uci.proxy.core.model.CountryEngineKind

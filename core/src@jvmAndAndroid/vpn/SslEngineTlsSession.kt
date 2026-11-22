@@ -1,5 +1,6 @@
 package org.uci.proxy.core.vpn
 
+import org.uci.proxy.core.model.VpnHandshakeIssue
 import java.io.ByteArrayInputStream
 import java.nio.ByteBuffer
 import java.security.KeyStore

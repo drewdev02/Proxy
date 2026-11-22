@@ -5,12 +5,12 @@ import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.port.NetFailure
-import org.uci.proxy.core.proxy.ProtocolIssue
+import org.uci.proxy.core.model.ProtocolIssue
 import org.uci.proxy.core.proxy.ProxyFailure
 import org.uci.proxy.core.proxy.RefusalReason
 import org.uci.proxy.core.proxy.ProxyTestResult
-import org.uci.proxy.core.vpn.OvpnConfigError
-import org.uci.proxy.core.vpn.VpnHandshakeIssue
+import org.uci.proxy.core.model.OvpnConfigError
+import org.uci.proxy.core.model.VpnHandshakeIssue
 import org.uci.proxy.resources.Res
 import org.uci.proxy.resources.*
 

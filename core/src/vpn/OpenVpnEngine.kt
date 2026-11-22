@@ -1,5 +1,7 @@
 package org.uci.proxy.core.vpn
 
+import org.uci.proxy.core.model.OvpnConfigError
+import org.uci.proxy.core.model.VpnHandshakeIssue
 import kotlinx.coroutines.CancellationException
 import org.uci.proxy.core.model.CountryEngineKind
 import org.uci.proxy.core.model.CountryExitSecrets

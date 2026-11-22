@@ -1,5 +1,6 @@
 package org.uci.proxy.core.proxy
 
+import org.uci.proxy.core.model.ProtocolIssue
 import kotlinx.coroutines.test.runTest
 import org.uci.proxy.core.fakes.FakeConnection
 import org.uci.proxy.core.fakes.FakeHttpProxy

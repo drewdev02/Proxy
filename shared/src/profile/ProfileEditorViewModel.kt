@@ -34,7 +34,7 @@ import org.uci.proxy.core.routing.parseRule
 import org.uci.proxy.core.model.AppSettings
 import org.uci.proxy.core.port.SettingsRepository
 import org.uci.proxy.core.vpn.CountryEngineCatalog
-import org.uci.proxy.core.vpn.OvpnConfigError
+import org.uci.proxy.core.model.OvpnConfigError
 import org.uci.proxy.core.vpn.OvpnConfigException
 import org.uci.proxy.core.vpn.parseOvpn
 import org.uci.proxy.core.vpn.tailscale.ExitNodeListing

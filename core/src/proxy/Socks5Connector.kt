@@ -1,5 +1,6 @@
 package org.uci.proxy.core.proxy
 
+import org.uci.proxy.core.model.ProtocolIssue
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.ProxyProtocol
 import org.uci.proxy.core.net.BufferedTcpConnection

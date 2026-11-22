@@ -61,8 +61,8 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
-import org.uci.proxy.core.vpn.OvpnConfigError
-import org.uci.proxy.core.vpn.VpnHandshakeIssue
+import org.uci.proxy.core.model.OvpnConfigError
+import org.uci.proxy.core.model.VpnHandshakeIssue
 import org.uci.proxy.core.port.NetFailure
 
 class EngineProtocolTest {

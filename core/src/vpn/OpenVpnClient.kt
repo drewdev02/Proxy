@@ -1,5 +1,6 @@
 package org.uci.proxy.core.vpn
 
+import org.uci.proxy.core.model.VpnHandshakeIssue
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch

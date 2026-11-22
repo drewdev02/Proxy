@@ -1,5 +1,7 @@
 package org.uci.proxy.core.vpn
 
+import org.uci.proxy.core.model.OvpnConfigError
+import org.uci.proxy.core.model.VpnHandshakeIssue
 import kotlinx.coroutines.test.runTest
 import org.uci.proxy.core.fakes.FakeCountryEngine
 import org.uci.proxy.core.fakes.FakeProxyConnector
