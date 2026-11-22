@@ -2,10 +2,10 @@ package org.uci.proxy.core.proxy
 
 import org.uci.proxy.core.packet.NON_PUBLIC_RANGES
 import org.uci.proxy.core.packet.parseIpv4
-import org.uci.proxy.core.settings.AppSettings
-import org.uci.proxy.core.settings.IpNameService
-import org.uci.proxy.core.settings.NameOutcome
-import org.uci.proxy.core.settings.NameServiceReporter
+import org.uci.proxy.core.model.AppSettings
+import org.uci.proxy.core.model.IpNameService
+import org.uci.proxy.core.model.NameOutcome
+import org.uci.proxy.core.port.NameServiceReporter
 import kotlin.time.TimeMark
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes

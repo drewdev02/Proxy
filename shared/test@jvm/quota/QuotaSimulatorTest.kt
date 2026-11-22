@@ -1,5 +1,6 @@
 package org.uci.proxy.quota
 
+import org.uci.proxy.core.port.QuotaFetch
 import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.util.concurrent.TimeUnit

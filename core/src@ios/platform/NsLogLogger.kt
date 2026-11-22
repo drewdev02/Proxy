@@ -1,6 +1,6 @@
 package org.uci.proxy.core.platform
 
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.port.Logger
 import platform.Foundation.NSLog
 

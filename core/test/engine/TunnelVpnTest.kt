@@ -19,9 +19,9 @@ import org.uci.proxy.core.model.CountryExitSecrets
 import org.uci.proxy.core.packet.parseIpv4
 import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.port.TunnelState
-import org.uci.proxy.core.profile.AppDispatchers
-import org.uci.proxy.core.settings.AppSettings
-import org.uci.proxy.core.profile.StoredProfileRepository
+import org.uci.proxy.core.common.AppDispatchers
+import org.uci.proxy.core.model.AppSettings
+import org.uci.proxy.core.data.StoredProfileRepository
 import org.uci.proxy.core.fakes.fakeEngines
 import org.uci.proxy.core.vpn.CountryEngines
 import org.uci.proxy.core.vpn.CountryExitStart

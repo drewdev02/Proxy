@@ -3,7 +3,7 @@ package org.uci.proxy.core.proxy
 import kotlinx.coroutines.withTimeoutOrNull
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.port.NetFailure
-import org.uci.proxy.core.settings.IpNameService
+import org.uci.proxy.core.model.IpNameService
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 

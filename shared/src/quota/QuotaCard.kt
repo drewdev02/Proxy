@@ -1,5 +1,10 @@
 package org.uci.proxy.quota
 
+import org.uci.proxy.core.model.UciQuota
+import org.uci.proxy.core.quota.QuotaProblem
+import org.uci.proxy.core.quota.QuotaStatus
+import org.uci.proxy.core.quota.mbText
+import org.uci.proxy.core.quota.wholePercent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,7 +22,7 @@ import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import org.uci.proxy.common.decimalSeparator
 import org.uci.proxy.common.percentText
-import org.uci.proxy.core.settings.QuotaSettings
+import org.uci.proxy.core.model.QuotaSettings
 import org.uci.proxy.resources.Res
 import org.uci.proxy.resources.*
 import org.uci.proxy.theme.ProxyUciTheme
@@ -49,7 +54,6 @@ val UciQuota.tone: UciTone
         percent >= 75 -> UciTone.Warning
         else -> UciTone.Success
     }
-
 
 /**
  * La tarjeta «Cuota de la UCI» de Consumo: el anillo con lo consumido y lo que queda. No dice cuándo se renueva: la cuota

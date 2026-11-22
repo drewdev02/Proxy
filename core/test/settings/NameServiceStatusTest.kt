@@ -1,5 +1,8 @@
 package org.uci.proxy.core.settings
 
+import org.uci.proxy.core.data.StoredNameServiceStatusRepository
+import org.uci.proxy.core.model.NameOutcome
+import org.uci.proxy.core.model.NameServiceStatus
 import org.uci.proxy.core.fakes.InMemoryKeyValueStore
 import kotlin.test.Test
 import kotlin.test.assertEquals

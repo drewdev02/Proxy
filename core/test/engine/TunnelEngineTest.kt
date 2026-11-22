@@ -35,13 +35,13 @@ import org.uci.proxy.core.proxy.ProxyTestResult
 import org.uci.proxy.core.proxy.ProxyTester
 import org.uci.proxy.core.proxy.RefusalReason
 import org.uci.proxy.core.port.TunnelState
-import org.uci.proxy.core.profile.AppDispatchers
-import org.uci.proxy.core.profile.StoredProfileRepository
+import org.uci.proxy.core.common.AppDispatchers
+import org.uci.proxy.core.data.StoredProfileRepository
 import org.uci.proxy.core.proxy.ProxyTarget
 import kotlin.test.Test
 import org.uci.proxy.core.model.RouteExit
 import org.uci.proxy.core.traffic.TrafficMeter
-import org.uci.proxy.core.traffic.TrafficUsage
+import org.uci.proxy.core.model.TrafficUsage
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull

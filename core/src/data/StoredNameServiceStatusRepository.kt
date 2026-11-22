@@ -1,0 +1,49 @@
+package org.uci.proxy.core.data
+
+import org.uci.proxy.core.model.NameOutcome
+import org.uci.proxy.core.model.NameServiceStatus
+import org.uci.proxy.core.port.NameServiceStatusRepository
+import kotlin.time.Clock
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.json.Json
+import org.uci.proxy.core.port.KeyValueStore
+
+/**
+ * Recuerda el último resultado de cada servicio, también entre arranques. Para no escribir en disco con cada conexión,
+ * un resultado igual al anterior y reciente solo refresca la hora cada [MIN_REFRESH_MS].
+ */
+class StoredNameServiceStatusRepository(
+    private val keyValueStore: KeyValueStore,
+    private val clock: Clock,
+) : NameServiceStatusRepository {
+    private val json = Json { ignoreUnknownKeys = true }
+    private val state = MutableStateFlow(load())
+
+    override val statuses: StateFlow<Map<String, NameServiceStatus>> = state.asStateFlow()
+
+    override fun report(serviceId: String, outcome: NameOutcome) {
+        val now = clock.now().toEpochMilliseconds()
+        val previous = state.value[serviceId]
+        if (previous != null && previous.outcome == outcome && now - previous.atMillis < MIN_REFRESH_MS) return
+        val updated = state.value + (serviceId to NameServiceStatus(outcome, now))
+        keyValueStore.putString(KEY, json.encodeToString(updated))
+        state.value = updated
+    }
+
+    private fun load(): Map<String, NameServiceStatus> {
+        val stored = keyValueStore.getString(KEY) ?: return emptyMap()
+        return try {
+            json.decodeFromString(stored)
+        } catch (_: SerializationException) {
+            emptyMap()
+        }
+    }
+
+    internal companion object {
+        const val KEY = "name_service_status"
+        const val MIN_REFRESH_MS = 60_000L
+    }
+}

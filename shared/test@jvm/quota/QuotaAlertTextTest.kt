@@ -1,5 +1,7 @@
 package org.uci.proxy.quota
 
+import org.uci.proxy.core.model.QuotaAlert
+import org.uci.proxy.core.model.UciQuota
 import kotlinx.coroutines.runBlocking
 import java.util.Locale
 import kotlin.test.AfterTest

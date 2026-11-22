@@ -1,7 +1,7 @@
 package org.uci.proxy.core.vpn
 
 import kotlinx.coroutines.withTimeoutOrNull
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.TcpConnection
 import org.uci.proxy.core.proxy.IpNamer
@@ -10,7 +10,7 @@ import org.uci.proxy.core.proxy.ProxyConnectResult
 import org.uci.proxy.core.proxy.ProxyConnector
 import org.uci.proxy.core.proxy.ProxyFailure
 import org.uci.proxy.core.proxy.ProxyTarget
-import org.uci.proxy.core.settings.NameServiceReporter
+import org.uci.proxy.core.port.NameServiceReporter
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -44,7 +44,7 @@ class ProxyDialer(
     private val connectors: List<ProxyConnector>,
     private val logger: Logger,
     /** A quién se avisa de qué servicio de nombres funcionó o fue rechazado, para mostrarlo en Ajustes. */
-    private val reporter: NameServiceReporter = NameServiceReporter.None,
+    internal val reporter: NameServiceReporter = NameServiceReporter.None,
     private val connectTimeout: Duration = 20.seconds,
 ) {
     /** Una tanda de conexiones con el mismo contexto: recuerda qué servicio de nombres funcionó la última vez. */

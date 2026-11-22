@@ -1,5 +1,7 @@
 package org.uci.proxy.core.vpn
 
+import org.uci.proxy.core.model.VpnHandshakeIssue
+
 private const val MESSAGE = "El modo Otro País no está disponible en esta plataforma"
 
 /** Para iOS, que no tiene cliente VPN propio: así el resto del núcleo compila y resuelve sus dependencias. */

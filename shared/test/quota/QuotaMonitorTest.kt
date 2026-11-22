@@ -1,5 +1,14 @@
 package org.uci.proxy.quota
 
+import org.uci.proxy.core.model.QuotaAlert
+import org.uci.proxy.core.model.UciQuota
+import org.uci.proxy.core.port.QuotaFetch
+import org.uci.proxy.core.port.QuotaNotifier
+import org.uci.proxy.core.data.StoredQuotaStore
+import org.uci.proxy.core.port.UciQuotaService
+import org.uci.proxy.core.quota.QuotaMonitor
+import org.uci.proxy.core.quota.QuotaProblem
+import org.uci.proxy.core.quota.QuotaSoap
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -9,9 +18,9 @@ import kotlinx.coroutines.test.runTest
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.ProxyProtocol
 import org.uci.proxy.core.port.TunnelState
-import org.uci.proxy.core.profile.AppDispatchers
-import org.uci.proxy.core.profile.StoredActiveProfileStore
-import org.uci.proxy.core.settings.StoredSettingsRepository
+import org.uci.proxy.core.common.AppDispatchers
+import org.uci.proxy.core.data.StoredActiveProfileStore
+import org.uci.proxy.core.data.StoredSettingsRepository
 import org.uci.proxy.fakes.FakeProfileRepository
 import org.uci.proxy.fakes.FakeTunnel
 import org.uci.proxy.fakes.InMemoryKeyValueStore
@@ -58,7 +67,7 @@ class QuotaMonitorTest {
             override fun now() = Instant.fromEpochMilliseconds(1_795_348_800_000 + testScheduler.currentTime)
         }
         return QuotaMonitor(
-            profiles, active, tunnel, tunnel, settings, service, QuotaStore(keyValues),
+            profiles, active, tunnel, tunnel, settings, service, StoredQuotaStore(keyValues),
             object : QuotaNotifier {
                 override suspend fun notify(alert: QuotaAlert) {
                     notifications += alert

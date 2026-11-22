@@ -8,135 +8,29 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import org.jetbrains.compose.resources.StringResource
 import org.uci.proxy.common.exitSearchReason
 import org.uci.proxy.core.model.CountryEngineKind
-import org.uci.proxy.core.model.CountryExit
 import org.uci.proxy.core.model.CountryExitSecrets
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.RouteExit
-import org.uci.proxy.core.model.RouteRule
 import org.uci.proxy.core.model.RoutingRules
-import org.uci.proxy.core.model.RuleKind
 import org.uci.proxy.core.port.LocalNetworkPermission
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.port.Logger
-import org.uci.proxy.core.port.TunnelFailure
-import org.uci.proxy.core.profile.IdGenerator
+import org.uci.proxy.core.common.IdGenerator
 import org.uci.proxy.core.profile.ProfileDraft
 import org.uci.proxy.core.profile.ProfileField
-import org.uci.proxy.core.profile.ProfileRepository
+import org.uci.proxy.core.port.ProfileRepository
 import org.uci.proxy.core.profile.ProfileValidation
 import org.uci.proxy.core.profile.ProfileValidator
-import org.uci.proxy.core.proxy.ProxyTestResult
 import org.uci.proxy.core.proxy.ProxyTester
-import org.uci.proxy.core.routing.parseRule
-import org.uci.proxy.core.settings.AppSettings
-import org.uci.proxy.core.settings.SettingsRepository
+import org.uci.proxy.core.model.AppSettings
+import org.uci.proxy.core.port.SettingsRepository
 import org.uci.proxy.core.vpn.CountryEngineCatalog
-import org.uci.proxy.core.vpn.OvpnConfigError
-import org.uci.proxy.core.vpn.OvpnConfigException
-import org.uci.proxy.core.vpn.parseOvpn
 import org.uci.proxy.core.vpn.tailscale.ExitNodeListing
-import org.uci.proxy.core.vpn.tailscale.TailscaleExitNode
 import org.uci.proxy.resources.*
 import org.uci.proxy.resources.Res
-import org.uci.proxy.common.StorageFailure
 import org.uci.proxy.common.classifyStorageError
-
-sealed interface ProxyTestUiState {
-    data object Idle : ProxyTestUiState
-
-    data object Running : ProxyTestUiState
-
-    data class Finished(val result: ProxyTestResult) : ProxyTestUiState
-
-    /** La persona no concedió el acceso a la red local, así que la prueba no llegó a hacerse. */
-    data object LocalNetworkDenied : ProxyTestUiState
-}
-
-/** La salida «Otro País» del perfil tal como se edita. Con [enabled] en false el perfil sale directo por el proxy. */
-data class VpnDraft(
-    val enabled: Boolean = false,
-    /** El motor elegido; los campos de cada uno se conservan al cambiar, por si se vuelve atrás. */
-    val engine: CountryEngineKind = CountryEngineKind.OPENVPN,
-    val fileName: String = "",
-    /** El contenido del archivo ya leído; vacío si no se eligió uno válido. */
-    val ovpn: String = "",
-    val username: String = "",
-    val password: String = "",
-    /** Por qué no sirve el archivo elegido, para mostrarlo. */
-    val fileError: OvpnConfigError? = null,
-    /** Si el servidor VPN pide usuario y contraseña (casi todos los comerciales sí). */
-    val needsCredentials: Boolean = true,
-    val tailscale: TailscaleDraft = TailscaleDraft(),
-)
-
-/** La configuración de Tailscale tal como se edita. */
-data class TailscaleDraft(
-    val controlUrl: String = CountryExit.Tailscale.DEFAULT_CONTROL_URL,
-    val authKey: String = "",
-    val exitNode: String = "",
-    val hostname: String = CountryExit.Tailscale.DEFAULT_HOSTNAME,
-    val search: ExitNodeSearch = ExitNodeSearch.Idle,
-)
-
-/** La búsqueda de nodos de salida de la red, que lanza el botón «Buscar nodos». */
-sealed interface ExitNodeSearch {
-    data object Idle : ExitNodeSearch
-
-    data object Running : ExitNodeSearch
-
-    data class Found(val nodes: List<TailscaleExitNode>) : ExitNodeSearch
-
-    data class Failed(val reason: StringResource) : ExitNodeSearch
-}
-
-/** Las reglas de salida tal como se editan, más la regla que se está escribiendo. */
-data class RoutingDraft(
-    val rules: RoutingRules = RoutingRules(),
-    val newRule: String = "",
-    /** Proxy por defecto: un perfil nuevo no tiene Otro País (ver [withNewRuleExitFor]). */
-    val newRuleExit: RouteExit = RouteExit.PROXY,
-    /** Lo escrito no es ni un dominio ni una IP. */
-    val newRuleInvalid: Boolean = false,
-) {
-    /**
-     * La salida de la regla nueva sigue a Otro País: al apagarlo deja de ser «Otro País» (no se puede elegir) y al
-     * encenderlo pasa a serlo, que es para lo que se suelen añadir reglas. Otras salidas elegidas a mano se respetan.
-     */
-    fun withNewRuleExitFor(countryExitEnabled: Boolean): RoutingDraft = when {
-        !countryExitEnabled && newRuleExit == RouteExit.VPN -> copy(newRuleExit = RouteExit.PROXY)
-        countryExitEnabled && newRuleExit == RouteExit.PROXY -> copy(newRuleExit = RouteExit.VPN)
-        else -> this
-    }
-}
-
-data class ProfileEditorUiState(
-    val isNew: Boolean = true,
-    val draft: ProfileDraft = ProfileDraft(),
-    val password: String = "",
-    val errors: Set<ProfileField> = emptySet(),
-    val isSaving: Boolean = false,
-    /** Por qué falló el último guardado; null si no falló. */
-    val saveFailure: StorageFailure? = null,
-    /** Pasa a true cuando el perfil quedó guardado; la pantalla lo usa para cerrarse. */
-    val saved: Boolean = false,
-    val test: ProxyTestUiState = ProxyTestUiState.Idle,
-    val vpn: VpnDraft = VpnDraft(),
-    val routing: RoutingDraft = RoutingDraft(),
-    /** Los motores de Otro País que hay en este equipo, en el orden en que se ofrecen. */
-    val engines: List<CountryEngineKind> = listOf(CountryEngineKind.OPENVPN),
-    /** Consultar la cuota de la UCI con este perfil; null: según el proxy (sí, si es de la UCI). */
-    val uciQuota: Boolean? = null,
-) {
-    val saveFailed: Boolean get() = saveFailure != null
-
-    val isBusy: Boolean get() = isSaving || test == ProxyTestUiState.Running
-
-    /** Lo que se hará con la cuota, con lo escrito ahora en el formulario. */
-    val checksUciQuota: Boolean get() = uciQuota ?: ProxyProfile("", "", draft.host.trim(), 0, draft.protocol, "").isUciProxy
-}
 
 class ProfileEditorViewModel(
     private val repository: ProfileRepository,
@@ -175,7 +69,7 @@ class ProfileEditorViewModel(
         state.value = ProfileEditorUiState(
             isNew = existing == null,
             draft = existing?.toDraft() ?: ProfileDraft(),
-            vpn = existing?.countryExit?.toDraft() ?: VpnDraft(engine = engines.first()),
+            vpn = existing?.countryExit?.let(VpnDraft::from) ?: VpnDraft(engine = engines.first()),
             routing = RoutingDraft(
                 rules = existing?.routing ?: RoutingRules(),
                 // Una regla nueva va por Otro País solo si el perfil lo tiene; si no, esa salida no se puede elegir.
@@ -193,15 +87,7 @@ class ProfileEditorViewModel(
                     state.update {
                         it.copy(
                             password = password,
-                            vpn = when (secrets) {
-                                is CountryExitSecrets.OpenVpn -> it.vpn.copy(
-                                    ovpn = secrets.ovpn,
-                                    password = secrets.password,
-                                    needsCredentials = needsCredentials(secrets.ovpn),
-                                )
-                                is CountryExitSecrets.Tailscale -> it.vpn.copy(tailscale = it.vpn.tailscale.copy(authKey = secrets.authKey))
-                                null -> it.vpn
-                            },
+                            vpn = it.vpn.withSecrets(secrets),
                         )
                     }
                 }
@@ -271,7 +157,7 @@ class ProfileEditorViewModel(
         val current = state.value
         if (current.vpn.tailscale.search == ExitNodeSearch.Running) return
         val tailscale = current.vpn.tailscale
-        val errors = tailscaleErrors(tailscale)
+        val errors = tailscale.errors()
         val validation = validator.validate(editingId ?: TEST_PROFILE_ID, current.draft)
         if (validation is ProfileValidation.Invalid || errors.isNotEmpty()) {
             state.update { it.copy(errors = (validation as? ProfileValidation.Invalid)?.errors.orEmpty() + errors) }
@@ -299,35 +185,13 @@ class ProfileEditorViewModel(
                     null -> ExitNodeSearch.Failed(Res.string.error_exit_search_failed)
                 }
             }
-            state.update {
-                if (it.vpn.tailscale.search != ExitNodeSearch.Running) return@update it
-                val found = (outcome as? ExitNodeSearch.Found)?.nodes
-                val autoPick = if (found?.size == 1 && it.vpn.tailscale.exitNode.isBlank()) found.single().selector else it.vpn.tailscale.exitNode
-                it.copy(vpn = it.vpn.copy(tailscale = it.vpn.tailscale.copy(search = outcome, exitNode = autoPick)))
-            }
+            state.update { it.copy(vpn = it.vpn.copy(tailscale = it.vpn.tailscale.withSearchOutcome(outcome))) }
         }
-    }
-
-    private fun tailscaleErrors(tailscale: TailscaleDraft): Set<ProfileField> = buildSet {
-        val url = tailscale.controlUrl.trim()
-        if (!(url.startsWith("https://") || url.startsWith("http://")) || url.substringAfter("://").isBlank()) add(ProfileField.TAILSCALE_CONTROL_URL)
-        if (tailscale.authKey.isBlank()) add(ProfileField.TAILSCALE_AUTH_KEY)
     }
 
     /** La persona eligió un archivo `.ovpn`: se comprueba enseguida, para avisar antes de guardar y no al conectar. */
     fun loadOvpnFile(fileName: String, text: String) {
-        val vpn = try {
-            val config = parseOvpn(text)
-            state.value.vpn.copy(
-                enabled = true,
-                fileName = fileName,
-                ovpn = text,
-                fileError = null,
-                needsCredentials = config.needsCredentials,
-            )
-        } catch (e: OvpnConfigException) {
-            state.value.vpn.copy(fileName = fileName, ovpn = "", fileError = e.error)
-        }
+        val vpn = state.value.vpn.withOvpnFile(fileName, text)
         state.update {
             it.copy(vpn = vpn, routing = it.routing.withNewRuleExitFor(vpn.enabled), errors = it.errors - ProfileField.VPN_FILE, saveFailure = null)
         }
@@ -341,67 +205,42 @@ class ProfileEditorViewModel(
         state.update { it.copy(vpn = it.vpn.copy(password = password), saveFailure = null) }
     }
 
-    fun setRoutingEnabled(enabled: Boolean) = updateRules { it.copy(enabled = enabled) }
+    fun setRoutingEnabled(enabled: Boolean) = updateRouting { it.withEnabled(enabled) }
 
-    fun setDefaultExit(exit: RouteExit) = updateRules { it.copy(defaultExit = exit) }
+    fun setDefaultExit(exit: RouteExit) = updateRouting { it.withDefaultExit(exit) }
 
     fun updateNewRule(text: String) {
-        state.update { it.copy(routing = it.routing.copy(newRule = text, newRuleInvalid = false)) }
+        state.update { it.copy(routing = it.routing.withNewRule(text)) }
     }
 
     fun setNewRuleExit(exit: RouteExit) {
-        state.update { it.copy(routing = it.routing.copy(newRuleExit = exit)) }
+        state.update { it.copy(routing = it.routing.withNewRuleExit(exit)) }
     }
 
-    /** Añade lo escrito al final de la lista. Si es un dominio con salida «Directo», que no existe para dominios, pasa a «Proxy». */
+    /** Añade lo escrito al final de la lista; si no es un dominio ni una IP, solo lo marca como inválido. */
     fun addRule() {
-        val routing = state.value.routing
-        val parsed = parseRule(routing.newRule, routing.newRuleExit)
-        if (parsed == null) {
-            state.update { it.copy(routing = it.routing.copy(newRuleInvalid = true)) }
+        val rule = state.value.routing.parsedNewRule()
+        if (rule == null) {
+            state.update { it.copy(routing = it.routing.markInvalid()) }
             return
         }
-        val rule = if (parsed.exit in RoutingRules.exitsFor(parsed.kind)) parsed else parsed.copy(exit = RouteExit.PROXY)
-        appendRule(rule, clearText = true)
+        updateRouting { it.withRule(rule, clearText = true) }
     }
 
     fun addAppRule(packageName: String) {
         if (packageName.isBlank()) return
-        appendRule(RouteRule(RuleKind.APP, packageName, state.value.routing.newRuleExit), clearText = false)
+        updateRouting { it.withAppRule(packageName) }
     }
 
-    /** Al final de la lista; si ya había una para lo mismo, se sustituye. */
-    private fun appendRule(rule: RouteRule, clearText: Boolean) {
-        state.update {
-            it.copy(
-                routing = it.routing.copy(
-                    rules = it.routing.rules.copy(rules = it.routing.rules.rules.filterNot { r -> r.kind == rule.kind && r.value == rule.value } + rule),
-                    newRule = if (clearText) "" else it.routing.newRule,
-                    newRuleInvalid = if (clearText) false else it.routing.newRuleInvalid,
-                ),
-                saveFailure = null,
-            )
-        }
-    }
+    fun setRuleExit(index: Int, exit: RouteExit) = updateRouting { it.withRuleExit(index, exit) }
 
-    fun setRuleExit(index: Int, exit: RouteExit) = updateRules { rules ->
-        rules.copy(rules = rules.rules.mapIndexed { i, rule -> if (i == index) rule.copy(exit = exit) else rule })
-    }
+    fun moveRule(index: Int, delta: Int) = updateRouting { it.withRuleMoved(index, delta) }
 
-    fun moveRule(index: Int, delta: Int) = updateRules { rules ->
-        val target = index + delta
-        if (index !in rules.rules.indices || target !in rules.rules.indices) return@updateRules rules
-        val list = rules.rules.toMutableList()
-        list.add(target, list.removeAt(index))
-        rules.copy(rules = list)
-    }
+    fun removeRule(index: Int) = updateRouting { it.withRuleRemoved(index) }
 
-    fun removeRule(index: Int) = updateRules { rules ->
-        rules.copy(rules = rules.rules.filterIndexed { i, _ -> i != index })
-    }
-
-    private fun updateRules(change: (RoutingRules) -> RoutingRules) {
-        state.update { it.copy(routing = it.routing.copy(rules = change(it.routing.rules)), saveFailure = null) }
+    /** Un cambio en las reglas: un aviso de guardado fallido anterior ya no vale. */
+    private fun updateRouting(change: (RoutingDraft) -> RoutingDraft) {
+        state.update { it.copy(routing = change(it.routing), saveFailure = null) }
     }
 
     /**
@@ -439,27 +278,16 @@ class ProfileEditorViewModel(
         if (current.isBusy) return
 
         val validation = validator.validate(editingId ?: idGenerator.newId(), current.draft)
-        val vpn = current.vpn
-        val vpnErrors = when {
-            !vpn.enabled -> emptySet()
-            vpn.engine == CountryEngineKind.TAILSCALE -> tailscaleErrors(vpn.tailscale)
-            else -> buildSet {
-                if (vpn.ovpn.isBlank()) add(ProfileField.VPN_FILE)
-                if (vpn.needsCredentials && vpn.username.isBlank()) add(ProfileField.VPN_USERNAME)
-            }
-        }
+        val vpnErrors = current.vpn.errors()
         when {
             validation is ProfileValidation.Invalid -> state.update { it.copy(errors = validation.errors + vpnErrors) }
             vpnErrors.isNotEmpty() -> state.update { it.copy(errors = vpnErrors) }
             validation is ProfileValidation.Valid -> {
                 state.update { it.copy(errors = emptySet(), isSaving = true, saveFailure = null) }
                 viewModelScope.launch {
-                    val (exit, secrets) = when {
-                        !vpn.enabled -> null to null
-                        vpn.engine == CountryEngineKind.TAILSCALE ->
-                            vpn.tailscale.toExit() to CountryExitSecrets.Tailscale(vpn.tailscale.authKey.trim())
-                        else -> CountryExit.OpenVpn(vpn.fileName, vpn.username.trim()) to CountryExitSecrets.OpenVpn(vpn.ovpn, vpn.password)
-                    }
+                    val exitWithSecrets = current.vpn.toExitAndSecrets()
+                    val exit = exitWithSecrets?.first
+                    val secrets = exitWithSecrets?.second
                     val profile = validation.profile.copy(countryExit = exit, routing = current.routing.rules, uciQuota = current.uciQuota)
                     val failure = try {
                         repository.save(profile, current.password, secrets)
@@ -496,27 +324,6 @@ class ProfileEditorViewModel(
         if (old.host != new.host) add(ProfileField.HOST)
         if (old.port != new.port) add(ProfileField.PORT)
     }
-
-    private fun needsCredentials(ovpn: String): Boolean = try {
-        parseOvpn(ovpn).needsCredentials
-    } catch (_: OvpnConfigException) {
-        true
-    }
-
-    private fun CountryExit.toDraft(): VpnDraft = when (this) {
-        is CountryExit.OpenVpn -> VpnDraft(enabled = true, engine = CountryEngineKind.OPENVPN, fileName = fileName, username = username)
-        is CountryExit.Tailscale -> VpnDraft(
-            enabled = true,
-            engine = CountryEngineKind.TAILSCALE,
-            tailscale = TailscaleDraft(controlUrl = controlUrl, exitNode = exitNode, hostname = hostname),
-        )
-    }
-
-    private fun TailscaleDraft.toExit() = CountryExit.Tailscale(
-        controlUrl = controlUrl.trim().trimEnd('/'),
-        exitNode = exitNode.trim(),
-        hostname = hostname.trim().ifEmpty { CountryExit.Tailscale.DEFAULT_HOSTNAME },
-    )
 
     private fun ProxyProfile.toDraft() = ProfileDraft(
         name = name,

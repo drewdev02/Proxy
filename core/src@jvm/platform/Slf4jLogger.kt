@@ -1,7 +1,7 @@
 package org.uci.proxy.core.platform
 
 import org.slf4j.LoggerFactory
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.port.Logger
 
 class Slf4jLogger : Logger {

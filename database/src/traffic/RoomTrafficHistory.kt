@@ -3,10 +3,10 @@ package org.uci.proxy.database.traffic
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import org.uci.proxy.core.model.RouteExit
-import org.uci.proxy.core.traffic.DailyTraffic
-import org.uci.proxy.core.traffic.NamedTraffic
-import org.uci.proxy.core.traffic.TrafficHistory
-import org.uci.proxy.core.traffic.TrafficUsage
+import org.uci.proxy.core.model.DailyTraffic
+import org.uci.proxy.core.model.NamedTraffic
+import org.uci.proxy.core.port.TrafficHistory
+import org.uci.proxy.core.model.TrafficUsage
 
 /** El [TrafficHistory] de verdad: la tabla `traffic_usage`. */
 class RoomTrafficHistory(private val dao: TrafficDao) : TrafficHistory {

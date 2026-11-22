@@ -38,8 +38,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
-import org.uci.proxy.core.log.LogEntry
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogEntry
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.resources.Res
 import org.uci.proxy.resources.*
 import org.uci.proxy.theme.ProxyUciTheme

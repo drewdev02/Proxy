@@ -4,7 +4,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
-import org.uci.proxy.core.desktop.EngineArguments
+import org.uci.proxy.desktop.EngineArguments
 import org.uci.proxy.core.platform.JvmPlatformInfo
 import org.uci.proxy.di.initKoin
 import java.nio.file.Files

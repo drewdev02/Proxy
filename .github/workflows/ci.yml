@@ -79,8 +79,14 @@ jobs:
         env:
           PROXYUCI_REQUIRE_TAILSCALE: "1"
         run: ${{ matrix.kotlin }} test -m core --platform jvm
+      - name: Pruebas del motor de escritorio
+        run: ${{ matrix.kotlin }} test -m desktopEngine --platform jvm
       - name: Pruebas de la interfaz
         run: ${{ matrix.kotlin }} test -m shared --platform jvm
+      # Que los documentos no apunten a enlaces ni rutas de código que ya no existen.
+      - name: Documentos al día
+        if: matrix.name == 'Linux'
+        run: python3 tools/check_docs.py
       # El servicio de cuotas de la UCI, de mentira, contra el que se prueba la consulta de la cuota.
       - name: Simulador del servicio de cuotas
         if: matrix.name == 'Linux'
@@ -269,7 +275,7 @@ jobs:
             Start-Sleep -Seconds 3
             if (-not (Test-NetConnection 127.0.0.1 -Port 3128 -InformationLevel Quiet)) { throw "El proxy no escucha en 3128" }
 
-            ./kotlin.bat test -m core --platform jvm --include-classes 'org.uci.proxy.core.windows.WindowsPackagedExeE2ETest'
+            ./kotlin.bat test -m desktopEngine --platform jvm --include-classes 'org.uci.proxy.desktop.WindowsPackagedExeE2ETest'
             $code = $LASTEXITCODE
           } finally {
             "--- registro del proxy de pruebas"

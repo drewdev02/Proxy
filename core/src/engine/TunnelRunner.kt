@@ -3,23 +3,16 @@ package org.uci.proxy.core.engine
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelChildren
-import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
 import org.uci.proxy.core.dns.LocalDnsPolicy
 import org.uci.proxy.core.dns.LocalDnsResolver
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.RouteExit
 import org.uci.proxy.core.model.RoutingRules
-import org.uci.proxy.core.packet.Ipv4Packet
 import org.uci.proxy.core.packet.Ipv4Route
 import org.uci.proxy.core.packet.NON_PUBLIC_RANGES
 import org.uci.proxy.core.packet.routesExcluding
@@ -28,7 +21,7 @@ import org.uci.proxy.core.port.HostResolver
 import org.uci.proxy.core.port.LocalAddresses
 import org.uci.proxy.core.port.LocalDnsConfig
 import org.uci.proxy.core.port.LocalDnsSource
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.PlatformTunnel
 import org.uci.proxy.core.port.TunConfig
@@ -38,12 +31,11 @@ import org.uci.proxy.core.port.code
 import org.uci.proxy.core.proxy.ProxyFailure
 import org.uci.proxy.core.proxy.ProxyTestResult
 import org.uci.proxy.core.proxy.ProxyTester
-import org.uci.proxy.core.port.TunnelMonitor
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.port.TunnelUnavailableException
-import org.uci.proxy.core.profile.AppDispatchers
+import org.uci.proxy.core.common.AppDispatchers
 import org.uci.proxy.core.port.TunDevice
-import org.uci.proxy.core.profile.ProfileRepository
+import org.uci.proxy.core.port.ProfileRepository
 import org.uci.proxy.core.routing.RuleSet
 import org.uci.proxy.core.traffic.TrafficMeter
 import org.uci.proxy.core.traffic.TrafficStore
@@ -51,26 +43,11 @@ import kotlin.time.TimeSource
 import org.uci.proxy.core.vpn.VpnSession
 import kotlin.time.Duration.Companion.seconds
 import org.uci.proxy.core.port.EngineStateDirectories
-import org.uci.proxy.core.settings.AppSettings
+import org.uci.proxy.core.model.AppSettings
 import org.uci.proxy.core.vpn.CountryEngines
 import org.uci.proxy.core.vpn.CountryExitStart
 import org.uci.proxy.core.vpn.ExitContext
 import org.uci.proxy.core.vpn.VpnConnectResult
-
-/** Estado del túnel, compartido entre quien lo ejecuta y quien lo observa dentro del mismo proceso. */
-class TunnelStateStore : TunnelMonitor {
-    private val mutableState = MutableStateFlow<TunnelState>(TunnelState.Disconnected)
-    override val state: StateFlow<TunnelState> = mutableState.asStateFlow()
-
-    fun set(newState: TunnelState) {
-        mutableState.value = newState
-    }
-
-    /** Cambia el estado a partir del actual sin perder un cambio que llegue a la vez desde otra corrutina. */
-    fun update(change: (TunnelState) -> TunnelState) {
-        mutableState.update(change)
-    }
-}
 
 /**
  * Ejecuta un túnel de principio a fin: elige direcciones, crea la interfaz, corre el motor

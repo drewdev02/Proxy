@@ -5,7 +5,7 @@ import org.uci.proxy.core.model.CountryExit
 import org.uci.proxy.core.model.CountryExitSecrets
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.port.TunnelFailure
-import org.uci.proxy.core.settings.AppSettings
+import org.uci.proxy.core.model.AppSettings
 import org.uci.proxy.core.vpn.tailscale.ExitNodeListing
 import org.uci.proxy.core.vpn.tailscale.TailscaleEngine
 
@@ -43,7 +43,7 @@ interface CountryEngineCatalog {
 /** El catálogo real: OpenVPN si hay cliente, Tailscale si su librería cargó. */
 class EngineCatalog(
     openVpnAvailable: Boolean,
-    private val tailscale: TailscaleEngine?,
+    internal val tailscale: TailscaleEngine?,
 ) : CountryEngineCatalog {
     override val available: List<CountryEngineKind> by lazy {
         buildList {

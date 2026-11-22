@@ -35,12 +35,12 @@ import org.uci.proxy.core.packet.buildTcpPacket
 import org.uci.proxy.core.packet.buildUdpPacket
 import org.uci.proxy.core.packet.formatIpv4
 import org.uci.proxy.core.packet.parseIpv4
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.RandomBytes
 import org.uci.proxy.core.port.TunnelState
-import org.uci.proxy.core.profile.AppDispatchers
-import org.uci.proxy.core.profile.StoredProfileRepository
+import org.uci.proxy.core.common.AppDispatchers
+import org.uci.proxy.core.data.StoredProfileRepository
 import org.uci.proxy.core.proxy.BasicAuthScheme
 import org.uci.proxy.core.proxy.HttpConnectConnector
 import org.uci.proxy.core.proxy.NtlmAuthScheme

@@ -16,9 +16,9 @@ import org.uci.proxy.core.proxy.IpNamer
 import org.uci.proxy.core.proxy.ProxyConnectResult
 import org.uci.proxy.core.proxy.ProxyFailure
 import org.uci.proxy.core.proxy.ProxyTarget
-import org.uci.proxy.core.settings.AppSettings
-import org.uci.proxy.core.settings.IpNameService
-import org.uci.proxy.core.settings.NameOutcome
+import org.uci.proxy.core.model.AppSettings
+import org.uci.proxy.core.model.IpNameService
+import org.uci.proxy.core.model.NameOutcome
 import org.uci.proxy.core.tcp.TcpTestClient
 import org.uci.proxy.core.tcp.text
 import kotlin.test.Test

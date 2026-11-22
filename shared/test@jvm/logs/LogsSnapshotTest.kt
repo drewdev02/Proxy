@@ -1,7 +1,7 @@
 package org.uci.proxy.logs
 
-import org.uci.proxy.core.log.LogEntry
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogEntry
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.ui.Snapshots
 import kotlin.test.Test
 

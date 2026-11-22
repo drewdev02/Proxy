@@ -6,7 +6,7 @@ import org.uci.proxy.settings.AndroidSystemSettings
 import org.uci.proxy.i18n.AndroidLanguageSetting
 import org.uci.proxy.i18n.AppLanguageSetting
 import org.uci.proxy.quota.AndroidQuotaNotifier
-import org.uci.proxy.quota.QuotaNotifier
+import org.uci.proxy.core.port.QuotaNotifier
 import org.uci.proxy.core.platform.AndroidTunnelController
 import org.uci.proxy.core.port.TunnelControl
 import org.uci.proxy.vpn.ProxyVpnService

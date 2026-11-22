@@ -2,8 +2,8 @@ package org.uci.proxy.logs
 
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import org.uci.proxy.core.log.LogEntry
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogEntry
+import org.uci.proxy.core.model.LogLevel
 import kotlin.time.Instant
 
 /** La hora de un mensaje como `14:03:07.042`, en la zona horaria del equipo. */

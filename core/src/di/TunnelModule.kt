@@ -11,56 +11,37 @@ import org.uci.proxy.core.net.KtorDnsTransport
 import org.uci.proxy.core.port.ConnectionOwner
 import org.uci.proxy.core.port.DnsTransport
 import org.uci.proxy.core.port.LocalDnsSource
-import org.uci.proxy.core.port.TunnelMonitor
-import org.uci.proxy.core.proxy.HttpConnectConnector
-import org.uci.proxy.core.proxy.Socks5Connector
-import org.uci.proxy.core.settings.NameServiceReporter
-import org.uci.proxy.core.settings.NameServiceStatusRepository
 import org.uci.proxy.core.port.EngineStateDirectories
-import org.uci.proxy.core.profile.AppDispatchers
-import org.uci.proxy.core.vpn.tailscale.TailscaleBridge
-import org.uci.proxy.core.vpn.tailscale.TailscaleEngine
+import org.uci.proxy.core.port.TunnelMonitor
 import org.uci.proxy.core.vpn.CountryEngines
 import org.uci.proxy.core.vpn.OpenVpnClient
-import org.uci.proxy.core.vpn.OpenVpnCrypto
 import org.uci.proxy.core.vpn.OpenVpnEngine
-import org.uci.proxy.core.vpn.ProxyDialer
-import org.uci.proxy.core.vpn.UnavailableOpenVpnCrypto
+import org.uci.proxy.core.vpn.tailscale.TailscaleEngine
 import kotlin.time.Clock
 import kotlin.time.TimeSource
 
 /**
  * Lo que necesita un proceso que ejecuta el túnel. Solo lo cargan esos procesos: hoy la app de
  * Android; más adelante la extensión de iOS y el proceso elevado de escritorio.
- * Requiere [coreModule] y que la plataforma enlace `LocalAddresses` y `HostResolver` (y, si sabe leerlo, `LocalDnsSource`).
+ * Requiere [coreModule] (de él salen los conectores, el `ProxyDialer` y el `TailscaleEngine`) y que la plataforma
+ * enlace `LocalAddresses` y `HostResolver` (y, si sabe leerlo, `LocalDnsSource`).
  */
 val tunnelModule = module {
     singleOf(::TunnelStateStore) { bind<TunnelMonitor>() }
     singleOf(::TunAddressPlanner)
     // Reloj monótono: los temporizadores TCP no deben verse afectados por cambios de hora del sistema.
     single<TimeSource> { TimeSource.Monotonic }
-    // Quien se entera de qué servicio de nombres funcionó: por defecto, el repositorio de este mismo proceso. El motor de
-    // escritorio, que corre aparte, lo sustituye por uno que avisa a la ventana.
-    single<NameServiceReporter> { get<NameServiceStatusRepository>() }
     // Las consultas al DNS de la red local, para abrir sin proxy lo interno.
     single<DnsTransport> { KtorDnsTransport(get(), get()) }
     single {
         TunnelEngineFactory(
-            connectors = listOf(get<HttpConnectConnector>(), get<Socks5Connector>()),
+            connectors = get(ProxyConnectors),
             randomBytes = get(),
             timeSource = get(),
             logger = get(),
             nameReporter = get(),
             // Solo Android lo enlaza; sin él las reglas de app no coinciden.
             owner = getOrNull<ConnectionOwner>() ?: ConnectionOwner.Unknown,
-        )
-    }
-    // Cómo llegan los motores de Otro País a sus servidores: por el proxy del perfil, todos igual.
-    single {
-        ProxyDialer(
-            connectors = listOf(get<HttpConnectConnector>(), get<Socks5Connector>()),
-            logger = get(),
-            reporter = get(),
         )
     }
     single {
@@ -76,26 +57,11 @@ val tunnelModule = module {
             random = get(),
             logger = get(),
             // iOS no tiene cliente OpenVPN propio.
-            isAvailable = get<OpenVpnCrypto>() !is UnavailableOpenVpnCrypto,
+            isAvailable = openVpnAvailable(),
         )
     }
     // Los motores de esta plataforma; cada uno dice si puede usarse aquí (Tailscale, si su librería está).
-    single {
-        CountryEngines(
-            listOf(
-                get<OpenVpnEngine>(),
-                TailscaleEngine(
-                    bridge = getOrNull<TailscaleBridge>() ?: TailscaleBridge.Unavailable,
-                    dialer = get(),
-                    selector = get(),
-                    random = get(),
-                    logger = get(),
-                    io = get<AppDispatchers>().background,
-                ),
-            ),
-            logger = get(),
-        )
-    }
+    single { CountryEngines(listOf(get<OpenVpnEngine>(), get<TailscaleEngine>()), logger = get()) }
     // Con get() explícitos: las rutas públicas usan el valor por defecto del constructor.
     single {
         TunnelRunner(

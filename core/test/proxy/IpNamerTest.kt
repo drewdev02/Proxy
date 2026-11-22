@@ -1,9 +1,9 @@
 package org.uci.proxy.core.proxy
 
-import org.uci.proxy.core.settings.AppSettings
-import org.uci.proxy.core.settings.IpNameService
-import org.uci.proxy.core.settings.NameOutcome
-import org.uci.proxy.core.settings.NameServiceReporter
+import org.uci.proxy.core.model.AppSettings
+import org.uci.proxy.core.model.IpNameService
+import org.uci.proxy.core.model.NameOutcome
+import org.uci.proxy.core.port.NameServiceReporter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull

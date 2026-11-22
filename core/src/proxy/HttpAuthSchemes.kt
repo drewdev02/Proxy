@@ -1,5 +1,6 @@
 package org.uci.proxy.core.proxy
 
+import org.uci.proxy.core.model.ProtocolIssue
 import org.uci.proxy.core.auth.NtlmFormatException
 import org.uci.proxy.core.auth.NtlmMessages
 import org.uci.proxy.core.auth.NtlmUser

@@ -5,7 +5,7 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TestTimeSource
-import org.uci.proxy.core.log.LogEntry
+import org.uci.proxy.core.model.LogEntry
 import org.uci.proxy.core.model.CountryExit
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.ProxyProtocol
@@ -13,13 +13,13 @@ import org.uci.proxy.core.model.RouteExit
 import org.uci.proxy.core.model.RouteRule
 import org.uci.proxy.core.model.RoutingRules
 import org.uci.proxy.core.model.RuleKind
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.proxy.ProxyTestResult
 import org.uci.proxy.core.traffic.LiveTraffic
-import org.uci.proxy.quota.QuotaStatus
-import org.uci.proxy.quota.UciQuota
+import org.uci.proxy.core.quota.QuotaStatus
+import org.uci.proxy.core.model.UciQuota
 import org.uci.proxy.ui.Snapshots
 
 /** La pantalla Conexión en cada estado, en móvil y en escritorio, contra sus capturas de referencia. */

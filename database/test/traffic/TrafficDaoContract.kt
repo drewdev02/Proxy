@@ -3,9 +3,9 @@ package org.uci.proxy.database.traffic
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.uci.proxy.core.model.RouteExit
-import org.uci.proxy.core.traffic.DailyTraffic
-import org.uci.proxy.core.traffic.NamedTraffic
-import org.uci.proxy.core.traffic.TrafficUsage
+import org.uci.proxy.core.model.DailyTraffic
+import org.uci.proxy.core.model.NamedTraffic
+import org.uci.proxy.core.model.TrafficUsage
 import org.uci.proxy.database.ProxyDatabase
 import kotlin.test.AfterTest
 import kotlin.test.Test

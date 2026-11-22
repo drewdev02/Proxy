@@ -1,5 +1,7 @@
 package org.uci.proxy.quota
 
+import org.uci.proxy.core.model.QuotaAlert
+import org.uci.proxy.core.port.QuotaNotifier
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager

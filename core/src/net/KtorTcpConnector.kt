@@ -13,7 +13,7 @@ import org.uci.proxy.core.port.TcpConnection
 import org.uci.proxy.core.port.TcpConnector
 import org.uci.proxy.core.port.TcpException
 import org.uci.proxy.core.port.classifyNetworkError
-import org.uci.proxy.core.profile.AppDispatchers
+import org.uci.proxy.core.common.AppDispatchers
 
 /** Sockets TCP reales mediante ktor-network, igual en JVM, Android e iOS. */
 class KtorTcpConnector(

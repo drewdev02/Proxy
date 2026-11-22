@@ -5,7 +5,7 @@ import org.uci.proxy.core.fakes.FakeProxyConnector
 import org.uci.proxy.core.fakes.FakeTunnelConnection
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.ProxyProtocol
-import org.uci.proxy.core.settings.IpNameService
+import org.uci.proxy.core.model.IpNameService
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

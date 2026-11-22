@@ -4,8 +4,8 @@ import kotlin.test.Test
 import org.uci.proxy.core.traffic.TrafficDelta
 import org.uci.proxy.core.traffic.TrafficStore
 import kotlinx.coroutines.flow.MutableStateFlow
-import org.uci.proxy.quota.QuotaStatus
-import org.uci.proxy.quota.QuotaTracker
+import org.uci.proxy.core.quota.QuotaStatus
+import org.uci.proxy.core.quota.QuotaTracker
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -23,10 +23,10 @@ import org.uci.proxy.core.model.RouteExit
 import org.uci.proxy.core.model.RouteRule
 import org.uci.proxy.core.model.RoutingRules
 import org.uci.proxy.core.model.RuleKind
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.port.TunnelState
-import org.uci.proxy.core.profile.StoredActiveProfileStore
+import org.uci.proxy.core.data.StoredActiveProfileStore
 import org.uci.proxy.core.proxy.ProxyFailure
 import org.uci.proxy.core.proxy.ProxyTestResult
 import org.uci.proxy.fakes.FakeLocalNetworkPermission

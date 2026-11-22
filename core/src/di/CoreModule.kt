@@ -10,34 +10,33 @@ import org.uci.proxy.core.traffic.TrafficMonitor
 import org.uci.proxy.core.traffic.TrafficStore
 import org.uci.proxy.core.net.KtorTcpConnector
 import org.uci.proxy.core.port.TcpConnector
-import org.uci.proxy.core.profile.AppDispatchers
-import org.uci.proxy.core.profile.IdGenerator
-import org.uci.proxy.core.profile.ProfileRepository
+import org.uci.proxy.core.common.AppDispatchers
+import org.uci.proxy.core.common.IdGenerator
+import org.uci.proxy.core.port.ProfileRepository
 import org.uci.proxy.core.profile.ProfileValidator
-import org.uci.proxy.core.profile.RandomIdGenerator
-import org.uci.proxy.core.profile.StoredProfileRepository
+import org.uci.proxy.core.common.RandomIdGenerator
+import org.uci.proxy.core.data.StoredProfileRepository
 import org.uci.proxy.core.proxy.BasicAuthScheme
 import org.uci.proxy.core.proxy.ConnectingProxyTester
 import org.uci.proxy.core.proxy.HttpConnectConnector
 import org.uci.proxy.core.proxy.NtlmAuthScheme
 import org.uci.proxy.core.proxy.ConnectingNameServiceTester
 import org.uci.proxy.core.proxy.NameServiceTester
+import org.uci.proxy.core.proxy.ProxyConnector
 import org.uci.proxy.core.proxy.ProxyTarget
 import org.uci.proxy.core.proxy.ProxyTester
 import org.uci.proxy.core.proxy.Socks5Connector
 import org.uci.proxy.core.settings.IpNameServiceValidator
-import org.uci.proxy.core.settings.NameServiceStatusRepository
-import org.uci.proxy.core.profile.ActiveProfileStore
-import org.uci.proxy.core.profile.StoredActiveProfileStore
-import org.uci.proxy.core.settings.SettingsRepository
-import org.uci.proxy.core.settings.StoredNameServiceStatusRepository
-import org.uci.proxy.core.settings.StoredSettingsRepository
+import org.uci.proxy.core.port.NameServiceReporter
+import org.uci.proxy.core.port.NameServiceStatusRepository
+import org.uci.proxy.core.port.ActiveProfileStore
+import org.uci.proxy.core.data.StoredActiveProfileStore
+import org.uci.proxy.core.port.SettingsRepository
+import org.uci.proxy.core.data.StoredNameServiceStatusRepository
+import org.uci.proxy.core.data.StoredSettingsRepository
 import org.uci.proxy.core.vpn.CountryEngineCatalog
 import org.uci.proxy.core.vpn.EngineCatalog
-import org.uci.proxy.core.vpn.OpenVpnCrypto
 import org.uci.proxy.core.vpn.ProxyDialer
-import org.uci.proxy.core.vpn.UnavailableOpenVpnCrypto
-import org.uci.proxy.core.vpn.tailscale.TailscaleBridge
 import org.uci.proxy.core.vpn.tailscale.TailscaleEngine
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
@@ -62,7 +61,10 @@ val coreModule = module {
     // Cómo le fue a cada servicio de nombres para IP públicas, para mostrarlo en Ajustes.
     single<NameServiceStatusRepository> { StoredNameServiceStatusRepository(get(), get()) }
     singleOf(::IpNameServiceValidator)
-    single<NameServiceTester> { ConnectingNameServiceTester(listOf(get<HttpConnectConnector>(), get<Socks5Connector>())) }
+    // Quien se entera de qué servicio de nombres funcionó: por defecto, el repositorio de este mismo proceso. El motor de
+    // escritorio, que corre aparte, lo sustituye por uno que avisa a la ventana.
+    single<NameServiceReporter> { get<NameServiceStatusRepository>() }
+    single<NameServiceTester> { ConnectingNameServiceTester(get(ProxyConnectors)) }
 
     single { SelectorManager(get<AppDispatchers>().background) }
     singleOf(::KtorTcpConnector) { bind<TcpConnector>() }
@@ -72,24 +74,28 @@ val coreModule = module {
     // El orden es la preferencia: NTLM antes que Basic, que manda la contraseña en claro.
     single { HttpConnectConnector(get(), schemes = listOf(get<NtlmAuthScheme>(), get<BasicAuthScheme>())) }
     singleOf(::Socks5Connector)
-    // Los motores de Otro País que puede ofrecer la interfaz, y la búsqueda de nodos de Tailscale.
-    single<CountryEngineCatalog> {
-        val bridge = getOrNull<TailscaleBridge>() ?: TailscaleBridge.Unavailable
-        EngineCatalog(
-            openVpnAvailable = getOrNull<OpenVpnCrypto>().let { it != null && it !is UnavailableOpenVpnCrypto },
-            tailscale = TailscaleEngine(
-                bridge = bridge,
-                dialer = ProxyDialer(listOf(get<HttpConnectConnector>(), get<Socks5Connector>()), get(), get<NameServiceStatusRepository>()),
-                selector = get(),
-                random = get(),
-                logger = get(),
-                io = get<AppDispatchers>().background,
-            ),
+    // Todos los protocolos de proxy; quien abre conexiones por el proxy del perfil elige de aquí el suyo.
+    single<List<ProxyConnector>>(ProxyConnectors) { listOf(get<HttpConnectConnector>(), get<Socks5Connector>()) }
+
+    // Cómo llegan los motores de Otro País a sus servidores: por el proxy del perfil, todos igual.
+    single { ProxyDialer(connectors = get(ProxyConnectors), logger = get(), reporter = get()) }
+    // Un solo motor Tailscale por proceso: lo comparten la búsqueda de nodos (interfaz) y el túnel. No guarda estado
+    // propio; cada sesión lleva el suyo.
+    single {
+        TailscaleEngine(
+            bridge = tailscaleBridge(),
+            dialer = get(),
+            selector = get(),
+            random = get(),
+            logger = get(),
+            io = get<AppDispatchers>().background,
         )
     }
+    // Los motores de Otro País que puede ofrecer la interfaz, y la búsqueda de nodos de Tailscale.
+    single<CountryEngineCatalog> { EngineCatalog(openVpnAvailable = openVpnAvailable(), tailscale = get()) }
     single<ProxyTester> {
         ConnectingProxyTester(
-            connectors = listOf(get<HttpConnectConnector>(), get<Socks5Connector>()),
+            connectors = get(ProxyConnectors),
             target = PROXY_TEST_TARGET,
             timeout = PROXY_TEST_TIMEOUT,
         )

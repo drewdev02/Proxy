@@ -1,10 +1,10 @@
 package org.uci.proxy.usage
 
-import org.uci.proxy.core.traffic.NamedTraffic
+import org.uci.proxy.core.model.NamedTraffic
 import org.uci.proxy.quota.QuotaCardUi
-import org.uci.proxy.quota.QuotaProblem
-import org.uci.proxy.quota.QuotaStatus
-import org.uci.proxy.quota.UciQuota
+import org.uci.proxy.core.quota.QuotaProblem
+import org.uci.proxy.core.quota.QuotaStatus
+import org.uci.proxy.core.model.UciQuota
 import org.uci.proxy.ui.Snapshots
 import kotlin.test.Test
 import kotlin.time.Duration.Companion.hours

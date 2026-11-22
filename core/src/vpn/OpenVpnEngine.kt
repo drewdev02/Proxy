@@ -1,10 +1,12 @@
 package org.uci.proxy.core.vpn
 
+import org.uci.proxy.core.model.OvpnConfigError
+import org.uci.proxy.core.model.VpnHandshakeIssue
 import kotlinx.coroutines.CancellationException
 import org.uci.proxy.core.model.CountryEngineKind
 import org.uci.proxy.core.model.CountryExitSecrets
 import org.uci.proxy.core.model.CountryExit
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.RandomBytes
 import org.uci.proxy.core.port.TunnelFailure
@@ -15,7 +17,7 @@ import org.uci.proxy.core.port.TunnelFailure
  */
 class OpenVpnEngine(
     private val client: OpenVpnClient,
-    private val dialer: ProxyDialer,
+    internal val dialer: ProxyDialer,
     private val random: RandomBytes,
     private val logger: Logger,
     /** False donde no hay cliente OpenVPN (iOS): el motor existe, pero no se ofrece. */

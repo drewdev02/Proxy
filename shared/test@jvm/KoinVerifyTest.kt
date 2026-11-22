@@ -9,6 +9,7 @@ import org.koin.test.verify.verify
 import org.uci.proxy.core.proxy.ConnectingProxyTester
 import org.uci.proxy.core.proxy.HttpConnectConnector
 import org.uci.proxy.core.proxy.ProxyTarget
+import org.uci.proxy.core.vpn.ProxyDialer
 import org.uci.proxy.di.appModules
 import kotlin.test.Test
 import kotlin.time.Duration
@@ -25,6 +26,8 @@ class KoinVerifyTest {
             injections = injectedParameters(
                 definition<HttpConnectConnector>(List::class),
                 definition<ConnectingProxyTester>(List::class, ProxyTarget::class, Duration::class),
+                // Los conectores van con nombre (ProxyConnectors), que verify no distingue.
+                definition<ProxyDialer>(List::class),
             ),
         )
     }

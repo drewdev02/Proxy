@@ -1,5 +1,9 @@
 package org.uci.proxy.core.traffic
 
+import org.uci.proxy.core.model.DailyTraffic
+import org.uci.proxy.core.model.NamedTraffic
+import org.uci.proxy.core.model.TrafficUsage
+import org.uci.proxy.core.port.TrafficHistory
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
@@ -8,7 +12,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.TimeZone
 import org.uci.proxy.core.model.RouteExit
-import org.uci.proxy.core.profile.AppDispatchers
+import org.uci.proxy.core.common.AppDispatchers
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

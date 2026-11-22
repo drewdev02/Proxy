@@ -2,14 +2,14 @@ package org.uci.proxy
 
 import kotlinx.coroutines.runBlocking
 import org.koin.core.context.startKoin
-import org.uci.proxy.core.settings.NameServiceReporter
-import org.uci.proxy.core.desktop.EngineNameForwarder
+import org.uci.proxy.core.port.NameServiceReporter
+import org.uci.proxy.desktop.EngineNameForwarder
 import org.koin.dsl.module
-import org.uci.proxy.core.desktop.EngineArguments
-import org.uci.proxy.core.desktop.EngineSession
+import org.uci.proxy.desktop.EngineArguments
+import org.uci.proxy.desktop.EngineSession
 import org.uci.proxy.core.traffic.TrafficStore
-import org.uci.proxy.core.desktop.MacElevatedEngineLauncher
-import org.uci.proxy.core.desktop.WindowsElevatedEngineLauncher
+import org.uci.proxy.desktop.MacElevatedEngineLauncher
+import org.uci.proxy.desktop.WindowsElevatedEngineLauncher
 import org.uci.proxy.core.di.coreModule
 import org.uci.proxy.core.di.platformModule
 import org.uci.proxy.core.di.tunnelModule
@@ -31,7 +31,7 @@ import org.uci.proxy.core.platform.windows.WinPlatformTunnel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.PlatformInfo
 import org.uci.proxy.core.port.PlatformKind
-import org.uci.proxy.core.profile.AppDispatchers
+import org.uci.proxy.core.common.AppDispatchers
 import java.io.FileOutputStream
 import java.io.PrintStream
 import java.net.InetAddress

@@ -3,9 +3,9 @@ package org.uci.proxy.core.port
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import org.uci.proxy.core.proxy.ProtocolIssue
-import org.uci.proxy.core.vpn.OvpnConfigError
-import org.uci.proxy.core.vpn.VpnHandshakeIssue
+import org.uci.proxy.core.model.ProtocolIssue
+import org.uci.proxy.core.model.OvpnConfigError
+import org.uci.proxy.core.model.VpnHandshakeIssue
 import org.uci.proxy.core.packet.Ipv4Route
 
 interface PacketReader {

@@ -7,7 +7,7 @@ import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.profile.ProfileDraft
 import org.uci.proxy.core.profile.ProfileField
 import org.uci.proxy.core.profile.ProfileValidator
-import org.uci.proxy.core.vpn.OvpnConfigError
+import org.uci.proxy.core.model.OvpnConfigError
 import org.uci.proxy.fakes.FakeLocalNetworkPermission
 import org.uci.proxy.fakes.FakeProfileRepository
 import org.uci.proxy.fakes.FakeProxyTester

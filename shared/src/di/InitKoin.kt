@@ -8,11 +8,11 @@ import org.uci.proxy.core.di.coreModule
 import org.uci.proxy.core.di.platformModule
 import org.uci.proxy.core.log.LogRecorder
 import org.uci.proxy.core.traffic.TrafficRecorder
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.PlatformInfo
 import org.uci.proxy.database.di.databaseModule
-import org.uci.proxy.quota.QuotaMonitor
+import org.uci.proxy.core.quota.QuotaMonitor
 
 /** Módulos del proceso que muestra la interfaz. */
 val appModules: List<Module> = listOf(platformModule, coreModule, databaseModule, uiModule)

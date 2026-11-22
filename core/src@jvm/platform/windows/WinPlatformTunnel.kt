@@ -5,7 +5,7 @@ import kotlinx.coroutines.withContext
 import org.uci.proxy.core.packet.parseIpv4
 import org.uci.proxy.core.platform.PacketChannel
 import org.uci.proxy.core.platform.PollingTunDevice
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.PlatformTunnel
 import org.uci.proxy.core.port.TunConfig

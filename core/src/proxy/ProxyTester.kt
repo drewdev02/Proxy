@@ -1,5 +1,6 @@
 package org.uci.proxy.core.proxy
 
+import org.uci.proxy.core.model.ProtocolIssue
 import kotlinx.coroutines.withTimeoutOrNull
 import org.uci.proxy.core.model.ProxyProfile
 import kotlin.time.Duration

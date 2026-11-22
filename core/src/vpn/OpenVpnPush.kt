@@ -1,5 +1,7 @@
 package org.uci.proxy.core.vpn
 
+import org.uci.proxy.core.model.VpnHandshakeIssue
+
 /** Lo que el servidor VPN indica al cliente en su `PUSH_REPLY`. */
 class OpenVpnPush(
     /** Dirección de la interfaz y máscara. */

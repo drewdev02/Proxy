@@ -1,5 +1,7 @@
 package org.uci.proxy.quota
 
+import org.uci.proxy.core.port.QuotaFetch
+import org.uci.proxy.core.quota.QuotaSoap
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertIs

@@ -10,13 +10,13 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.uci.proxy.core.model.ProxyProfile
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.PlatformInfo
 import org.uci.proxy.core.port.TunnelControl
 import org.uci.proxy.core.port.TunnelMonitor
 import org.uci.proxy.core.port.TunnelState
-import org.uci.proxy.core.profile.ProfileRepository
+import org.uci.proxy.core.port.ProfileRepository
 import org.uci.proxy.common.StorageFailure
 import org.uci.proxy.common.classifyStorageError
 

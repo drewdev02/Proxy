@@ -1,5 +1,6 @@
 package org.uci.proxy.core.vpn
 
+import org.uci.proxy.core.model.OvpnConfigError
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals

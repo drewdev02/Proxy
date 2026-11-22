@@ -1,7 +1,8 @@
 package org.uci.proxy.core.log
 
+import org.uci.proxy.core.model.LogEntry
 import org.uci.proxy.core.fakes.RecordingLogger
-import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.model.LogLevel
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

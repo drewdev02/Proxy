@@ -42,10 +42,10 @@ import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import org.uci.proxy.core.proxy.NameServiceTestResult
-import org.uci.proxy.core.settings.AppSettings
-import org.uci.proxy.core.settings.IpNameService
-import org.uci.proxy.core.settings.NameOutcome
-import org.uci.proxy.core.settings.NameServiceStatus
+import org.uci.proxy.core.model.AppSettings
+import org.uci.proxy.core.model.IpNameService
+import org.uci.proxy.core.model.NameOutcome
+import org.uci.proxy.core.model.NameServiceStatus
 import org.uci.proxy.core.settings.ServiceError
 import org.uci.proxy.core.settings.ServiceValidation
 import org.uci.proxy.resources.Res
@@ -63,7 +63,7 @@ import org.uci.proxy.ui.components.UciSwitch
 import org.uci.proxy.ui.components.UciSwitchRow
 import org.uci.proxy.ui.components.UciTextField
 import org.uci.proxy.ui.components.UciFilterChip
-import org.uci.proxy.core.settings.QuotaSettings
+import org.uci.proxy.core.model.QuotaSettings
 import org.uci.proxy.ui.components.UciTone
 import org.uci.proxy.ui.components.UciTopBar
 import org.uci.proxy.ui.components.colors
