@@ -29,7 +29,8 @@ Un perfil puede salir además por **Otro País**, con el motor que se elija, sie
 nada que instalar: **OpenVPN** (un `.ovpn`, con un cliente propio) o **Tailscale** (un nodo de salida de una red de
 Tailscale o de un servidor Headscale, con la librería oficial de Tailscale embebida). Con **reglas de salida** cada sitio
 (dominio, IP o rango) o app de Android elige por dónde sale: el proxy, Otro País, directo o bloqueado. Si Otro País se
-cae, lo suyo sale por el proxy y se avisa. Los detalles están en las capas 9, 11 y 12 del [ROADMAP](ROADMAP.md).
+cae, lo suyo sale por el proxy y se avisa. Los detalles están en las capas [9](docs/capas/09-otro-pais.md), [11](docs/capas/11-reglas-de-salida.md) y
+[12](docs/capas/12-motores-de-otro-pais.md).
 
 En el escritorio la ventana no tiene privilegios: lanza el motor, que sí puede crear la interfaz, con el diálogo de
 administrador de macOS o el aviso de UAC de Windows, y habla con él por un socket local.
@@ -62,10 +63,17 @@ Para Android e iOS: `./kotlin run -m androidApp` y
 
 ## Código
 
-`core` es el motor, sin Compose; `database` guarda el registro con Room; `shared` es la interfaz; `androidApp`,
-`desktopApp` e `iosApp` son los puntos de entrada.
-El diseño está en [PLAN.md](PLAN.md), el estado por capas en [ROADMAP.md](ROADMAP.md) y cómo se publica una versión en
-[PUBLICAR.md](PUBLICAR.md).
+`core` es el motor, sin Compose; `database` guarda el registro y el consumo con Room; `shared` es la interfaz;
+`androidApp`, `desktopApp` e `iosApp` son los puntos de entrada. `desktopEngine` es cómo la ventana de escritorio lanza el
+motor con permisos de administrador, y `coreTesting` reúne los dobles de prueba de `core`.
+
+Para entender el proyecto:
+
+- [`docs/architecture.md`](docs/architecture.md): módulos, capas de `core` y reglas de dependencia, inyección.
+- [`PLAN.md`](PLAN.md): qué hace cada pieza y por qué.
+- [`docs/adr`](docs/adr/README.md): las decisiones de diseño, una por página.
+- [`ROADMAP.md`](ROADMAP.md): el estado y lo que falta; [`docs/capas`](docs/capas/) cuenta cómo se construyó cada capa.
+- [`PUBLICAR.md`](PUBLICAR.md): cómo se publica una versión.
 
 ## Idiomas
 
