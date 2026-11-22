@@ -109,10 +109,11 @@ class ProxyVpnService : VpnService() {
     private suspend fun watchVpnDown() {
         var wasDown = false
         monitor.state
-            .map { (it as? TunnelState.Connected)?.vpnDown }
+            .map { it as? TunnelState.Connected }
             .filterNotNull()
-            .distinctUntilChanged()
-            .collect { down ->
+            .distinctUntilChanged { old, new -> old.vpnDown == new.vpnDown }
+            .collect { connected ->
+                val down = connected.vpnDown
                 if (down == wasDown) return@collect
                 wasDown = down
                 val manager = getSystemService(NotificationManager::class.java)
@@ -122,7 +123,15 @@ class ProxyVpnService : VpnService() {
                 val notification = Notification.Builder(this, ALERT_CHANNEL_ID)
                     .setSmallIcon(R.drawable.ic_vpn_notification)
                     .setContentTitle(getString(if (down) R.string.vpn_down_title else R.string.vpn_back_title))
-                    .setContentText(getString(if (down) R.string.vpn_down_text else R.string.vpn_back_text))
+                    .setContentText(
+                        getString(
+                            when {
+                                !down -> R.string.vpn_back_text
+                                connected.vpnBlocked -> R.string.vpn_down_blocked_text
+                                else -> R.string.vpn_down_text
+                            },
+                        ),
+                    )
                     .setContentIntent(PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE))
                     .setAutoCancel(true)
                     .build()

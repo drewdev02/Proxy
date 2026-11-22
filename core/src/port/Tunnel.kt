@@ -227,6 +227,8 @@ sealed interface TunnelState {
     data class Connected(
         val profileId: String,
         val vpnDown: Boolean = false,
+        /** Con [vpnDown]: lo que iba por Otro País se bloquea en vez de salir por el proxy (el ajuste está apagado). */
+        val vpnBlocked: Boolean = false,
         val viaProxy: List<String> = emptyList(),
         /** El túnel sigue en pie, pero el proxy está fallando: lo que pasa por él no carga. */
         val proxyProblem: ProxyProblem? = null,

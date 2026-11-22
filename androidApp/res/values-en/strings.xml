@@ -9,4 +9,5 @@
     <string name="vpn_down_text">Traffic that went through the VPN goes through the proxy while it retries.</string>
     <string name="vpn_back_title">Other Country is back</string>
     <string name="vpn_back_text">Traffic from your rules goes through the VPN again.</string>
+    <string name="vpn_down_blocked_text">Traffic that went through the VPN is blocked until it comes back.</string>
 </resources>

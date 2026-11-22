@@ -205,7 +205,7 @@ class TunnelRunner(
         val vpnDown = retry != null && firstSession == null
         if (vpnDown) logger.log(LogLevel.WARN, TAG, "Otro País no conectó: lo que iba por él ${whileDown(settings)}")
         traffic.reset()
-        stateStore.set(TunnelState.Connected(profile.id, vpnDown = vpnDown))
+        stateStore.set(TunnelState.Connected(profile.id, vpnDown = vpnDown, vpnBlocked = vpnDown && !settings.vpnFallbackToProxy))
         try {
             coroutineScope {
                 // En este ámbito viven también el temporizador TCP y los relés de cada conexión.
@@ -358,7 +358,7 @@ class TunnelRunner(
                     session.close()
                     session = null
                     logger.log(LogLevel.WARN, TAG, "Se cayó Otro País: su tráfico ${whileDown(settings)} mientras se reintenta")
-                    stateStore.set(TunnelState.Connected(profileId, vpnDown = true))
+                    stateStore.set(TunnelState.Connected(profileId, vpnDown = true, vpnBlocked = !settings.vpnFallbackToProxy))
                 }
                 if (!retryable) return
                 delay(wait)

@@ -51,6 +51,7 @@ object EngineProtocol {
 
     /** Tras «connected»: Otro País no está y su tráfico sale por el proxy. */
     private const val VPN_DOWN = "vpn-down"
+    private const val VPN_BLOCKED = "vpn-blocked"
     private const val VIA_PROXY = "via-proxy="
     private const val PROXY_PROBLEM = "proxy-problem="
 
@@ -114,6 +115,7 @@ object EngineProtocol {
     fun encodeState(state: TunnelState): String? = when (state) {
         is TunnelState.Connected -> STATE_PREFIX + "connected" +
             (if (state.vpnDown) " $VPN_DOWN" else "") +
+            (if (state.vpnBlocked) " $VPN_BLOCKED" else "") +
             // Los nombres no llevan espacios ni comas: van en una sola palabra.
             (if (state.viaProxy.isNotEmpty()) " $VIA_PROXY" + state.viaProxy.joinToString(",") else "") +
             (state.proxyProblem?.let { " $PROXY_PROBLEM${it.name}" } ?: "")
@@ -131,6 +133,7 @@ object EngineProtocol {
             "connected" -> TunnelState.Connected(
                 profileId,
                 vpnDown = VPN_DOWN in parts,
+                vpnBlocked = VPN_BLOCKED in parts,
                 viaProxy = parts.firstOrNull { it.startsWith(VIA_PROXY) }?.removePrefix(VIA_PROXY)?.split(',')?.filter { it.isNotEmpty() }.orEmpty(),
                 proxyProblem = parts.firstOrNull { it.startsWith(PROXY_PROBLEM) }?.removePrefix(PROXY_PROBLEM)
                     ?.let { name -> ProxyProblem.entries.firstOrNull { it.name == name } },

@@ -413,7 +413,7 @@ class SplitRoutingTest {
         connect(allThroughVpn, settings = settings)
 
         assertNotNull(platformTunnel.config)
-        assertEquals(TunnelState.Connected("p1", vpnDown = true), stateStore.state.value)
+        assertEquals(TunnelState.Connected("p1", vpnDown = true, vpnBlocked = !settings.vpnFallbackToProxy), stateStore.state.value)
     }
 
     @Test
@@ -474,7 +474,7 @@ class SplitRoutingTest {
 
             session.fromServer.close()
             runCurrent()
-            assertEquals(TunnelState.Connected("p1", vpnDown = true), stateStore.state.value)
+            assertEquals(TunnelState.Connected("p1", vpnDown = true, vpnBlocked = true), stateStore.state.value)
             send(syn(server))
             assertReset()
             val written = tun.written.size

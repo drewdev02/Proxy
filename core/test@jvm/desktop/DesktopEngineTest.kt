@@ -177,6 +177,8 @@ class EngineProtocolTest {
         val viaProxy = TunnelState.Connected("p1", viaProxy = listOf("example.com", "www.google.com"))
         assertEquals(viaProxy, roundTrip(viaProxy))
         val failing = TunnelState.Connected("p1", proxyProblem = ProxyProblem.AUTH_REJECTED)
+        val blocked = TunnelState.Connected("p1", vpnDown = true, vpnBlocked = true)
+        assertEquals(blocked, roundTrip(blocked))
         assertEquals(failing, roundTrip(failing))
         assertEquals(TunnelState.Disconnected, roundTrip(TunnelState.Disconnected))
         listOf(

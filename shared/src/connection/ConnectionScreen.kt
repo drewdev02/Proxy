@@ -453,7 +453,7 @@ private fun FailureActionButton(action: FailureAction, actions: ConnectionAction
 private fun ConnectedAlerts(tunnel: TunnelState.Connected) {
     when {
         tunnel.vpnDown -> UciInlineAlert(
-            stringResource(Res.string.connection_vpn_down_message),
+            stringResource(if (tunnel.vpnBlocked) Res.string.connection_vpn_down_blocked_message else Res.string.connection_vpn_down_message),
             title = stringResource(Res.string.connection_vpn_down_title),
             tone = UciTone.Warning,
         )

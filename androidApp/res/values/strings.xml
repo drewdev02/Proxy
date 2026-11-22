@@ -9,4 +9,5 @@
     <string name="vpn_down_text">Lo que iba por la VPN sale por el proxy mientras se reintenta.</string>
     <string name="vpn_back_title">Otro País volvió</string>
     <string name="vpn_back_text">El tráfico de tus reglas sale otra vez por la VPN.</string>
+    <string name="vpn_down_blocked_text">Lo que iba por la VPN está bloqueado hasta que vuelva.</string>
 </resources>
