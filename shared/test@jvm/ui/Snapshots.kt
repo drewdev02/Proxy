@@ -16,7 +16,10 @@ import org.jetbrains.skia.Image
 import org.uci.proxy.theme.ProxyUciTheme
 import java.io.File
 import kotlin.math.abs
-import kotlinx.coroutines.Dispatchers
+import java.util.concurrent.Executors
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.yield
 import kotlin.test.fail
 
 /**
@@ -64,20 +67,32 @@ class Snapshots(private val group: String) {
     private fun render(widthDp: Int, heightDp: Int?, content: @Composable () -> Unit): ByteArray {
         val widthPx = (widthDp * density).toInt()
         val heightPx = ((heightDp ?: MAX_HEIGHT_DP) * density).toInt()
-        // Los efectos (LaunchedEffect, produceState) corren en el hilo de la prueba durante cada fotograma y se cancelan al
-        // cerrar la escena. En el hilo de Swing, alguno llegaba a ejecutarse con la escena ya cerrada y su excepción la
-        // recogía la prueba siguiente, que fallaba sin tener nada que ver.
-        val image = ImageComposeScene(width = widthPx, height = heightPx, density = Density(density), coroutineContext = Dispatchers.Unconfined) {
-            ProxyUciTheme {
-                // Fondo en toda la imagen: así el recorte encuentra dónde acaba el contenido.
-                Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) { content() }
+        // La escena, sus fotogramas y sus efectos (LaunchedEffect, produceState) corren en un hilo propio que se cierra
+        // con ella. Con el hilo de Swing, o con Dispatchers.Unconfined (que reanuda donde la despiertan, y en escritorio
+        // los avisos de cambios de estado llegan por Swing), un efecto como el scrollToItem del registro acababa en
+        // Swing: Compose lo rechaza por tocar la escena desde otro hilo y la excepción la recogía la prueba siguiente.
+        val executor = Executors.newSingleThreadExecutor { Thread(it, "snapshot-$group").apply { isDaemon = true } }
+        val dispatcher = executor.asCoroutineDispatcher()
+        val image = try {
+            runBlocking(dispatcher) {
+                ImageComposeScene(width = widthPx, height = heightPx, density = Density(density), coroutineContext = dispatcher) {
+                    ProxyUciTheme {
+                        // Fondo en toda la imagen: así el recorte encuentra dónde acaba el contenido.
+                        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) { content() }
+                    }
+                }.use { scene ->
+                    // Varios fotogramas para que las fuentes y los iconos estén cargados; tiempo fijo para que las
+                    // animaciones (el arco de «Conectando», el punto que late) salgan siempre igual. Entre uno y
+                    // otro se ceden el hilo para que corran los efectos pendientes.
+                    scene.render(0)
+                    yield()
+                    scene.render(100_000_000)
+                    yield()
+                    scene.render(500_000_000)
+                }
             }
-        }.use { scene ->
-            // Varios fotogramas para que las fuentes y los iconos estén cargados; tiempo fijo para que las
-            // animaciones (el arco de «Conectando», el punto que late) salgan siempre igual.
-            scene.render(0)
-            scene.render(100_000_000)
-            scene.render(500_000_000)
+        } finally {
+            dispatcher.close()
         }
         val result = if (heightDp == null) cropToContent(image) else image
         return result.encodeToData(EncodedImageFormat.PNG)!!.bytes
