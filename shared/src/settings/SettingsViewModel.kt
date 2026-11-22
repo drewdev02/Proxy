@@ -25,6 +25,7 @@ import org.uci.proxy.core.settings.NameServiceStatus
 import org.uci.proxy.core.settings.NameServiceStatusRepository
 import org.uci.proxy.core.settings.ServiceValidation
 import org.uci.proxy.core.settings.SettingsRepository
+import org.uci.proxy.core.port.classifyNetworkError
 
 /** Lo que muestra la fila de un servicio tras pulsar «Probar». */
 sealed interface ServiceTestUi {
@@ -149,7 +150,7 @@ class SettingsViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                ServiceTestUi.Done(NameServiceTestResult.Unreachable(e.message.orEmpty()))
+                ServiceTestUi.Done(NameServiceTestResult.Unreachable(classifyNetworkError(e), e.message.orEmpty()))
             }
             setTest(id, outcome)
         }

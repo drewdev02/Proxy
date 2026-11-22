@@ -69,6 +69,7 @@ import org.uci.proxy.ui.components.UciTopBar
 import org.uci.proxy.ui.components.colors
 import org.uci.proxy.ui.icons.UciIcons
 import org.koin.compose.koinInject
+import org.uci.proxy.common.proxyReason
 import org.uci.proxy.i18n.AppLanguage
 import org.uci.proxy.i18n.AppLanguageSetting
 
@@ -436,7 +437,7 @@ private fun ServiceTestUi.message(): Pair<String, UciTone> = when (this) {
         NameServiceTestResult.Works -> stringResource(Res.string.settings_test_works) to UciTone.Success
         is NameServiceTestResult.Refused -> stringResource(Res.string.settings_test_refused, result.detail) to UciTone.Danger
         NameServiceTestResult.ProxyAuth -> stringResource(Res.string.settings_test_proxy_auth) to UciTone.Warning
-        is NameServiceTestResult.Unreachable -> stringResource(Res.string.settings_test_unreachable, result.detail) to UciTone.Danger
+        is NameServiceTestResult.Unreachable -> stringResource(Res.string.settings_test_unreachable, stringResource(result.kind.proxyReason)) to UciTone.Danger
         NameServiceTestResult.Timeout -> stringResource(Res.string.error_proxy_test_timeout) to UciTone.Warning
     }
 }

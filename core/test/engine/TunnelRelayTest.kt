@@ -25,6 +25,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import org.uci.proxy.core.proxy.RefusalReason
+import org.uci.proxy.core.port.NetFailure
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TunnelRelayTest {
@@ -123,7 +125,7 @@ class TunnelRelayTest {
             if (target.host.endsWith(".sslip.io")) {
                 ProxyConnectResult.Connected(tunnel)
             } else {
-                ProxyConnectResult.Failed(ProxyFailure.Refused("HTTP/1.1 403 Forbidden"))
+                ProxyConnectResult.Failed(ProxyFailure.Refused(RefusalReason.FORBIDDEN, "HTTP/1.1 403 Forbidden"))
             }
         }
         val app = appThrough(connector)
@@ -139,7 +141,7 @@ class TunnelRelayTest {
     fun `when the proxy refuses every name the IP itself is tried`() = runTest {
         val connector = FakeProxyConnector { target ->
             if (target.host.endsWith(".sslip.io") || target.host.endsWith(".nip.io")) {
-                ProxyConnectResult.Failed(ProxyFailure.Refused("HTTP/1.1 403 Forbidden"))
+                ProxyConnectResult.Failed(ProxyFailure.Refused(RefusalReason.FORBIDDEN, "HTTP/1.1 403 Forbidden"))
             } else {
                 ProxyConnectResult.Connected(tunnel)
             }
@@ -159,7 +161,7 @@ class TunnelRelayTest {
     @Test
     fun `the next service is tried when the proxy refuses the first one`() = runTest {
         val connector = FakeProxyConnector { target ->
-            if (target.host.endsWith(".nip.io")) ProxyConnectResult.Connected(tunnel) else ProxyConnectResult.Failed(ProxyFailure.Refused("403"))
+            if (target.host.endsWith(".nip.io")) ProxyConnectResult.Connected(tunnel) else ProxyConnectResult.Failed(ProxyFailure.Refused(RefusalReason.FORBIDDEN, "403"))
         }
         val app = appThrough(connector)
         app.handshake()
@@ -174,7 +176,7 @@ class TunnelRelayTest {
 
     @Test
     fun `a service the user switched off is never asked`() = runTest {
-        val connector = FakeProxyConnector.failingWith(ProxyFailure.Refused("403"))
+        val connector = FakeProxyConnector.failingWith(ProxyFailure.Refused(RefusalReason.FORBIDDEN, "403"))
         val settings = AppSettings(nameServices = listOf(IpNameService.SSLIP.copy(enabled = false), IpNameService.NIP))
         val app = appThrough(connector, namer = IpNamer(settings))
         app.handshake()
@@ -197,7 +199,7 @@ class TunnelRelayTest {
 
     @Test
     fun `a timeout or a network failure does not try the next service`() = runTest {
-        val connector = FakeProxyConnector.failingWith(ProxyFailure.Unreachable("sin ruta"))
+        val connector = FakeProxyConnector.failingWith(ProxyFailure.Unreachable(NetFailure.NO_ROUTE, "sin ruta"))
         val app = appThrough(connector)
         app.handshake()
 
@@ -211,7 +213,7 @@ class TunnelRelayTest {
         val reports = mutableListOf<Pair<String, NameOutcome>>()
         val namer = IpNamer(AppSettings(), { id, outcome -> reports += id to outcome }, testScheduler.timeSource)
         val connector = FakeProxyConnector { target ->
-            if (target.host.endsWith(".nip.io")) ProxyConnectResult.Connected(tunnel) else ProxyConnectResult.Failed(ProxyFailure.Refused("403"))
+            if (target.host.endsWith(".nip.io")) ProxyConnectResult.Connected(tunnel) else ProxyConnectResult.Failed(ProxyFailure.Refused(RefusalReason.FORBIDDEN, "403"))
         }
         val app = appThrough(connector, namer = namer)
         app.handshake()
@@ -223,7 +225,7 @@ class TunnelRelayTest {
 
     @Test
     fun `a refused host name is not retried`() = runTest {
-        val connector = FakeProxyConnector.failingWith(ProxyFailure.Refused("HTTP/1.1 403 Forbidden"))
+        val connector = FakeProxyConnector.failingWith(ProxyFailure.Refused(RefusalReason.FORBIDDEN, "HTTP/1.1 403 Forbidden"))
         val app = appThrough(connector)
 
         app.handshake(destinationHost = "bloqueado.example")
@@ -234,7 +236,7 @@ class TunnelRelayTest {
 
     @Test
     fun `a refused private IP is not retried through sslip`() = runTest {
-        val connector = FakeProxyConnector.failingWith(ProxyFailure.Refused("HTTP/1.1 403 Forbidden"))
+        val connector = FakeProxyConnector.failingWith(ProxyFailure.Refused(RefusalReason.FORBIDDEN, "HTTP/1.1 403 Forbidden"))
         val app = appThrough(connector, serverIp = "192.168.1.10")
         app.handshake()
 
@@ -368,7 +370,7 @@ class TunnelRelayTest {
     @Test
     fun `a connection the proxy refuses does not make it count as working`() = runTest {
         val health = ProxyHealth(testScheduler.timeSource)
-        val app = appThrough(FakeProxyConnector.failingWith(ProxyFailure.Refused("HTTP/1.1 403 Forbidden")), health = health)
+        val app = appThrough(FakeProxyConnector.failingWith(ProxyFailure.Refused(RefusalReason.FORBIDDEN, "HTTP/1.1 403 Forbidden")), health = health)
 
         app.handshake(destinationHost = "bloqueado.example")
 

@@ -4,6 +4,7 @@ import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.ProxyProtocol
 import org.uci.proxy.core.net.BufferedTcpConnection
 import org.uci.proxy.core.port.TcpConnector
+import org.uci.proxy.core.port.NetFailure
 import org.uci.proxy.core.port.TcpException
 
 /** Túnel mediante SOCKS5 (RFC 1928) con autenticación de usuario y contraseña (RFC 1929). */
@@ -16,14 +17,14 @@ class Socks5Connector(private val tcpConnector: TcpConnector) : ProxyConnector {
             connection = BufferedTcpConnection(tcpConnector.connect(profile.host, profile.port))
             handshake(connection, profile.username, password, target)
         } catch (e: TcpException) {
-            ProxyFailure.Unreachable(e.message.orEmpty())
+            ProxyFailure.Unreachable(e.kind, e.message.orEmpty())
         }
 
         return if (failure == null && connection != null) {
             ProxyConnectResult.Connected(connection)
         } else {
             connection?.close()
-            ProxyConnectResult.Failed(failure ?: ProxyFailure.Unreachable("Sin conexión"))
+            ProxyConnectResult.Failed(failure ?: ProxyFailure.Unreachable(NetFailure.OTHER, "sin conexión"))
         }
     }
 
@@ -38,7 +39,7 @@ class Socks5Connector(private val tcpConnector: TcpConnector) : ProxyConnector {
         connection.write(byteArrayOf(VERSION, methods.size.toByte()) + methods)
 
         val choice = connection.readExactly(2)
-        if (choice[0] != VERSION) return ProxyFailure.ProtocolError("El servidor no habla SOCKS5")
+        if (choice[0] != VERSION) return ProxyFailure.ProtocolError(ProtocolIssue.NOT_SOCKS5, "El servidor no habla SOCKS5")
         when (choice[1]) {
             METHOD_NONE -> Unit
             METHOD_USER_PASSWORD -> authenticate(connection, username, password)?.let { return it }
@@ -47,7 +48,7 @@ class Socks5Connector(private val tcpConnector: TcpConnector) : ProxyConnector {
         }
 
         val host = target.host.encodeToByteArray()
-        if (host.size > MAX_FIELD) return ProxyFailure.Refused("Nombre de destino demasiado largo")
+        if (host.size > MAX_FIELD) return ProxyFailure.Refused(RefusalReason.UNSUPPORTED_REQUEST, "Nombre de destino de más de $MAX_FIELD bytes")
         connection.write(
             byteArrayOf(VERSION, COMMAND_CONNECT, 0, ADDRESS_DOMAIN, host.size.toByte()) +
                 host +
@@ -55,15 +56,15 @@ class Socks5Connector(private val tcpConnector: TcpConnector) : ProxyConnector {
         )
 
         val reply = connection.readExactly(4)
-        if (reply[0] != VERSION) return ProxyFailure.ProtocolError("Respuesta SOCKS5 no válida")
-        if (reply[1] != REPLY_SUCCEEDED) return ProxyFailure.Refused("SOCKS5 código ${reply[1].toInt() and 0xFF}")
+        if (reply[0] != VERSION) return ProxyFailure.ProtocolError(ProtocolIssue.BAD_SOCKS5_REPLY, "Respuesta SOCKS5 no válida")
+        if (reply[1] != REPLY_SUCCEEDED) return ProxyFailure.Refused(RefusalReason.ofSocks(reply[1].toInt() and 0xFF), "SOCKS5 código ${reply[1].toInt() and 0xFF}")
 
         // La respuesta termina con la dirección y el puerto que usó el servidor; se leen para dejar el túnel limpio.
         val addressLength = when (reply[3]) {
             ADDRESS_IPV4 -> 4
             ADDRESS_IPV6 -> 16
             ADDRESS_DOMAIN -> connection.readExactly(1)[0].toInt() and 0xFF
-            else -> return ProxyFailure.ProtocolError("Tipo de dirección SOCKS5 desconocido")
+            else -> return ProxyFailure.ProtocolError(ProtocolIssue.BAD_SOCKS5_REPLY, "Tipo de dirección SOCKS5 desconocido")
         }
         connection.readExactly(addressLength + 2)
         return null

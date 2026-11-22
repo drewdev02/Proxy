@@ -4,7 +4,10 @@ import androidx.compose.runtime.Composable
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import org.uci.proxy.core.port.TunnelFailure
+import org.uci.proxy.core.port.NetFailure
+import org.uci.proxy.core.proxy.ProtocolIssue
 import org.uci.proxy.core.proxy.ProxyFailure
+import org.uci.proxy.core.proxy.RefusalReason
 import org.uci.proxy.core.proxy.ProxyTestResult
 import org.uci.proxy.core.vpn.OvpnConfigError
 import org.uci.proxy.resources.Res
@@ -64,9 +67,43 @@ internal val TunnelFailure.exitSearchReason: StringResource
         else -> Res.string.error_exit_search_other
     }
 
+/** Por qué no se llegó al proxy. */
+internal val NetFailure.proxyReason: StringResource
+    get() = when (this) {
+        NetFailure.NO_NETWORK -> Res.string.error_net_no_network
+        NetFailure.NAME_NOT_FOUND -> Res.string.error_net_name_not_found
+        NetFailure.REFUSED -> Res.string.error_net_refused
+        NetFailure.TIMEOUT -> Res.string.error_net_timeout
+        NetFailure.NO_ROUTE -> Res.string.error_net_no_route
+        NetFailure.RESET -> Res.string.error_net_reset
+        NetFailure.CLOSED -> Res.string.error_net_closed
+        NetFailure.PROTOCOL -> Res.string.error_net_protocol
+        NetFailure.OTHER -> Res.string.error_net_other
+    }
+
+/** Por qué el proxy no abrió un destino. */
+internal val RefusalReason.text: StringResource
+    get() = when (this) {
+        RefusalReason.FORBIDDEN -> Res.string.error_refusal_forbidden
+        RefusalReason.DESTINATION_UNREACHABLE -> Res.string.error_refusal_destination_unreachable
+        RefusalReason.DESTINATION_REFUSED -> Res.string.error_refusal_destination_refused
+        RefusalReason.UNSUPPORTED_REQUEST -> Res.string.error_refusal_unsupported
+        RefusalReason.OTHER -> Res.string.error_refusal_other
+    }
+
+/** Qué no cuadra en la respuesta del servidor. */
+internal val ProtocolIssue.text: StringResource
+    get() = when (this) {
+        ProtocolIssue.NOT_HTTP_PROXY -> Res.string.error_protocol_not_http
+        ProtocolIssue.NOT_SOCKS5 -> Res.string.error_protocol_not_socks5
+        ProtocolIssue.BAD_SOCKS5_REPLY -> Res.string.error_protocol_bad_socks5_reply
+        ProtocolIssue.BAD_NTLM_CHALLENGE -> Res.string.error_protocol_bad_ntlm
+        ProtocolIssue.NO_CONNECTOR -> Res.string.error_protocol_no_connector
+    }
+
 /**
- * El resultado de probar el proxy, para mostrarlo tal cual. Los detalles de [ProxyFailure] son diagnóstico técnico
- * (la línea de estado HTTP, el código SOCKS, el error del sistema) y salen sin traducir, como en el registro.
+ * El resultado de probar el proxy, en una frase que dice qué pasó. Los detalles técnicos de [ProxyFailure] (la línea
+ * de estado HTTP, el código SOCKS, el error del sistema) no van en la frase: se muestran aparte, en «Detalles».
  */
 @Composable
 internal fun ProxyTestResult.message(): String = when (this) {
@@ -81,9 +118,9 @@ internal fun ProxyTestResult.message(): String = when (this) {
             } else {
                 stringResource(Res.string.error_proxy_unsupported_auth_schemes, failure.schemes.joinToString())
             }
-        is ProxyFailure.Refused -> stringResource(Res.string.error_proxy_refused, failure.detail)
-        is ProxyFailure.Unreachable -> stringResource(Res.string.error_proxy_unreachable, failure.detail).trimEnd()
-        is ProxyFailure.ProtocolError -> stringResource(Res.string.error_proxy_protocol, failure.detail).trimEnd()
+        is ProxyFailure.Refused -> stringResource(Res.string.error_proxy_refused, stringResource(failure.reason.text))
+        is ProxyFailure.Unreachable -> stringResource(failure.kind.proxyReason)
+        is ProxyFailure.ProtocolError -> stringResource(Res.string.error_proxy_protocol_mismatch, stringResource(failure.issue.text))
     }
 }
 

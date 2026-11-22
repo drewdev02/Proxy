@@ -82,7 +82,7 @@
     <string name="settings_test_works">The proxy accepts this service.</string>
     <string name="settings_test_refused">The proxy rejects it: %1$s</string>
     <string name="settings_test_proxy_auth">The proxy rejected the profile's username or password: the test is not valid.</string>
-    <string name="settings_test_unreachable">Could not reach the proxy. %1$s If the tunnel is active, disconnect it and try again.</string>
+    <string name="settings_test_unreachable">%1$s If the tunnel is active, disconnect it and try again.</string>
 
     <!-- Adding a custom service -->
     <string name="settings_add_name_label">Name</string>

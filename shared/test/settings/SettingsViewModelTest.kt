@@ -24,6 +24,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import org.uci.proxy.core.proxy.RefusalReason
+import org.uci.proxy.core.port.NetFailure
 
 class SettingsViewModelTest : MainDispatcherTest() {
     private val store = InMemoryKeyValueStore()
@@ -212,7 +214,7 @@ class SettingsViewModelTest : MainDispatcherTest() {
 
     @Test
     fun `a refusal is recorded as the service's status`() {
-        testResult = NameServiceTestResult.Refused("HTTP/1.1 403 Forbidden")
+        testResult = NameServiceTestResult.Refused(RefusalReason.FORBIDDEN, "HTTP/1.1 403 Forbidden")
 
         viewModel.testService("nip")
 
@@ -222,7 +224,7 @@ class SettingsViewModelTest : MainDispatcherTest() {
 
     @Test
     fun `a network failure or rejected credentials are shown but not recorded as the service's status`() {
-        testResult = NameServiceTestResult.Unreachable("sin ruta")
+        testResult = NameServiceTestResult.Unreachable(NetFailure.NO_ROUTE, "sin ruta")
         viewModel.testService("sslip")
         testResult = NameServiceTestResult.ProxyAuth
         viewModel.testService("nip")

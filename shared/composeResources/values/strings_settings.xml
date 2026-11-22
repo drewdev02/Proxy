@@ -84,7 +84,7 @@
     <string name="settings_test_works">El proxy acepta este servicio.</string>
     <string name="settings_test_refused">El proxy lo rechaza: %1$s</string>
     <string name="settings_test_proxy_auth">El proxy rechazó el usuario o la contraseña del perfil: la prueba no vale.</string>
-    <string name="settings_test_unreachable">No se pudo llegar al proxy. %1$s Si el túnel está activo, desconéctalo y prueba otra vez.</string>
+    <string name="settings_test_unreachable">%1$s Si el túnel está activo, desconéctalo y prueba otra vez.</string>
 
     <!-- Añadir un servicio propio -->
     <string name="settings_add_name_label">Nombre</string>

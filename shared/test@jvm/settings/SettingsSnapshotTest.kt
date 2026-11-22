@@ -5,6 +5,7 @@ import org.uci.proxy.core.settings.AppSettings
 import org.uci.proxy.core.settings.IpNameService
 import org.uci.proxy.ui.Snapshots
 import kotlin.test.Test
+import org.uci.proxy.core.proxy.RefusalReason
 
 /** Ajustes en sus estados principales, contra sus capturas de referencia (ver [Snapshots]). */
 class SettingsSnapshotTest {
@@ -15,7 +16,7 @@ class SettingsSnapshotTest {
     // Resultados de prueba y no estados guardados: estos dicen «hace N min» con la hora real y la captura cambiaría cada día.
     private val tests = mapOf(
         "sslip" to ServiceTestUi.Done(NameServiceTestResult.Works),
-        "nip" to ServiceTestUi.Done(NameServiceTestResult.Refused("403 Forbidden")),
+        "nip" to ServiceTestUi.Done(NameServiceTestResult.Refused(RefusalReason.FORBIDDEN, "403 Forbidden")),
         "custom" to ServiceTestUi.Running,
     )
 

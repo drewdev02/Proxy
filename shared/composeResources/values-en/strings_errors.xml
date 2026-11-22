@@ -21,9 +21,30 @@
     <string name="error_proxy_auth_rejected">The proxy rejected the username or password.</string>
     <string name="error_proxy_unsupported_auth">The proxy requires an authentication type the app does not support.</string>
     <string name="error_proxy_unsupported_auth_schemes">The proxy requires an authentication type the app does not support (%1$s).</string>
-    <string name="error_proxy_refused">The proxy answered but did not allow the test connection: %1$s</string>
-    <string name="error_proxy_unreachable">Could not connect to the proxy. %1$s</string>
-    <string name="error_proxy_protocol">The server did not answer as expected. %1$s</string>
+    <string name="error_proxy_refused">The proxy is reachable, but it did not open the test destination. %1$s</string>
+    <string name="error_proxy_protocol_mismatch">%1$s Check the profile's protocol.</string>
+
+    <string name="error_net_no_network">There is no network connection.</string>
+    <string name="error_net_name_not_found">The proxy server cannot be found: check its name.</string>
+    <string name="error_net_refused">The proxy server does not accept connections on that port: check the port.</string>
+    <string name="error_net_timeout">The proxy did not answer in time.</string>
+    <string name="error_net_no_route">The proxy server cannot be reached: it may be off or outside this network.</string>
+    <string name="error_net_reset">The proxy cut the connection.</string>
+    <string name="error_net_closed">The proxy closed the connection before finishing its answer.</string>
+    <string name="error_net_protocol">The server does not answer like a proxy.</string>
+    <string name="error_net_other">Could not connect to the proxy.</string>
+
+    <string name="error_refusal_forbidden">The proxy policy does not allow that destination.</string>
+    <string name="error_refusal_destination_unreachable">The proxy could not reach the destination: it does not exist or does not answer.</string>
+    <string name="error_refusal_destination_refused">The destination refused the connection.</string>
+    <string name="error_refusal_unsupported">The proxy does not accept this kind of request.</string>
+    <string name="error_refusal_other">The proxy did not allow the connection.</string>
+
+    <string name="error_protocol_not_http">The server does not answer like an HTTP proxy. Is it SOCKS5?</string>
+    <string name="error_protocol_not_socks5">The server does not answer like a SOCKS5 proxy. Is it HTTP?</string>
+    <string name="error_protocol_bad_socks5_reply">The SOCKS5 server sent an answer that cannot be understood.</string>
+    <string name="error_protocol_bad_ntlm">The proxy sent an NTLM challenge that cannot be read.</string>
+    <string name="error_protocol_no_connector">The app does not support this profile's protocol.</string>
     <string name="error_local_network_denied_for_test">The app needs permission to access the local network to connect to the proxy.</string>
 
     <string name="error_ovpn_missing">Choose an .ovpn file (OpenVPN over TCP).</string>

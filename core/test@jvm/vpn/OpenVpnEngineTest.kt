@@ -18,6 +18,8 @@ import org.uci.proxy.core.settings.IpNameService
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import org.uci.proxy.core.proxy.RefusalReason
+import org.uci.proxy.core.port.NetFailure
 
 // Una autoridad autofirmada cualquiera, solo para que el perfil de prueba tenga un <ca> legible.
 private val AUTHORITY = """
@@ -81,7 +83,7 @@ class OpenVpnEngineTest {
 
     @Test
     fun `the servers are tried in the order of the file`() = runTest {
-        val connector = FakeProxyConnector.failingWith(ProxyFailure.Refused("HTTP/1.1 403 Forbidden"))
+        val connector = FakeProxyConnector.failingWith(ProxyFailure.Refused(RefusalReason.FORBIDDEN, "HTTP/1.1 403 Forbidden"))
 
         val result = exit(connector).connect(proxy, "x", start(ovpn()))
 
@@ -93,7 +95,7 @@ class OpenVpnEngineTest {
     fun `when the proxy refuses the first server the next one is tried`() = runTest {
         val closed = FakeTunnelConnection().also { it.end() }
         val connector = FakeProxyConnector { target ->
-            if (target.port == 443) ProxyConnectResult.Failed(ProxyFailure.Refused("403")) else ProxyConnectResult.Connected(closed)
+            if (target.port == 443) ProxyConnectResult.Failed(ProxyFailure.Refused(RefusalReason.FORBIDDEN, "403")) else ProxyConnectResult.Connected(closed)
         }
 
         val result = exit(connector).connect(proxy, "x", start(ovpn()))
@@ -110,7 +112,7 @@ class OpenVpnEngineTest {
         // El Squid de la UCI rechaza el CONNECT a una IP escrita tal cual y acepta el nombre sslip.io.
         val closed = FakeTunnelConnection().also { it.end() }
         val connector = FakeProxyConnector { target ->
-            if (target.host.endsWith(".sslip.io")) ProxyConnectResult.Connected(closed) else ProxyConnectResult.Failed(ProxyFailure.Refused("HTTP/1.1 403 Forbidden"))
+            if (target.host.endsWith(".sslip.io")) ProxyConnectResult.Connected(closed) else ProxyConnectResult.Failed(ProxyFailure.Refused(RefusalReason.FORBIDDEN, "HTTP/1.1 403 Forbidden"))
         }
 
         exit(connector).connect(proxy, "x", start(ovpn(remotes = "remote $publicIp 443")))
@@ -120,7 +122,7 @@ class OpenVpnEngineTest {
 
     @Test
     fun `if the proxy refuses the sslip name the address is tried before giving up on that server`() = runTest {
-        val connector = FakeProxyConnector.failingWith(ProxyFailure.Refused("HTTP/1.1 403 Forbidden"))
+        val connector = FakeProxyConnector.failingWith(ProxyFailure.Refused(RefusalReason.FORBIDDEN, "HTTP/1.1 403 Forbidden"))
 
         exit(connector).connect(proxy, "x", start(ovpn(remotes = "remote $publicIp 443")))
 
@@ -135,7 +137,7 @@ class OpenVpnEngineTest {
     fun `the next service is tried when the proxy refuses the first one`() = runTest {
         val closed = FakeTunnelConnection().also { it.end() }
         val connector = FakeProxyConnector { target ->
-            if (target.host.endsWith(".nip.io")) ProxyConnectResult.Connected(closed) else ProxyConnectResult.Failed(ProxyFailure.Refused("403"))
+            if (target.host.endsWith(".nip.io")) ProxyConnectResult.Connected(closed) else ProxyConnectResult.Failed(ProxyFailure.Refused(RefusalReason.FORBIDDEN, "403"))
         }
 
         exit(connector).connect(proxy, "x", start(ovpn(remotes = "remote $publicIp 443")))
@@ -147,7 +149,7 @@ class OpenVpnEngineTest {
     fun `the service that worked is asked first for the next server`() = runTest {
         val closed = FakeTunnelConnection().also { it.end() }
         val connector = FakeProxyConnector { target ->
-            if (target.host.endsWith(".nip.io")) ProxyConnectResult.Connected(closed) else ProxyConnectResult.Failed(ProxyFailure.Refused("403"))
+            if (target.host.endsWith(".nip.io")) ProxyConnectResult.Connected(closed) else ProxyConnectResult.Failed(ProxyFailure.Refused(RefusalReason.FORBIDDEN, "403"))
         }
 
         exit(connector).connect(proxy, "x", start(ovpn(remotes = "remote $publicIp 443\nremote 149.22.82.29 443")))
@@ -158,7 +160,7 @@ class OpenVpnEngineTest {
 
     @Test
     fun `the settings decide which services are asked and whether the address is`() = runTest {
-        val connector = FakeProxyConnector.failingWith(ProxyFailure.Refused("403"))
+        val connector = FakeProxyConnector.failingWith(ProxyFailure.Refused(RefusalReason.FORBIDDEN, "403"))
         val settings = AppSettings(tryRawIp = false, nameServices = listOf(IpNameService.NIP, IpNameService.SSLIP.copy(enabled = false)))
 
         exit(connector).connect(proxy, "x", start(ovpn(remotes = "remote $publicIp 443")), settings)
@@ -168,7 +170,7 @@ class OpenVpnEngineTest {
 
     @Test
     fun `with names turned off the server is asked for by address`() = runTest {
-        val connector = FakeProxyConnector.failingWith(ProxyFailure.Refused("403"))
+        val connector = FakeProxyConnector.failingWith(ProxyFailure.Refused(RefusalReason.FORBIDDEN, "403"))
 
         exit(connector).connect(proxy, "x", start(ovpn(remotes = "remote $publicIp 443")), AppSettings(nameByIp = false))
 
@@ -177,7 +179,7 @@ class OpenVpnEngineTest {
 
     @Test
     fun `a server given by name or a private address is not rewritten`() = runTest {
-        val connector = FakeProxyConnector.failingWith(ProxyFailure.Unreachable("sin ruta"))
+        val connector = FakeProxyConnector.failingWith(ProxyFailure.Unreachable(NetFailure.NO_ROUTE, "sin ruta"))
 
         exit(connector).connect(proxy, "x", start(ovpn(remotes = "remote vpn.ejemplo.org 443\nremote 10.9.0.5 443")))
 
@@ -186,7 +188,7 @@ class OpenVpnEngineTest {
 
     @Test
     fun `port 443 is tried first whatever the order in the file`() = runTest {
-        val connector = FakeProxyConnector.failingWith(ProxyFailure.Unreachable("sin ruta"))
+        val connector = FakeProxyConnector.failingWith(ProxyFailure.Unreachable(NetFailure.NO_ROUTE, "sin ruta"))
 
         exit(connector).connect(proxy, "x", start(ovpn(remotes = publicRemotes)))
 
@@ -196,7 +198,7 @@ class OpenVpnEngineTest {
 
     @Test
     fun `port 443 still comes first with a random order`() = runTest {
-        val connector = FakeProxyConnector.failingWith(ProxyFailure.Unreachable("sin ruta"))
+        val connector = FakeProxyConnector.failingWith(ProxyFailure.Unreachable(NetFailure.NO_ROUTE, "sin ruta"))
 
         exit(connector).connect(proxy, "x", start(ovpn(remotes = publicRemotes, extra = "remote-random")))
 
@@ -205,7 +207,7 @@ class OpenVpnEngineTest {
 
     @Test
     fun `when the proxy policy refuses every server the failure says so`() = runTest {
-        val connector = FakeProxyConnector.failingWith(ProxyFailure.Refused("HTTP/1.1 403 Forbidden"))
+        val connector = FakeProxyConnector.failingWith(ProxyFailure.Refused(RefusalReason.FORBIDDEN, "HTTP/1.1 403 Forbidden"))
 
         val result = exit(connector).connect(proxy, "x", start(ovpn(remotes = publicRemotes)))
 
@@ -214,7 +216,7 @@ class OpenVpnEngineTest {
 
     @Test
     fun `when nothing answers at all it is unreachable and not blocked`() = runTest {
-        val connector = FakeProxyConnector.failingWith(ProxyFailure.Unreachable("sin ruta"))
+        val connector = FakeProxyConnector.failingWith(ProxyFailure.Unreachable(NetFailure.NO_ROUTE, "sin ruta"))
 
         val result = exit(connector).connect(proxy, "x", start(ovpn(remotes = publicRemotes)))
 
@@ -251,7 +253,7 @@ class OpenVpnEngineTest {
 
     @Test
     fun `random order still tries every server`() = runTest {
-        val connector = FakeProxyConnector.failingWith(ProxyFailure.Refused("403"))
+        val connector = FakeProxyConnector.failingWith(ProxyFailure.Refused(RefusalReason.FORBIDDEN, "403"))
 
         exit(connector).connect(proxy, "x", start(ovpn(extra = "remote-random")))
 
