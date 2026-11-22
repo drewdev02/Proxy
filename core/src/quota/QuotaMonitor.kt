@@ -1,6 +1,6 @@
 package org.uci.proxy.core.quota
 
-import org.uci.proxy.core.data.QuotaStore
+import org.uci.proxy.core.port.QuotaStore
 import org.uci.proxy.core.model.UciQuota
 import org.uci.proxy.core.port.QuotaFetch
 import org.uci.proxy.core.port.QuotaNotifier

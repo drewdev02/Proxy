@@ -1,6 +1,6 @@
 package org.uci.proxy.quota
 
-import org.uci.proxy.core.data.QuotaStore
+import org.uci.proxy.core.data.StoredQuotaStore
 import org.uci.proxy.core.model.UciQuota
 import org.uci.proxy.core.port.QuotaFetch
 import org.uci.proxy.core.port.UciQuotaService
@@ -64,7 +64,7 @@ class QuotaMonitorTest {
             override fun now() = Instant.fromEpochMilliseconds(1_795_348_800_000 + testScheduler.currentTime)
         }
         return QuotaMonitor(
-            profiles, active, tunnel, tunnel, settings, service, QuotaStore(keyValues), { title, message -> notifications += title to message },
+            profiles, active, tunnel, tunnel, settings, service, StoredQuotaStore(keyValues), { title, message -> notifications += title to message },
             clock, AppDispatchers(StandardTestDispatcher(testScheduler)), RecordingLogger(),
         )
     }

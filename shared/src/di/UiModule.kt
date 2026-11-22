@@ -9,7 +9,8 @@ import org.uci.proxy.core.quota.QuotaTracker
 import org.uci.proxy.quota.HttpUciQuotaService
 import org.uci.proxy.core.quota.QuotaMonitor
 import org.uci.proxy.core.port.QuotaNotifier
-import org.uci.proxy.core.data.QuotaStore
+import org.uci.proxy.core.data.StoredQuotaStore
+import org.uci.proxy.core.port.QuotaStore
 import org.uci.proxy.core.port.UciQuotaService
 import org.uci.proxy.connection.ConnectionViewModel
 import org.uci.proxy.logs.LogsViewModel
@@ -20,7 +21,7 @@ import kotlin.time.TimeSource
 
 val uiModule = module {
     // La cuota de la UCI: se consulta en este proceso. Android sustituye el aviso por una notificación.
-    single { QuotaStore(get()) }
+    single<QuotaStore> { StoredQuotaStore(get()) }
     single<UciQuotaService> { HttpUciQuotaService() }
     single<QuotaNotifier> { QuotaNotifier.None }
     single {
