@@ -198,8 +198,11 @@ class TunnelRunner(
         }
 
         val meter = TrafficMeter()
-        val link = VpnLink(plan.tunAddress, logger, onViaProxy = { host -> noteViaProxy(host) }, meter = meter)
-        val split = rules?.let { SplitRouting(it, link, fallbackToProxy = settings.vpnFallbackToProxy) }
+        val link = VpnLink(
+            plan.tunAddress, logger, onViaProxy = { host -> noteViaProxy(host) }, meter = meter,
+            fallbackToProxy = settings.vpnFallbackToProxy, timeSource = timeSource,
+        )
+        val split = rules?.let { SplitRouting(it, link) }
         val localDns = localDnsFor(localDnsConfig, settings, rules, reserved = listOf(plan.subnet))
         logger.log(LogLevel.INFO, TAG, "Túnel activo en ${plan.tunAddressText}, proxy $proxyAddress" + if (rules != null) ", con reglas de salida" else "")
         val vpnDown = retry != null && firstSession == null

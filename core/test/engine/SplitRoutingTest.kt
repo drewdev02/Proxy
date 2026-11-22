@@ -140,6 +140,7 @@ class SplitRoutingTest {
             dispatchers = dispatchers,
             logger = logger,
             engines = exit,
+            timeSource = testScheduler.timeSource,
         )
         runner.run(platformTunnel, profile, "x", settings = settings, vpn = vpn)
     }.also { runCurrent() }
@@ -620,6 +621,110 @@ class SplitRoutingTest {
         advanceTimeBy(6.seconds)
         runCurrent()
         assertEquals(TunnelState.Connected("p1"), stateStore.state.value)
+    }
+
+    private val netflixApp = listOf("com.netflix.mediaclient")
+
+    /**
+     * Una app con regla «Otro País» va a [name], cuyo DNS de la VPN dice que no existe ([answered]) o no contesta. Devuelve
+     * la dirección inventada, tras el segundo SYN (el primero dispara la resolución y se descarta).
+     */
+    private fun TestScope.connectToUnresolvable(settings: AppSettings, answered: Boolean, name: String = "nada.invalid"): Int {
+        connect(profile.copy(routing = appRules), settings = settings)
+        val fake = fakeAddressOf(name)
+        appsByPort[50003] = netflixApp
+        send(syn(fake, sourcePort = 50003))
+        val query = UdpDatagram.parse(assertNotNull(Ipv4Packet.parse(session.sent.single())))!!
+        if (answered) {
+            fromVpn(vpnDnsAnswer(name, null, port = query.sourcePort, id = query.payload.readU16(0)))
+        } else {
+            advanceTimeBy(6.seconds)
+            runCurrent()
+        }
+        send(syn(fake, sourcePort = 50003))
+        return fake
+    }
+
+    private fun assertBlockedWithoutProxy(name: String = "nada.invalid") {
+        assertTrue(assertNotNull(TcpSegment.parse(lastToApp())).has(TcpFlags.RST), "RST como una regla «Bloquear»")
+        assertTrue(connector.targets.isEmpty(), "nada por el proxy")
+        assertEquals(emptyList(), (stateStore.state.value as TunnelState.Connected).viaProxy, "no se dice que sale por el proxy")
+        assertTrue(logger.entries.any { (level, message) -> level == LogLevel.WARN && name in message && "se bloquean" in message })
+    }
+
+    @Test
+    fun `with the kill switch a name the VPN says does not exist is blocked and never goes through the proxy`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val fake = connectToUnresolvable(killSwitch, answered = true)
+
+            assertBlockedWithoutProxy()
+            assertEquals(1, session.sent.size, "solo la consulta")
+            send(buildUdpPacket(app, fake, 50005, 443, ByteArray(100)).also { appsByPort[50005] = netflixApp })
+            assertEquals(1, Ipv4Packet.parse(tun.written.last())!!.protocol, "el UDP recibe un ICMP de puerto inalcanzable")
+        }
+
+    @Test
+    fun `with the kill switch a name the VPN's DNS does not answer is blocked and never goes through the proxy`() =
+        runTest(UnconfinedTestDispatcher()) {
+            connectToUnresolvable(killSwitch, answered = false)
+
+            assertBlockedWithoutProxy()
+        }
+
+    @Test
+    fun `a name the VPN's DNS does not answer goes through the proxy as before with the fallback on`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val fake = connectToUnresolvable(AppSettings(), answered = false)
+
+            assertAnsweredByProxyStack(fake)
+            assertEquals(listOf("nada.invalid"), (stateStore.state.value as TunnelState.Connected).viaProxy)
+        }
+
+    @Test
+    fun `with the fallback on a name without address stays on the proxy until the VPN reconnects`() = runTest(UnconfinedTestDispatcher()) {
+        val fake = connectToUnresolvable(AppSettings(), answered = true)
+        advanceTimeBy(120.seconds)
+        runCurrent()
+
+        send(syn(fake, sourcePort = 50003))
+
+        assertEquals(1, session.sent.size, "no se vuelve a preguntar")
+        assertAnsweredByProxyStack(fake)
+    }
+
+    @Test
+    fun `with the kill switch a name without address is asked again after a minute`() = runTest(UnconfinedTestDispatcher()) {
+        val fake = connectToUnresolvable(killSwitch, answered = true)
+
+        advanceTimeBy(58.seconds)
+        runCurrent()
+        send(syn(fake, sourcePort = 50003))
+        assertBlockedWithoutProxy()
+        assertEquals(1, session.sent.size, "aún no se vuelve a preguntar")
+
+        advanceTimeBy(3.seconds)
+        runCurrent()
+        val written = tun.written.size
+        send(syn(fake, sourcePort = 50003))
+        assertEquals(2, session.sent.size, "se pregunta otra vez al DNS de la VPN")
+        assertEquals(written, tun.written.size, "y mientras tanto el SYN se descarta")
+    }
+
+    @Test
+    fun `with the kill switch a name the DNS did not answer is asked again after ten seconds`() = runTest(UnconfinedTestDispatcher()) {
+        val fake = connectToUnresolvable(killSwitch, answered = false)
+
+        advanceTimeBy(8.seconds)
+        runCurrent()
+        send(syn(fake, sourcePort = 50003))
+        assertBlockedWithoutProxy()
+        assertEquals(1, session.sent.size)
+
+        advanceTimeBy(3.seconds)
+        runCurrent()
+        send(syn(fake, sourcePort = 50003))
+        assertEquals(2, session.sent.size, "se pregunta otra vez al DNS de la VPN")
+        assertTrue(connector.targets.isEmpty())
     }
 
     @Test
