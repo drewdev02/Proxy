@@ -56,22 +56,25 @@ módulo propio que la extensión no enlaza.
 ./                             raíz del repositorio
 ├── core/                      kmp/lib sin Compose: motor + adaptadores
 │   ├── module.yaml            platforms: jvm, android, iosArm64, iosSimulatorArm64; alias jvmAndAndroid
-│   ├── src/                   código común (todo el núcleo)
-│   │   ├── model/             ProxyProfile, RoutingRules
+│   ├── src/                   código común (todo el núcleo), por capas (las comprueba LayersTest)
+│   │   ├── model/             datos: ProxyProfile, RoutingRules, AppSettings, LogEntry, tráfico, UciQuota
+│   │   ├── common/            AppDispatchers, IdGenerator
 │   │   ├── packet/            Ipv4, Tcp, Routes, HostSniffer
-│   │   ├── tcp/               TunTcpStack
-│   │   ├── dns/               FakeDnsTable, DnsResponder, DnsAnswers
 │   │   ├── auth/              Md4/Md5/HmacMd5 (Digests), Ntlm
-│   │   ├── proxy/             HttpConnectConnector, Socks5Connector, esquemas Basic/NTLM, ProxyTester, IpNamer
-│   │   ├── net/               KtorTcpConnector
-│   │   ├── engine/            TunnelEngine, TunnelRelay, TunnelRunner, SplitRouting, ConnectivityChecks
+│   │   ├── port/              interfaces hacia fuera: almacenes, repositorios, red, túnel, avisos
+│   │   ├── data/              Stored*: perfiles, ajustes, servicios de nombres, cuota; EncryptedSecretStore
 │   │   ├── routing/           RuleSet
+│   │   ├── dns/               FakeDnsTable, DnsResponder, DnsAnswers, LocalDns
+│   │   ├── tcp/               TunTcpStack
+│   │   ├── net/               KtorTcpConnector, KtorDnsTransport
+│   │   ├── proxy/             HttpConnectConnector, Socks5Connector, esquemas Basic/NTLM, ProxyTester, IpNamer
 │   │   ├── vpn/               CountryEngine, ProxyDialer, OpenVpnEngine (OvpnConfig, OpenVpnClient), tailscale/ (Otro País)
-│   │   ├── profile/           ProfileRepository, ProfileValidator
-│   │   ├── settings/          AppSettings, servicios de nombres y su estado
-│   │   ├── storage/           EncryptedSecretStore
+│   │   ├── profile/           ProfileValidator, perfil activo
+│   │   ├── settings/          IpNameServiceValidator
 │   │   ├── log/               LogBuffer, BufferedLogger, LogRecorder
-│   │   ├── port/              interfaces que implementa cada plataforma
+│   │   ├── traffic/           TrafficStore, TrafficRecorder
+│   │   ├── quota/             QuotaMonitor y el formato SOAP de la cuota UCI (el cliente HTTP está en shared)
+│   │   ├── engine/            TunnelEngine, TunnelRelay, TunnelRunner, SplitRouting, ConnectivityChecks
 │   │   └── di/                coreModule, tunnelModule y expect val platformModule
 │   ├── src@android/           VpnService, Keystore, dueño de cada conexión + actual platformModule
 │   ├── src@jvm/               utun y Wintun, motor elevado e IPC (desktop/) + actual platformModule
