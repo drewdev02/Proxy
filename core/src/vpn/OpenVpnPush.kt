@@ -22,14 +22,14 @@ internal fun parsePushReply(message: String): OpenVpnPush {
     val options = message.removePrefix("PUSH_REPLY").split(',').map { it.trim() }.filter { it.isNotEmpty() }
     fun value(name: String) = options.firstOrNull { it == name || it.startsWith("$name ") }
 
-    val ifconfig = value("ifconfig")?.split(' ') ?: throw OpenVpnException("El servidor VPN no indicó una dirección (ifconfig)")
-    val address = ifconfig.getOrNull(1) ?: throw OpenVpnException("El servidor VPN envió un ifconfig incompleto")
+    val ifconfig = value("ifconfig")?.split(' ') ?: throw OpenVpnException(VpnHandshakeIssue.UNSUPPORTED_SERVER, "El servidor VPN no indicó una dirección (ifconfig)")
+    val address = ifconfig.getOrNull(1) ?: throw OpenVpnException(VpnHandshakeIssue.UNSUPPORTED_SERVER, "El servidor VPN envió un ifconfig incompleto")
     // Con `topology subnet` el segundo valor es la máscara; con `net30` o `p2p` es la dirección del otro extremo.
     val second = ifconfig.getOrNull(2)
     val netmask = if (value("topology")?.endsWith("subnet") == true && second != null) second else "255.255.255.0"
 
     val peerId = value("peer-id")?.split(' ')?.getOrNull(1)?.toIntOrNull()
-        ?: throw OpenVpnException("El servidor VPN no indicó un peer-id: solo se admite el formato de datos v2")
+        ?: throw OpenVpnException(VpnHandshakeIssue.UNSUPPORTED_SERVER, "El servidor VPN no indicó un peer-id: solo se admite el formato de datos v2", subject = "peer-id")
     return OpenVpnPush(
         address = address,
         netmask = netmask,
