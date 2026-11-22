@@ -38,8 +38,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.delay
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
-import org.uci.proxy.common.LOCAL_NETWORK_DENIED_FOR_TEST
+import org.uci.proxy.common.LocalNetworkDeniedForTest
 import org.uci.proxy.common.isFixedInProfile
 import org.uci.proxy.common.message
 import org.uci.proxy.common.reason
@@ -55,13 +56,13 @@ import org.uci.proxy.core.port.LogLevel
 import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.port.TunnelState
 import org.uci.proxy.core.proxy.ProxyTestResult
+import org.uci.proxy.core.settings.QuotaSettings
 import org.uci.proxy.logs.formatLogTime
 import org.uci.proxy.logs.tone
 import org.uci.proxy.profile.label
 import org.uci.proxy.profile.tone
 import org.uci.proxy.quota.percentText
 import org.uci.proxy.quota.tone
-import org.uci.proxy.core.settings.QuotaSettings
 import org.uci.proxy.theme.ProxyUciTheme
 import org.uci.proxy.ui.components.UciBottomSheet
 import org.uci.proxy.ui.components.UciButton
@@ -365,7 +366,7 @@ private fun StatusAlerts(state: ConnectionUiState, actions: ConnectionActions, o
     }
     when (val tunnel = state.tunnel) {
         is TunnelState.Failed -> UciInlineAlert(
-            tunnel.failure.reason().replaceFirstChar { it.uppercase() },
+            stringResource(tunnel.failure.reason),
             title = "No se pudo conectar",
             tone = UciTone.Danger,
             action = {
@@ -411,7 +412,7 @@ private fun ProxyCheckCard(state: ConnectionUiState, onTest: () -> Unit) {
     ) {
         when (check) {
             ProxyCheck.Idle, ProxyCheck.Running -> Unit
-            ProxyCheck.LocalNetworkDenied -> UciInlineAlert(LOCAL_NETWORK_DENIED_FOR_TEST, tone = UciTone.Warning)
+            ProxyCheck.LocalNetworkDenied -> UciInlineAlert(stringResource(LocalNetworkDeniedForTest), tone = UciTone.Warning)
             is ProxyCheck.Finished -> when (check.result) {
                 // El tiempo es el de la prueba entera (conectar, autenticarse, abrir el túnel), no una latencia: no se
                 // le aplican los umbrales de latencia del diseño.

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="error_tunnel_failed">Could not connect. %1$s</string>
+    <string name="error_tunnel_vpn_permission_denied">You need to allow the VPN connection.</string>
+    <string name="error_tunnel_local_network_denied">The app needs permission to access the local network to reach the proxy.</string>
+    <string name="error_tunnel_profile_not_found">The profile no longer exists.</string>
+    <string name="error_tunnel_interface_unavailable">The system did not allow creating the VPN connection.</string>
+    <string name="error_tunnel_proxy_host_unresolved">The profile's server cannot be found.</string>
+    <string name="error_tunnel_proxy_auth_failed">The proxy rejected the username or password.</string>
+    <string name="error_tunnel_vpn_profile_invalid">The Other Country settings are not valid (the .ovpn file must be OpenVPN over TCP; the Tailscale server address must be valid). Check them in the profile.</string>
+    <string name="error_tunnel_vpn_server_unreachable">The proxy did not let the connection reach the Other Country server.</string>
+    <string name="error_tunnel_vpn_server_blocked">The proxy policy blocked access to the Other Country servers. With OpenVPN, try another server, one on port 443.</string>
+    <string name="error_tunnel_vpn_auth_failed">Other Country rejected the credentials (VPN username and password, or Tailscale key).</string>
+    <string name="error_tunnel_vpn_handshake_failed">The Other Country server did not complete the connection.</string>
+    <string name="error_tunnel_exit_node_not_found">The Tailscale exit node does not exist on the network, or there are several and none was chosen.</string>
+    <string name="error_tunnel_engine_unavailable">The profile's Other Country engine is not available on this device.</string>
+
+    <string name="error_proxy_test_success">Connection OK: the proxy accepted the profile details.</string>
+    <string name="error_proxy_test_timeout">The proxy did not answer in time.</string>
+    <string name="error_proxy_auth_required">The proxy asks for a username and password.</string>
+    <string name="error_proxy_auth_rejected">The proxy rejected the username or password.</string>
+    <string name="error_proxy_unsupported_auth">The proxy requires an authentication type the app does not support.</string>
+    <string name="error_proxy_unsupported_auth_schemes">The proxy requires an authentication type the app does not support (%1$s).</string>
+    <string name="error_proxy_refused">The proxy answered but did not allow the test connection: %1$s</string>
+    <string name="error_proxy_unreachable">Could not connect to the proxy. %1$s</string>
+    <string name="error_proxy_protocol">The server did not answer as expected. %1$s</string>
+    <string name="error_local_network_denied_for_test">The app needs permission to access the local network to connect to the proxy.</string>
+
+    <string name="error_ovpn_missing">Choose an .ovpn file (OpenVPN over TCP).</string>
+    <string name="error_ovpn_unclosed_block">The file is incomplete: &lt;%1$s&gt; is never closed.</string>
+    <string name="error_ovpn_not_a_client">The file is not an OpenVPN client profile.</string>
+    <string name="error_ovpn_tap_not_supported">Only tun profiles are supported, not tap.</string>
+    <string name="error_ovpn_no_tcp_servers">The profile has no TCP servers. Through a proxy only OpenVPN over TCP works: download the TCP version of the profile.</string>
+    <string name="error_ovpn_tls_auth">The profile uses tls-auth, which is not supported yet (tls-crypt is).</string>
+    <string name="error_ovpn_tls_crypt_v2">The profile uses tls-crypt-v2, which is not supported yet (tls-crypt is).</string>
+    <string name="error_ovpn_client_certificate">The profile uses a client certificate, which is not supported yet. Only username and password.</string>
+    <string name="error_ovpn_compression">The profile uses compression (%1$s), which is not supported.</string>
+    <string name="error_ovpn_missing_ca">The profile does not include the certificate authority (&lt;ca&gt;).</string>
+    <string name="error_ovpn_missing_tls_crypt">The profile does not include &lt;tls-crypt&gt;, the only option supported.</string>
+    <string name="error_ovpn_bad_tls_crypt_key">The &lt;tls-crypt&gt; key does not have the expected format.</string>
+
+    <string name="error_exit_search_vpn_auth_failed">The network rejected the authentication key.</string>
+    <string name="error_exit_search_proxy_auth_failed">The proxy rejected the profile's username or password.</string>
+    <string name="error_exit_search_server_blocked">The proxy policy does not allow reaching the control server.</string>
+    <string name="error_exit_search_server_unreachable">Could not reach the control server through the proxy.</string>
+    <string name="error_exit_search_engine_unavailable">Tailscale is not available on this device.</string>
+    <string name="error_exit_search_invalid_server">The control server address is not valid.</string>
+    <string name="error_exit_search_other">Could not search for exit nodes (another Tailscale session may be open).</string>
+    <string name="error_exit_search_no_nodes">The network has no exit nodes.</string>
+    <string name="error_exit_search_failed">Could not search for exit nodes.</string>
+</resources>

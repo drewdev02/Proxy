@@ -35,10 +35,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import org.uci.proxy.apps.AppCatalog
 import org.uci.proxy.apps.LocalAppCatalog
-import org.uci.proxy.common.LOCAL_NETWORK_DENIED_FOR_TEST
+import org.uci.proxy.common.LocalNetworkDeniedForTest
 import org.uci.proxy.common.message
 import org.uci.proxy.core.model.CountryEngineKind
 import org.uci.proxy.core.model.ProxyProtocol
@@ -47,11 +48,12 @@ import org.uci.proxy.core.profile.ProfileDraft
 import org.uci.proxy.core.profile.ProfileField
 import org.uci.proxy.core.proxy.ProxyTestResult
 import org.uci.proxy.files.LocalFilePicker
+import org.uci.proxy.resources.*
+import org.uci.proxy.resources.Res
 import org.uci.proxy.theme.ProxyUciTheme
 import org.uci.proxy.ui.components.UciButton
 import org.uci.proxy.ui.components.UciButtonVariant
 import org.uci.proxy.ui.components.UciDivider
-import org.uci.proxy.ui.components.UciSwitchRow
 import org.uci.proxy.ui.components.UciFileField
 import org.uci.proxy.ui.components.UciFilterChip
 import org.uci.proxy.ui.components.UciInlineAlert
@@ -59,6 +61,7 @@ import org.uci.proxy.ui.components.UciPasswordField
 import org.uci.proxy.ui.components.UciSectionCard
 import org.uci.proxy.ui.components.UciSegmentedControl
 import org.uci.proxy.ui.components.UciSwitch
+import org.uci.proxy.ui.components.UciSwitchRow
 import org.uci.proxy.ui.components.UciTextField
 import org.uci.proxy.ui.components.UciTone
 import org.uci.proxy.ui.components.UciTopBar
@@ -297,7 +300,7 @@ private fun AuthSection(
         )
         when (val test = state.test) {
             ProxyTestUiState.Idle, ProxyTestUiState.Running -> Unit
-            ProxyTestUiState.LocalNetworkDenied -> UciInlineAlert(LOCAL_NETWORK_DENIED_FOR_TEST, tone = UciTone.Warning)
+            ProxyTestUiState.LocalNetworkDenied -> UciInlineAlert(stringResource(LocalNetworkDeniedForTest), tone = UciTone.Warning)
             is ProxyTestUiState.Finished -> UciInlineAlert(
                 test.result.message(),
                 tone = when (test.result) {
@@ -359,7 +362,7 @@ private fun OpenVpnFields(state: ProfileEditorUiState, actions: CountryExitActio
         chooseLabel = "Elegir .ovpn",
         enabled = !state.isBusy,
     )
-    val fileError = vpn.fileError?.message() ?: "Elige un archivo .ovpn (OpenVPN sobre TCP).".takeIf { ProfileField.VPN_FILE in state.errors }
+    val fileError = vpn.fileError?.message() ?: stringResource(Res.string.error_ovpn_missing).takeIf { ProfileField.VPN_FILE in state.errors }
     fileError?.let { UciInlineAlert(it, tone = UciTone.Danger) }
     if (vpn.needsCredentials) {
         UciTextField(
@@ -427,7 +430,7 @@ private fun TailscaleFields(state: ProfileEditorUiState, actions: CountryExitAct
                 )
             }
         }
-        is ExitNodeSearch.Failed -> UciInlineAlert(search.message, tone = UciTone.Danger)
+        is ExitNodeSearch.Failed -> UciInlineAlert(stringResource(search.reason), tone = UciTone.Danger)
         else -> Unit
     }
     UciTextField(
@@ -444,11 +447,7 @@ internal val CountryEngineKind.label: String
         CountryEngineKind.TAILSCALE -> "Tailscale"
     }
 
-private fun ProxyTestUiState.message(): String? = when (this) {
-    ProxyTestUiState.Idle, ProxyTestUiState.Running -> null
-    ProxyTestUiState.LocalNetworkDenied -> LOCAL_NETWORK_DENIED_FOR_TEST
-    is ProxyTestUiState.Finished -> result.message()
-}
+
 
 @Preview
 @Composable

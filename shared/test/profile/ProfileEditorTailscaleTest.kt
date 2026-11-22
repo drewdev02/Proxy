@@ -1,5 +1,9 @@
 package org.uci.proxy.profile
 
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertTrue
 import org.uci.proxy.core.model.CountryEngineKind
 import org.uci.proxy.core.model.CountryExit
 import org.uci.proxy.core.model.CountryExitSecrets
@@ -18,10 +22,8 @@ import org.uci.proxy.fakes.FakeProfileRepository
 import org.uci.proxy.fakes.FakeProxyTester
 import org.uci.proxy.fakes.MainDispatcherTest
 import org.uci.proxy.fakes.RecordingLogger
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertIs
-import kotlin.test.assertTrue
+import org.uci.proxy.resources.*
+import org.uci.proxy.resources.Res
 
 /** Un catálogo con los dos motores, cuya búsqueda de nodos responde lo que diga la prueba. */
 private class FakeCatalog(
@@ -158,7 +160,7 @@ class ProfileEditorTailscaleTest : MainDispatcherTest() {
         viewModel.searchExitNodes()
 
         val search = assertIs<ExitNodeSearch.Failed>(viewModel.uiState.value.vpn.tailscale.search)
-        assertEquals("La red rechazó la clave de autenticación.", search.message)
+        assertEquals(Res.string.error_exit_search_vpn_auth_failed, search.reason)
     }
 
     @Test

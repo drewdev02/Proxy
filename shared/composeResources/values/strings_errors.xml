@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Los textos de los fallos, en un solo sitio para que todas las pantallas digan lo mismo. -->
+<resources>
+    <!-- Por qué falló el túnel. Cada uno es una frase completa: se muestra sola o tras «No se pudo conectar.» -->
+    <string name="error_tunnel_failed">No se pudo conectar. %1$s</string>
+    <string name="error_tunnel_vpn_permission_denied">Hace falta autorizar la conexión VPN.</string>
+    <string name="error_tunnel_local_network_denied">La app necesita permiso para acceder a la red local y alcanzar el proxy.</string>
+    <string name="error_tunnel_profile_not_found">El perfil ya no existe.</string>
+    <string name="error_tunnel_interface_unavailable">El sistema no permitió crear la conexión VPN.</string>
+    <string name="error_tunnel_proxy_host_unresolved">No se encuentra el servidor del perfil.</string>
+    <string name="error_tunnel_proxy_auth_failed">El proxy rechazó el usuario o la contraseña.</string>
+    <string name="error_tunnel_vpn_profile_invalid">La configuración de Otro País no sirve (el archivo .ovpn debe ser OpenVPN sobre TCP; la dirección del servidor de Tailscale debe ser válida). Revísala en el perfil.</string>
+    <string name="error_tunnel_vpn_server_unreachable">El proxy no dejó llegar al servidor de Otro País.</string>
+    <string name="error_tunnel_vpn_server_blocked">La política del proxy bloqueó el acceso a los servidores de Otro País. Con OpenVPN, prueba con otro servidor, uno con puerto 443.</string>
+    <string name="error_tunnel_vpn_auth_failed">Otro País rechazó las credenciales (usuario y contraseña de la VPN, o clave de Tailscale).</string>
+    <string name="error_tunnel_vpn_handshake_failed">El servidor de Otro País no completó la conexión.</string>
+    <string name="error_tunnel_exit_node_not_found">El nodo de salida de Tailscale no existe en la red, o hay varios y no se eligió ninguno.</string>
+    <string name="error_tunnel_engine_unavailable">El motor de Otro País del perfil no está disponible en este equipo.</string>
+
+    <!-- La prueba del proxy. El detalle (%1$s) es técnico y sale tal cual: una línea de estado HTTP, un código SOCKS… -->
+    <string name="error_proxy_test_success">Conexión correcta: el proxy aceptó los datos del perfil.</string>
+    <string name="error_proxy_test_timeout">El proxy no respondió a tiempo.</string>
+    <string name="error_proxy_auth_required">El proxy pide usuario y contraseña.</string>
+    <string name="error_proxy_auth_rejected">El proxy rechazó el usuario o la contraseña.</string>
+    <string name="error_proxy_unsupported_auth">El proxy exige un tipo de autenticación que la app no admite.</string>
+    <string name="error_proxy_unsupported_auth_schemes">El proxy exige un tipo de autenticación que la app no admite (%1$s).</string>
+    <string name="error_proxy_refused">El proxy respondió, pero no permitió la conexión de prueba: %1$s</string>
+    <string name="error_proxy_unreachable">No se pudo conectar con el proxy. %1$s</string>
+    <string name="error_proxy_protocol">El servidor no respondió como se esperaba. %1$s</string>
+    <string name="error_local_network_denied_for_test">La app necesita permiso para acceder a la red local y así poder conectar con el proxy.</string>
+
+    <!-- Por qué no sirve el archivo .ovpn elegido. -->
+    <string name="error_ovpn_missing">Elige un archivo .ovpn (OpenVPN sobre TCP).</string>
+    <string name="error_ovpn_unclosed_block">El archivo está incompleto: falta cerrar &lt;%1$s&gt;.</string>
+    <string name="error_ovpn_not_a_client">El archivo no es un perfil de cliente OpenVPN.</string>
+    <string name="error_ovpn_tap_not_supported">Solo se admiten perfiles de tipo tun, no tap.</string>
+    <string name="error_ovpn_no_tcp_servers">El perfil no tiene servidores TCP. A través de un proxy solo funciona OpenVPN sobre TCP: descarga la variante TCP del perfil.</string>
+    <string name="error_ovpn_tls_auth">El perfil usa tls-auth, que todavía no se admite (sí tls-crypt).</string>
+    <string name="error_ovpn_tls_crypt_v2">El perfil usa tls-crypt-v2, que todavía no se admite (sí tls-crypt).</string>
+    <string name="error_ovpn_client_certificate">El perfil usa certificado de cliente, que todavía no se admite. Solo usuario y contraseña.</string>
+    <string name="error_ovpn_compression">El perfil usa compresión (%1$s), que no se admite.</string>
+    <string name="error_ovpn_missing_ca">El perfil no incluye el certificado de la autoridad (&lt;ca&gt;).</string>
+    <string name="error_ovpn_missing_tls_crypt">El perfil no incluye &lt;tls-crypt&gt;, que es lo único que se admite.</string>
+    <string name="error_ovpn_bad_tls_crypt_key">La clave de &lt;tls-crypt&gt; no tiene el formato esperado.</string>
+
+    <!-- La búsqueda de nodos de salida de Tailscale. -->
+    <string name="error_exit_search_vpn_auth_failed">La red rechazó la clave de autenticación.</string>
+    <string name="error_exit_search_proxy_auth_failed">El proxy rechazó el usuario o la contraseña del perfil.</string>
+    <string name="error_exit_search_server_blocked">La política del proxy no deja llegar al servidor de control.</string>
+    <string name="error_exit_search_server_unreachable">No se pudo llegar al servidor de control a través del proxy.</string>
+    <string name="error_exit_search_engine_unavailable">Tailscale no está disponible en este equipo.</string>
+    <string name="error_exit_search_invalid_server">La dirección del servidor de control no es válida.</string>
+    <string name="error_exit_search_other">No se pudo buscar los nodos de salida (puede que haya otra sesión de Tailscale abierta).</string>
+    <string name="error_exit_search_no_nodes">La red no tiene ningún nodo de salida.</string>
+    <string name="error_exit_search_failed">No se pudo buscar los nodos de salida.</string>
+</resources>

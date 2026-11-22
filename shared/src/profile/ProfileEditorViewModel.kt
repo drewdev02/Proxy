@@ -8,20 +8,16 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import org.uci.proxy.core.model.ProxyProfile
-import org.uci.proxy.core.model.RouteExit
-import org.uci.proxy.core.model.RouteRule
-import org.uci.proxy.core.model.RuleKind
-import org.uci.proxy.core.model.RoutingRules
-import org.uci.proxy.core.routing.parseRule
+import org.jetbrains.compose.resources.StringResource
+import org.uci.proxy.common.exitSearchReason
 import org.uci.proxy.core.model.CountryEngineKind
 import org.uci.proxy.core.model.CountryExit
 import org.uci.proxy.core.model.CountryExitSecrets
-import org.uci.proxy.core.settings.AppSettings
-import org.uci.proxy.core.settings.SettingsRepository
-import org.uci.proxy.core.vpn.CountryEngineCatalog
-import org.uci.proxy.core.vpn.tailscale.ExitNodeListing
-import org.uci.proxy.core.vpn.tailscale.TailscaleExitNode
+import org.uci.proxy.core.model.ProxyProfile
+import org.uci.proxy.core.model.RouteExit
+import org.uci.proxy.core.model.RouteRule
+import org.uci.proxy.core.model.RoutingRules
+import org.uci.proxy.core.model.RuleKind
 import org.uci.proxy.core.port.LocalNetworkPermission
 import org.uci.proxy.core.port.LogLevel
 import org.uci.proxy.core.port.Logger
@@ -34,9 +30,17 @@ import org.uci.proxy.core.profile.ProfileValidation
 import org.uci.proxy.core.profile.ProfileValidator
 import org.uci.proxy.core.proxy.ProxyTestResult
 import org.uci.proxy.core.proxy.ProxyTester
+import org.uci.proxy.core.routing.parseRule
+import org.uci.proxy.core.settings.AppSettings
+import org.uci.proxy.core.settings.SettingsRepository
+import org.uci.proxy.core.vpn.CountryEngineCatalog
 import org.uci.proxy.core.vpn.OvpnConfigError
 import org.uci.proxy.core.vpn.OvpnConfigException
 import org.uci.proxy.core.vpn.parseOvpn
+import org.uci.proxy.core.vpn.tailscale.ExitNodeListing
+import org.uci.proxy.core.vpn.tailscale.TailscaleExitNode
+import org.uci.proxy.resources.*
+import org.uci.proxy.resources.Res
 
 sealed interface ProxyTestUiState {
     data object Idle : ProxyTestUiState
@@ -83,7 +87,7 @@ sealed interface ExitNodeSearch {
 
     data class Found(val nodes: List<TailscaleExitNode>) : ExitNodeSearch
 
-    data class Failed(val message: String) : ExitNodeSearch
+    data class Failed(val reason: StringResource) : ExitNodeSearch
 }
 
 /** Las reglas de salida tal como se editan, más la regla que se está escribiendo. */
@@ -272,7 +276,7 @@ class ProfileEditorViewModel(
         updateTailscale(null) { it.copy(search = ExitNodeSearch.Running) }
         viewModelScope.launch {
             val outcome = if (!localNetworkPermission.request()) {
-                ExitNodeSearch.Failed("La app necesita permiso para acceder a la red local y alcanzar el proxy.")
+                ExitNodeSearch.Failed(Res.string.error_tunnel_local_network_denied)
             } else {
                 val listing = guarded("buscar los nodos de salida") {
                     catalog.listTailscaleExitNodes(
@@ -285,9 +289,9 @@ class ProfileEditorViewModel(
                 }
                 when (listing) {
                     is ExitNodeListing.Found ->
-                        if (listing.nodes.isEmpty()) ExitNodeSearch.Failed("La red no tiene ningún nodo de salida.") else ExitNodeSearch.Found(listing.nodes)
-                    is ExitNodeListing.Failed -> ExitNodeSearch.Failed(listing.failure.searchMessage())
-                    null -> ExitNodeSearch.Failed("No se pudo buscar los nodos de salida.")
+                        if (listing.nodes.isEmpty()) ExitNodeSearch.Failed(Res.string.error_exit_search_no_nodes) else ExitNodeSearch.Found(listing.nodes)
+                    is ExitNodeListing.Failed -> ExitNodeSearch.Failed(listing.failure.exitSearchReason)
+                    null -> ExitNodeSearch.Failed(Res.string.error_exit_search_failed)
                 }
             }
             state.update {
@@ -500,16 +504,6 @@ class ProfileEditorViewModel(
         exitNode = exitNode.trim(),
         hostname = hostname.trim().ifEmpty { CountryExit.Tailscale.DEFAULT_HOSTNAME },
     )
-
-    private fun TunnelFailure.searchMessage(): String = when (this) {
-        TunnelFailure.VPN_AUTH_FAILED -> "La red rechazó la clave de autenticación."
-        TunnelFailure.PROXY_AUTH_FAILED -> "El proxy rechazó el usuario o la contraseña del perfil."
-        TunnelFailure.VPN_SERVER_BLOCKED -> "La política del proxy no deja llegar al servidor de control."
-        TunnelFailure.VPN_SERVER_UNREACHABLE -> "No se pudo llegar al servidor de control a través del proxy."
-        TunnelFailure.ENGINE_UNAVAILABLE -> "Tailscale no está disponible en este equipo."
-        TunnelFailure.VPN_PROFILE_INVALID -> "La dirección del servidor de control no es válida."
-        else -> "No se pudo buscar los nodos de salida (puede que haya otra sesión de Tailscale abierta)."
-    }
 
     private fun ProxyProfile.toDraft() = ProfileDraft(
         name = name,

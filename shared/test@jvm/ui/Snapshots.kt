@@ -15,6 +15,7 @@ import org.jetbrains.skia.IRect
 import org.jetbrains.skia.Image
 import org.uci.proxy.theme.ProxyUciTheme
 import java.io.File
+import java.util.Locale
 import kotlin.math.abs
 import java.util.concurrent.Executors
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -39,6 +40,12 @@ class Snapshots(private val group: String) {
     private val outputDir = File(moduleDir, "../build/snapshots/${osName()}/$group").normalize().apply { mkdirs() }
     private val update = System.getenv("UPDATE_SNAPSHOTS") == "1"
     private val failures = mutableListOf<String>()
+
+    init {
+        // Las referencias están en español: sin fijar el idioma, una máquina en inglés (como las del CI) dibujaría los textos
+        // de values-en y ninguna captura coincidiría.
+        Locale.setDefault(Locale.forLanguageTag("es"))
+    }
 
     /**
      * Dibuja [content] con el tema de la app en [widthDp] de ancho. Con [heightDp] la imagen tiene ese alto fijo
@@ -138,7 +145,7 @@ class Snapshots(private val group: String) {
     private fun channelDistance(a: Int, b: Int): Int =
         (0..3).maxOf { shift -> abs(((a shr (shift * 8)) and 0xFF) - ((b shr (shift * 8)) and 0xFF)) }
 
-    private companion object {
+    companion object {
         const val MAX_HEIGHT_DP = 2600
 
         fun osName(): String {
