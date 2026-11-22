@@ -70,12 +70,15 @@ class NativeTailscaleBridge(
          * nueva dentro de [root] (en Unix, solo accesible para este usuario), se comprueba que lo escrito es idéntico al
          * recurso y se carga con [System.load]. Nada de reutilizar una copia anterior: el motor de escritorio corre con
          * privilegios y no debe cargar algo que otro proceso haya podido dejar o cambiar.
+         *
+         * @param prepareRoot deja [root] lista antes de usarla (en Windows, protegida para que nadie más pueda escribir).
          */
         fun fromResource(
             resourceDir: String,
             fileName: String,
             root: Path = Path.of(System.getProperty("java.io.tmpdir"), "proxyuci-native"),
             onLoadError: (String) -> Unit = {},
+            prepareRoot: (Path) -> Path = { it },
         ): NativeTailscaleBridge {
             val resource = "/native/tsbridge/$resourceDir/$fileName"
             return NativeTailscaleBridge(resource, load = {
@@ -83,8 +86,9 @@ class NativeTailscaleBridge(
                 if (bytes == null) {
                     false
                 } else {
-                    Files.createDirectories(root)
-                    val directory = Files.createTempDirectory(root, "tsbridge-")
+                    val base = prepareRoot(root)
+                    Files.createDirectories(base)
+                    val directory = Files.createTempDirectory(base, "tsbridge-")
                     val library = directory.resolve(fileName)
                     Files.write(library, bytes)
                     if (!sha256(Files.readAllBytes(library)).contentEquals(sha256(bytes))) {

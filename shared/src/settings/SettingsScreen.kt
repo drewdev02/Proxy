@@ -79,6 +79,7 @@ class SettingsActions(
     val onBack: (() -> Unit)? = null,
     val onAnswerConnectivityChecksChange: (Boolean) -> Unit = {},
     val onIntranetDirectChange: (Boolean) -> Unit = {},
+    val onVpnFallbackToProxyChange: (Boolean) -> Unit = {},
     val onNameByIpChange: (Boolean) -> Unit = {},
     val onTryRawIpChange: (Boolean) -> Unit = {},
     val onServiceEnabledChange: (String, Boolean) -> Unit = { _, _ -> },
@@ -116,6 +117,7 @@ internal fun SettingsScreen(
             onBack = onBack,
             onAnswerConnectivityChecksChange = viewModel::setAnswerConnectivityChecks,
             onIntranetDirectChange = viewModel::setIntranetDirect,
+            onVpnFallbackToProxyChange = viewModel::setVpnFallbackToProxy,
             onNameByIpChange = viewModel::setNameByIp,
             onTryRawIpChange = viewModel::setTryRawIp,
             onServiceEnabledChange = viewModel::setServiceEnabled,
@@ -181,6 +183,13 @@ fun SettingsScreen(
                         subtitle = stringResource(Res.string.settings_intranet_direct_subtitle),
                         checked = settings.intranetDirect,
                         onCheckedChange = actions.onIntranetDirectChange,
+                    )
+                    UciDivider()
+                    UciSwitchRow(
+                        title = stringResource(Res.string.settings_vpn_fallback_title),
+                        subtitle = stringResource(Res.string.settings_vpn_fallback_subtitle),
+                        checked = settings.vpnFallbackToProxy,
+                        onCheckedChange = actions.onVpnFallbackToProxyChange,
                     )
                 }
                 QuotaCard(settings.quota, actions)

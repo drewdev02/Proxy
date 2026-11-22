@@ -1,10 +1,13 @@
 package org.uci.proxy.core.vpn
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
 import org.uci.proxy.core.model.CountryEngineKind
 import org.uci.proxy.core.model.CountryExit
 import org.uci.proxy.core.model.CountryExitSecrets
 import org.uci.proxy.core.model.ProxyProfile
+import org.uci.proxy.core.port.LogLevel
+import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.settings.AppSettings
 
@@ -76,7 +79,7 @@ interface CountryEngine {
 }
 
 /** Los motores de esta plataforma. */
-class CountryEngines(engines: List<CountryEngine>) {
+class CountryEngines(engines: List<CountryEngine>, private val logger: Logger? = null) {
     private val byKind = engines.associateBy { it.kind }
 
     /** El motor de [kind] si existe y puede usarse aquí. */
@@ -88,13 +91,22 @@ class CountryEngines(engines: List<CountryEngine>) {
     /** Abre la sesión con el motor de la salida, o falla con un motivo claro si no está disponible. */
     suspend fun connect(context: ExitContext, start: CountryExitStart): VpnConnectResult {
         val engine = get(start.exit.kind) ?: return VpnConnectResult.Failed(TunnelFailure.EngineUnavailable)
-        return engine.connect(context, start)
+        // Un motor que lanza no debe tumbar el túnel: quien llama solo sabe tratar Failed (caer al proxy o reintentar).
+        return try {
+            engine.connect(context, start)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            logger?.log(LogLevel.WARN, TAG, "El motor ${start.exit.kind.tag} falló al conectar: ${e.message}")
+            VpnConnectResult.Failed(TunnelFailure.EngineInternal)
+        }
     }
 
     fun isPermanent(kind: CountryEngineKind, failure: TunnelFailure): Boolean =
         byKind[kind]?.isPermanent(failure) ?: CountryEngine.isPermanentFailure(failure)
 
     companion object {
+        private const val TAG = "Vpn"
         val None = CountryEngines(emptyList())
     }
 }

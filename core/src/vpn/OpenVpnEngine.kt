@@ -1,5 +1,6 @@
 package org.uci.proxy.core.vpn
 
+import kotlinx.coroutines.CancellationException
 import org.uci.proxy.core.model.CountryEngineKind
 import org.uci.proxy.core.model.CountryExitSecrets
 import org.uci.proxy.core.model.CountryExit
@@ -74,6 +75,13 @@ class OpenVpnEngine(
                     return VpnConnectResult.Failed(TunnelFailure.VpnHandshakeFailed(e.issue, e.subject))
                 }
                 handshakeFailure = handshakeFailure ?: TunnelFailure.VpnHandshakeFailed(e.issue, e.subject)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // También un corte del proxy a mitad (TcpException): otro servidor puede responder, y si ninguno lo hace
+                // el túnel debe caer al proxy en vez de romperse.
+                logger.log(LogLevel.WARN, TAG, "Se cortó la conexión con ${remote.host}:${remote.port}: ${e.message}")
+                handshakeFailure = handshakeFailure ?: TunnelFailure.VpnHandshakeFailed(VpnHandshakeIssue.CLOSED)
             }
         }
         // Lo más informativo primero: si algún servidor llegó a responder, el problema es de la VPN y no del proxy.

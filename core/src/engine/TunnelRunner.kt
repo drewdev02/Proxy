@@ -18,6 +18,7 @@ import org.uci.proxy.core.dns.LocalDnsPolicy
 import org.uci.proxy.core.dns.LocalDnsResolver
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.RouteExit
+import org.uci.proxy.core.model.RoutingRules
 import org.uci.proxy.core.packet.Ipv4Packet
 import org.uci.proxy.core.packet.Ipv4Route
 import org.uci.proxy.core.packet.NON_PUBLIC_RANGES
@@ -146,13 +147,12 @@ class TunnelRunner(
             fail(it)
             return
         }
-        val routing = profile.routing
+        // Todo por Otro País y sin reglas es un reparto con la VPN por defecto: así su caída se trata igual que con reglas
+        // (por el proxy o bloqueado, según el ajuste) y hay un solo camino.
+        val allThroughVpn = vpn != null && !profile.routing.enabled
+        val routing = if (allThroughVpn) RoutingRules(enabled = true, defaultExit = RouteExit.VPN) else profile.routing
         // También antes de tocar la red: el DNS de la red real deja de verse en cuanto el túnel captura el DNS.
         val localDnsConfig = readLocalDns()
-        if (vpn != null && !routing.enabled) {
-            runThroughVpn(platformTunnel, profile, resolvedProfile, password, vpn, settings, localDnsConfig)
-            return
-        }
 
         // Con reglas de salida que usan «Otro País», la VPN se abre antes que la interfaz: así las primeras consultas DNS
         // ya pueden ir por ella. Si no conecta, el túnel arranca igual y lo suyo sale por el proxy mientras se reintenta.
@@ -164,6 +164,15 @@ class TunnelRunner(
         val retry = vpnStart?.let { VpnRetry(ExitContext(resolvedProfile, password, settings), it) }
         val firstAttempt = retry?.let { openVpn(it) }
         val firstSession = firstAttempt?.session
+        // Sin reglas, una VPN que no puede conectar nunca (credenciales, archivo, motor) es un fallo, como siempre: con
+        // todo por ella, arrancar sin ella sería sacarlo todo por el proxy o bloquearlo todo sin remedio.
+        val permanentFailure = firstAttempt?.failure?.takeIf { !firstAttempt.retry }
+        if (allThroughVpn && permanentFailure != null) {
+            fail(permanentFailure)
+            return
+        }
+        // La red de la VPN (la de Tailscale, por ejemplo) también entra en la interfaz, y el MTU no puede pasar del suyo.
+        val vpnNetwork = if (allThroughVpn) firstSession?.network else null
 
         val plan = addressPlanner.plan()
         val directRoutes = rules?.directRoutes.orEmpty()
@@ -173,9 +182,10 @@ class TunnelRunner(
                     sessionName = profile.name,
                     address = plan.tunAddressText,
                     dnsServer = plan.dnsServerText,
-                    mtu = MTU,
+                    mtu = minOf(MTU, vpnNetwork?.mtu ?: MTU),
                     // Los rangos con salida directa no entran en la interfaz: el sistema los manda por la red real.
-                    routes = listOf(plan.subnet) + if (directRoutes.isEmpty()) publicRoutes else routesExcluding(directRoutes, from = publicRoutes),
+                    routes = listOf(plan.subnet) + listOfNotNull(vpnNetwork?.subnet) +
+                        if (directRoutes.isEmpty()) publicRoutes else routesExcluding(directRoutes, from = publicRoutes),
                     proxyAddress = proxyAddress,
                     excludedApps = rules?.directApps.orEmpty(),
                 ),
@@ -189,11 +199,11 @@ class TunnelRunner(
 
         val meter = TrafficMeter()
         val link = VpnLink(plan.tunAddress, logger, onViaProxy = { host -> noteViaProxy(host) }, meter = meter)
-        val split = rules?.let { SplitRouting(it, link) }
+        val split = rules?.let { SplitRouting(it, link, fallbackToProxy = settings.vpnFallbackToProxy) }
         val localDns = localDnsFor(localDnsConfig, settings, rules, reserved = listOf(plan.subnet))
         logger.log(LogLevel.INFO, TAG, "Túnel activo en ${plan.tunAddressText}, proxy $proxyAddress" + if (rules != null) ", con reglas de salida" else "")
         val vpnDown = retry != null && firstSession == null
-        if (vpnDown) logger.log(LogLevel.WARN, TAG, "Otro País no conectó: lo que iba por él sale por el proxy")
+        if (vpnDown) logger.log(LogLevel.WARN, TAG, "Otro País no conectó: lo que iba por él ${whileDown(settings)}")
         traffic.reset()
         stateStore.set(TunnelState.Connected(profile.id, vpnDown = vpnDown))
         try {
@@ -208,7 +218,7 @@ class TunnelRunner(
                 launch { sampleTraffic(meter) }
                 launch { watchProxy(health) }
                 if (retry != null && firstAttempt != null) {
-                    launch { superviseVpn(firstAttempt, link, tun, profile.id, retry) }
+                    launch { superviseVpn(firstAttempt, link, tun, profile.id, retry, settings) }
                 }
                 try {
                     loop.join()
@@ -294,8 +304,11 @@ class TunnelRunner(
 
     private class VpnRetry(val context: ExitContext, val start: CountryExitStart)
 
-    /** Un intento de abrir la VPN: la sesión, o si merece la pena reintentar. */
-    private class VpnAttempt(val session: VpnSession?, val retry: Boolean)
+    /** Un intento de abrir la VPN: la sesión, o por qué no y si merece la pena reintentar. */
+    private class VpnAttempt(val session: VpnSession?, val retry: Boolean, val failure: TunnelFailure? = null)
+
+    /** Qué pasa con el tráfico de Otro País mientras está caído, para el registro. */
+    private fun whileDown(settings: AppSettings) = if (settings.vpnFallbackToProxy) "sale por el proxy" else "se bloquea"
 
     private suspend fun openVpn(retry: VpnRetry): VpnAttempt =
         when (val result = engines.connect(retry.context, retry.start)) {
@@ -305,7 +318,7 @@ class TunnelRunner(
                 // Credenciales o configuración malas no se arreglan reintentando.
                 val retryable = !engines.isPermanent(retry.start.exit.kind, result.failure)
                 if (!retryable) logger.log(LogLevel.ERROR, TAG, "La VPN no se reintentará: revisa el archivo o las credenciales del perfil")
-                VpnAttempt(null, retryable)
+                VpnAttempt(null, retryable, result.failure)
             }
         }
 
@@ -313,7 +326,14 @@ class TunnelRunner(
      * Mantiene la VPN de las reglas de salida: la entrega al motor mientras está, y cuando se cae (o no llegó a conectar)
      * avisa, deja que su tráfico salga por el proxy y reintenta cada vez más espaciado.
      */
-    private suspend fun superviseVpn(firstAttempt: VpnAttempt, link: VpnLink, tun: TunDevice, profileId: String, retry: VpnRetry) {
+    private suspend fun superviseVpn(
+        firstAttempt: VpnAttempt,
+        link: VpnLink,
+        tun: TunDevice,
+        profileId: String,
+        retry: VpnRetry,
+        settings: AppSettings,
+    ) {
         val first = firstAttempt.session
         var session = first
         var retryable = firstAttempt.retry
@@ -337,7 +357,7 @@ class TunnelRunner(
                     link.detach()
                     session.close()
                     session = null
-                    logger.log(LogLevel.WARN, TAG, "Se cayó Otro País: su tráfico sale por el proxy mientras se reintenta")
+                    logger.log(LogLevel.WARN, TAG, "Se cayó Otro País: su tráfico ${whileDown(settings)} mientras se reintenta")
                     stateStore.set(TunnelState.Connected(profileId, vpnDown = true))
                 }
                 if (!retryable) return
@@ -349,108 +369,6 @@ class TunnelRunner(
             }
         } finally {
             session?.close()
-        }
-    }
-
-    /**
-     * Modo «Otro País»: primero se establece la sesión VPN a través del proxy y solo entonces se crea la interfaz, con la
-     * dirección y el DNS que el servidor indica. Después los paquetes pasan tal cual entre la interfaz y la VPN: no hace
-     * falta la pila TCP ni el DNS falso, porque quien resuelve y enruta es el servidor VPN.
-     */
-    private suspend fun runThroughVpn(
-        platformTunnel: PlatformTunnel,
-        profile: ProxyProfile,
-        resolvedProfile: ProxyProfile,
-        password: String,
-        vpn: CountryExitStart,
-        settings: AppSettings,
-        localDnsConfig: LocalDnsConfig = LocalDnsConfig.NONE,
-    ) {
-        val session = when (val result = engines.connect(ExitContext(resolvedProfile, password, settings), vpn)) {
-            is VpnConnectResult.Connected -> result.session
-            is VpnConnectResult.Failed -> {
-                fail(result.failure)
-                return
-            }
-        }
-
-        val network = session.network
-        val tun = try {
-            platformTunnel.establish(
-                TunConfig(
-                    sessionName = profile.name,
-                    address = network.address,
-                    dnsServer = network.dnsServers.firstOrNull() ?: FALLBACK_DNS,
-                    mtu = network.mtu,
-                    routes = listOfNotNull(network.subnet) + publicRoutes,
-                    proxyAddress = resolvedProfile.host,
-                    netmask = network.netmask,
-                ),
-            )
-        } catch (e: TunnelUnavailableException) {
-            logger.log(LogLevel.ERROR, TAG, "No se pudo crear la interfaz: ${e.message}")
-            session.close()
-            fail(TunnelFailure.InterfaceUnavailable)
-            return
-        }
-
-        logger.log(LogLevel.INFO, TAG, "Túnel activo por Otro País (${vpn.exit.kind.tag}) en ${network.address}, DNS ${network.dnsServers.joinToString()}")
-        // Todo va por la VPN y no hay motor que vea a qué destino: se cuenta el total, sin destinos.
-        val meter = TrafficMeter()
-        traffic.reset()
-        stateStore.set(TunnelState.Connected(profile.id))
-        try {
-            coroutineScope {
-                // Aquí no hay motor que reparta: el DNS de la red local se atiende al vuelo, y lo que no le toca sigue a
-                // la VPN tal cual. Lo que apartó un momento vuelve por esta misma cola, antes del siguiente paquete.
-                val localDns = localDnsFor(localDnsConfig, settings, rules = null, reserved = listOfNotNull(network.subnet))
-                val requeued = Channel<Ipv4Packet>(REQUEUE_CAPACITY, BufferOverflow.DROP_OLDEST)
-                val local = LocalDnsHandler(localDns, tun, this, logger) { requeued.trySend(it) }
-                val outbound = launch(dispatchers.background) {
-                    while (true) {
-                        val packet = tun.readPacket() ?: break
-                        while (true) {
-                            val waiting = requeued.tryReceive().getOrNull() ?: break
-                            session.writePacket(waiting.bytes)
-                        }
-                        // La VPN solo lleva IPv4: el IPv6 que el sistema intente se descarta, como en el modo directo.
-                        if (packet.isEmpty() || (packet[0].toInt() ushr 4) != 4) continue
-                        val replies = Ipv4Packet.parse(packet)?.let { local.handle(it) }
-                        if (replies == null) {
-                            session.writePacket(packet)
-                            meter.count(RouteExit.VPN, host = null, app = null, up = packet.size.toLong(), down = 0)
-                        } else {
-                            replies.forEach { tun.writePacket(it) }
-                        }
-                    }
-                }
-                val inbound = launch {
-                    session.receive {
-                        tun.writePacket(it)
-                        meter.count(RouteExit.VPN, host = null, app = null, up = 0, down = it.size.toLong())
-                    }
-                }
-                launch { sampleTraffic(meter) }
-                try {
-                    select<Unit> {
-                        outbound.onJoin { }
-                        inbound.onJoin { }
-                    }
-                } catch (e: CancellationException) {
-                    // La lectura de la interfaz es bloqueante: solo cerrarla la despierta.
-                    tun.close()
-                    session.close()
-                    throw e
-                }
-                tun.close()
-                session.close()
-                coroutineContext.cancelChildren()
-            }
-        } finally {
-            tun.close()
-            session.close()
-            stateStore.set(TunnelState.Disconnected)
-            logger.log(LogLevel.INFO, TAG, "Túnel detenido")
         }
     }
 

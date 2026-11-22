@@ -54,6 +54,11 @@ data class AppSettings(
      * si su dirección es interna, van directos, sin proxy ni Otro País: el proxy institucional no suele abrirlos.
      */
     val intranetDirect: Boolean = true,
+    /**
+     * Mientras Otro País está caído (o no llega a conectar), lo que iba por él sale por el proxy. Apagado, se bloquea hasta
+     * que vuelva, para quien prefiere no salir nunca por el proxy con lo que manda fuera.
+     */
+    val vpnFallbackToProxy: Boolean = true,
     /** Pedir al proxy las IP públicas por un nombre de [nameServices], en vez de por la IP tal cual. */
     val nameByIp: Boolean = true,
     /** Si ningún nombre sirve, probar por último la IP tal cual. */
@@ -95,6 +100,8 @@ interface SettingsRepository {
 
     fun setIntranetDirect(enabled: Boolean)
 
+    fun setVpnFallbackToProxy(enabled: Boolean)
+
     fun setNameByIp(enabled: Boolean)
 
     fun setTryRawIp(enabled: Boolean)
@@ -132,6 +139,11 @@ class StoredSettingsRepository(private val keyValueStore: KeyValueStore) : Setti
     override fun setIntranetDirect(enabled: Boolean) {
         keyValueStore.putString(INTRANET_DIRECT_KEY, enabled.toString())
         state.value = state.value.copy(intranetDirect = enabled)
+    }
+
+    override fun setVpnFallbackToProxy(enabled: Boolean) {
+        keyValueStore.putString(VPN_FALLBACK_TO_PROXY_KEY, enabled.toString())
+        state.value = state.value.copy(vpnFallbackToProxy = enabled)
     }
 
     override fun setNameByIp(enabled: Boolean) {
@@ -182,6 +194,7 @@ class StoredSettingsRepository(private val keyValueStore: KeyValueStore) : Setti
         return AppSettings(
             answerConnectivityChecks = flag(ANSWER_CONNECTIVITY_CHECKS_KEY, defaults.answerConnectivityChecks),
             intranetDirect = flag(INTRANET_DIRECT_KEY, defaults.intranetDirect),
+            vpnFallbackToProxy = flag(VPN_FALLBACK_TO_PROXY_KEY, defaults.vpnFallbackToProxy),
             nameByIp = flag(NAME_BY_IP_KEY, defaults.nameByIp),
             tryRawIp = flag(TRY_RAW_IP_KEY, defaults.tryRawIp),
             nameServices = loadServices() ?: defaults.nameServices,
@@ -215,6 +228,7 @@ class StoredSettingsRepository(private val keyValueStore: KeyValueStore) : Setti
     internal companion object {
         const val ANSWER_CONNECTIVITY_CHECKS_KEY = "settings.answer_connectivity_checks"
         const val INTRANET_DIRECT_KEY = "settings.intranet_direct"
+        const val VPN_FALLBACK_TO_PROXY_KEY = "settings.vpn_fallback_to_proxy"
         const val NAME_BY_IP_KEY = "settings.name_by_ip"
         const val TRY_RAW_IP_KEY = "settings.try_raw_ip"
         const val NAME_SERVICES_KEY = "settings.name_services"

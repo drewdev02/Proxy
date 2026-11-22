@@ -104,4 +104,6 @@
     <string name="settings_language_title">Idioma</string>
     <string name="settings_language_subtitle">Se aplica al momento</string>
     <string name="settings_language_system">Del sistema</string>
+    <string name="settings_vpn_fallback_title">Si Otro País se cae, salir por el proxy</string>
+    <string name="settings_vpn_fallback_subtitle">Si está apagado, lo que va por Otro País se bloquea hasta que vuelva.</string>
 </resources>

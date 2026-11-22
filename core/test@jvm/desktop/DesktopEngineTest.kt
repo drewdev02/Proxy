@@ -89,6 +89,19 @@ class EngineProtocolTest {
     }
 
     @Test
+    fun `falling back to the proxy when Otro País is down travels with the start order and is on when absent`() {
+        val off = EngineStart(profile, "x", AppSettings(vpnFallbackToProxy = false))
+        val encoded = EngineProtocol.encodeStart(off)
+
+        assertEquals(false, EngineProtocol.decodeStart(encoded)!!.settings.vpnFallbackToProxy)
+
+        // Una ventana de antes no manda la clave.
+        val fromOlderWindow = encoded.replace("\"vpnFallbackToProxy\":false", "\"otraClave\":true")
+        assertTrue("vpnFallbackToProxy" !in fromOlderWindow)
+        assertTrue(EngineProtocol.decodeStart(fromOlderWindow)!!.settings.vpnFallbackToProxy)
+    }
+
+    @Test
     fun `a start order carries the VPN along`() {
         val start = EngineStart(
             profile, "x",

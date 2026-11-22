@@ -102,4 +102,6 @@
     <string name="settings_language_title">Language</string>
     <string name="settings_language_subtitle">Applies right away</string>
     <string name="settings_language_system">System</string>
+    <string name="settings_vpn_fallback_title">If Other Country goes down, go out through the proxy</string>
+    <string name="settings_vpn_fallback_subtitle">When off, what goes through Other Country is blocked until it comes back.</string>
 </resources>

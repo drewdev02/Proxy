@@ -29,9 +29,9 @@ import org.uci.proxy.core.vpn.VpnConnectResult
 import org.uci.proxy.core.vpn.VpnNetwork
 import org.uci.proxy.core.vpn.VpnSession
 import kotlin.test.Test
-import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -95,8 +95,6 @@ class TunnelVpnTest {
 
     private fun session() = (result as VpnConnectResult.Connected).session as FakeVpnSession
 
-    private fun ipv4Packet(version: Int = 4) = ByteArray(40).also { it[0] = ((version shl 4) or 5).toByte() }
-
     @Test
     fun `the VPN is opened through the proxy with its resolved address and both passwords`() = runTest(UnconfinedTestDispatcher()) {
         val (runner, _) = newRunner()
@@ -120,73 +118,45 @@ class TunnelVpnTest {
     }
 
     @Test
-    fun `the interface takes its address and DNS from the server and routes its network and the internet`() =
-        runTest(UnconfinedTestDispatcher()) {
-            val (runner, _) = newRunner()
-            val job = launch { runner.run(platformTunnel, profile, "x", vpn = start) }
-
-            val config = assertNotNull(platformTunnel.config)
-            assertEquals("10.98.0.9", config.address)
-            assertEquals("10.98.0.1", config.dnsServer)
-            assertEquals(1500, config.mtu)
-            assertEquals("10.8.0.20", config.proxyAddress)
-            assertEquals("255.255.0.0", config.netmask, "la máscara que empuja el servidor")
-            fun routed(address: String) = config.routes.any { it.contains(parseIpv4(address)!!) }
-            assertTrue(routed("10.98.0.1"), "el DNS de la VPN vive en su red")
-            assertTrue(routed("8.8.8.8"))
-            assertFalse(routed("10.8.0.1"), "la red del proxy queda fuera, para llegar a él directamente")
-            assertEquals(TunnelState.Connected("p1"), stateStore.state.value)
-            job.cancel()
-        }
-
-    @Test
-    fun `without a DNS from the server a public one is used`() = runTest(UnconfinedTestDispatcher()) {
-        result = VpnConnectResult.Connected(FakeVpnSession(push(dns = emptyList())))
+    fun `the interface keeps its own address and adds the network of the VPN`() = runTest(UnconfinedTestDispatcher()) {
         val (runner, _) = newRunner()
         val job = launch { runner.run(platformTunnel, profile, "x", vpn = start) }
 
-        assertEquals("1.1.1.1", assertNotNull(platformTunnel.config).dnsServer)
+        val config = assertNotNull(platformTunnel.config)
+        assertNotEquals("10.98.0.9", config.address, "las apps salen de la interfaz y el reparto pone la dirección de la VPN")
+        assertEquals(1500, config.mtu)
+        assertEquals("10.8.0.20", config.proxyAddress)
+        fun routed(address: String) = config.routes.any { it.contains(parseIpv4(address)!!) }
+        assertTrue(routed("10.98.0.1"), "el DNS de la VPN vive en su red")
+        assertTrue(routed("8.8.8.8"))
+        assertFalse(routed("10.8.0.1"), "la red del proxy queda fuera, para llegar a él directamente")
+        assertEquals(TunnelState.Connected("p1"), stateStore.state.value)
         job.cancel()
     }
 
     @Test
-    fun `IPv4 packets from the apps go to the VPN and IPv6 ones are dropped`() = runTest(UnconfinedTestDispatcher()) {
+    fun `the interface does not take a larger MTU than the VPN`() = runTest(UnconfinedTestDispatcher()) {
+        result = VpnConnectResult.Connected(FakeVpnSession(push().copy(mtu = 1280)))
         val (runner, _) = newRunner()
         val job = launch { runner.run(platformTunnel, profile, "x", vpn = start) }
 
-        val v4 = ipv4Packet()
-        platformTunnel.tun.inject(v4)
-        platformTunnel.tun.inject(ipv4Packet(version = 6))
-
-        assertEquals(1, session().sent.size)
-        assertContentEquals(v4, session().sent.single())
+        assertEquals(1280, assertNotNull(platformTunnel.config).mtu)
         job.cancel()
     }
 
     @Test
-    fun `packets from the VPN reach the apps`() = runTest(UnconfinedTestDispatcher()) {
-        val (runner, _) = newRunner()
-        val job = launch { runner.run(platformTunnel, profile, "x", vpn = start) }
-
-        val reply = ipv4Packet()
-        session().fromServer.trySend(reply)
-
-        assertContentEquals(reply, platformTunnel.tun.written.single())
-        job.cancel()
-    }
-
-    @Test
-    fun `when the VPN ends the tunnel stops and releases everything`() = runTest(UnconfinedTestDispatcher()) {
+    fun `when the VPN ends the tunnel stays up and says Otro País is down`() = runTest(UnconfinedTestDispatcher()) {
         val (runner, _) = newRunner()
         val job = launch { runner.run(platformTunnel, profile, "x", vpn = start) }
         val session = session()
 
         session.fromServer.close()
 
-        assertTrue(job.isCompleted)
-        assertTrue(platformTunnel.tun.closed)
+        assertTrue(job.isActive)
+        assertFalse(platformTunnel.tun.closed)
         assertTrue(session.closed)
-        assertEquals(TunnelState.Disconnected, stateStore.state.value)
+        assertEquals(TunnelState.Connected("p1", vpnDown = true), stateStore.state.value)
+        job.cancel()
     }
 
     @Test
@@ -204,7 +174,7 @@ class TunnelVpnTest {
     }
 
     @Test
-    fun `a failure opening the VPN is reported and no interface is created`() = runTest {
+    fun `bad VPN credentials are reported and no interface is created`() = runTest {
         result = VpnConnectResult.Failed(TunnelFailure.VpnAuthFailed)
         val (runner, _) = newRunner()
 
@@ -212,6 +182,7 @@ class TunnelVpnTest {
 
         assertEquals(TunnelState.Failed(TunnelFailure.VpnAuthFailed), stateStore.state.value)
         assertNull(platformTunnel.config)
+        assertEquals(1, exitCalls.size, "no se reintenta")
     }
 
     @Test

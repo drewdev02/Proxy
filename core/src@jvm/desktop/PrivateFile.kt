@@ -53,10 +53,6 @@ object PrivateFile {
         }
     }
 
-    private fun administrators(file: Path): UserPrincipal? = try {
-        file.fileSystem.userPrincipalLookupService.lookupPrincipalByGroupName("Administrators")
-    } catch (e: IOException) {
-        // Un Windows con otro idioma puede llamar distinto al grupo; sin él queda el dueño solo.
-        null
-    }
+    // Por su SID: el nombre depende del idioma de Windows. Sin él queda el dueño solo.
+    private fun administrators(file: Path): UserPrincipal? = WindowsAccounts.administrators(file.fileSystem.userPrincipalLookupService)
 }

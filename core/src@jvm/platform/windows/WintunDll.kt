@@ -38,6 +38,8 @@ fun interface WintunDllLocator {
  * verifica su SHA-256, de modo que otro proceso no pueda dejar en su lugar una DLL ajena.
  *
  * @param root directorio donde crear la carpeta temporal.
+ * @param prepareRoot deja [root] lista antes de usarla; el motor elevado la protege con [WindowsProtectedDirectory],
+ *   porque si otro puede escribir en ella también puede cambiar la DLL entre la comprobación y la carga.
  * @param openResource lee un recurso del classpath; se inyecta para poder probarlo sin recursos reales.
  */
 class ResourceWintunDllLocator(
@@ -45,6 +47,7 @@ class ResourceWintunDllLocator(
     private val osArch: String = System.getProperty("os.arch").orEmpty(),
     private val expectedHashes: Map<String, String> = WintunDll.SHA256,
     private val openResource: (String) -> InputStream? = { ResourceWintunDllLocator::class.java.getResourceAsStream(it) },
+    private val prepareRoot: (Path) -> Path = { it },
 ) : WintunDllLocator {
     override fun locate(): Path {
         val architecture = WintunDll.architectureFor(osArch)
@@ -54,9 +57,10 @@ class ResourceWintunDllLocator(
         val resource = "/native/windows-$architecture/wintun.dll"
         val input = openResource(resource) ?: throw WindowsNetworkException("Falta el recurso $resource")
 
+        val base = prepareRoot(root)
         val directory = try {
-            Files.createDirectories(root)
-            Files.createTempDirectory(root, "wintun-")
+            Files.createDirectories(base)
+            Files.createTempDirectory(base, "wintun-")
         } catch (e: IOException) {
             throw WindowsNetworkException("No se pudo crear la carpeta para wintun.dll en $root: ${e.message}")
         }
