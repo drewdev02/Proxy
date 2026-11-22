@@ -10,11 +10,11 @@ import org.uci.proxy.core.traffic.TrafficMonitor
 import org.uci.proxy.core.traffic.TrafficStore
 import org.uci.proxy.core.net.KtorTcpConnector
 import org.uci.proxy.core.port.TcpConnector
-import org.uci.proxy.core.profile.AppDispatchers
-import org.uci.proxy.core.profile.IdGenerator
+import org.uci.proxy.core.common.AppDispatchers
+import org.uci.proxy.core.common.IdGenerator
 import org.uci.proxy.core.profile.ProfileRepository
 import org.uci.proxy.core.profile.ProfileValidator
-import org.uci.proxy.core.profile.RandomIdGenerator
+import org.uci.proxy.core.common.RandomIdGenerator
 import org.uci.proxy.core.profile.StoredProfileRepository
 import org.uci.proxy.core.proxy.BasicAuthScheme
 import org.uci.proxy.core.proxy.ConnectingProxyTester

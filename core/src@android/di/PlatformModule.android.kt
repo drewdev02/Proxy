@@ -32,7 +32,7 @@ import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.PlatformInfo
 import org.uci.proxy.core.port.RandomBytes
 import org.uci.proxy.core.port.SecretStore
-import org.uci.proxy.core.profile.AppDispatchers
+import org.uci.proxy.core.common.AppDispatchers
 import org.uci.proxy.core.storage.EncryptedSecretStore
 import org.uci.proxy.core.vpn.JcaOpenVpnCrypto
 import org.uci.proxy.core.vpn.OpenVpnCrypto

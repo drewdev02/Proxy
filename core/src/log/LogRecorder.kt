@@ -10,7 +10,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.uci.proxy.core.port.LogHistory
-import org.uci.proxy.core.profile.AppDispatchers
+import org.uci.proxy.core.common.AppDispatchers
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days

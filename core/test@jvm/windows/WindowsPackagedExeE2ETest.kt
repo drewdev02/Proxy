@@ -17,7 +17,7 @@ import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.ProxyProtocol
 import org.uci.proxy.core.platform.JavaSecureRandomBytes
 import org.uci.proxy.core.port.TunnelState
-import org.uci.proxy.core.profile.AppDispatchers
+import org.uci.proxy.core.common.AppDispatchers
 import org.uci.proxy.core.profile.StoredProfileRepository
 import java.nio.file.Files
 import java.nio.file.Path

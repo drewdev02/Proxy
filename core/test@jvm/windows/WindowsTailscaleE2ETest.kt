@@ -30,7 +30,7 @@ import org.uci.proxy.core.platform.windows.WinNetwork
 import org.uci.proxy.core.platform.windows.WinPlatformTunnel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.TunnelState
-import org.uci.proxy.core.profile.AppDispatchers
+import org.uci.proxy.core.common.AppDispatchers
 import org.uci.proxy.core.vpn.CountryEngines
 import org.uci.proxy.core.vpn.CountryExitStart
 import java.io.File

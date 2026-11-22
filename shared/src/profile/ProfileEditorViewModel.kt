@@ -26,7 +26,7 @@ import org.uci.proxy.core.port.LocalNetworkPermission
 import org.uci.proxy.core.port.LogLevel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.TunnelFailure
-import org.uci.proxy.core.profile.IdGenerator
+import org.uci.proxy.core.common.IdGenerator
 import org.uci.proxy.core.profile.ProfileDraft
 import org.uci.proxy.core.profile.ProfileField
 import org.uci.proxy.core.profile.ProfileRepository

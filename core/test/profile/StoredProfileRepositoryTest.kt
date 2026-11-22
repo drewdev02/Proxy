@@ -1,5 +1,6 @@
 package org.uci.proxy.core.profile
 
+import org.uci.proxy.core.common.AppDispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest

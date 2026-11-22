@@ -11,7 +11,7 @@ import kotlinx.io.Buffer
 import kotlinx.io.readByteArray
 import org.uci.proxy.core.dns.dnsTransactionId
 import org.uci.proxy.core.port.DnsTransport
-import org.uci.proxy.core.profile.AppDispatchers
+import org.uci.proxy.core.common.AppDispatchers
 
 /** Consultas DNS por UDP con ktor-network, igual en JVM, Android e iOS. */
 class KtorDnsTransport(

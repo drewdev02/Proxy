@@ -9,7 +9,7 @@ import kotlinx.coroutines.test.runTest
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.ProxyProtocol
 import org.uci.proxy.core.port.TunnelState
-import org.uci.proxy.core.profile.AppDispatchers
+import org.uci.proxy.core.common.AppDispatchers
 import org.uci.proxy.core.profile.StoredActiveProfileStore
 import org.uci.proxy.core.settings.StoredSettingsRepository
 import org.uci.proxy.fakes.FakeProfileRepository

@@ -50,7 +50,7 @@ import org.uci.proxy.core.port.ConnectionOwner
 import org.uci.proxy.core.port.LogLevel
 import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.port.TunnelState
-import org.uci.proxy.core.profile.AppDispatchers
+import org.uci.proxy.core.common.AppDispatchers
 import org.uci.proxy.core.profile.StoredProfileRepository
 import org.uci.proxy.core.vpn.CountryExitStart
 import org.uci.proxy.core.vpn.VpnConnectResult

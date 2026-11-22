@@ -25,7 +25,7 @@ import org.uci.proxy.R
 import org.uci.proxy.core.engine.TunnelRunner
 import org.uci.proxy.core.platform.AndroidPlatformTunnel
 import org.uci.proxy.core.platform.TunnelServiceContract
-import org.uci.proxy.core.profile.AppDispatchers
+import org.uci.proxy.core.common.AppDispatchers
 import org.uci.proxy.core.settings.SettingsRepository
 
 /**

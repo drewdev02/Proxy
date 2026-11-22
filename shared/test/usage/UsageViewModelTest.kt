@@ -4,7 +4,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.TimeZone
 import org.uci.proxy.core.model.RouteExit
-import org.uci.proxy.core.profile.AppDispatchers
+import org.uci.proxy.core.common.AppDispatchers
 import org.uci.proxy.core.traffic.NamedTraffic
 import org.uci.proxy.core.traffic.TrafficRecorder
 import org.uci.proxy.core.traffic.TrafficStore

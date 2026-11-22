@@ -5,7 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.uci.proxy.core.net.KtorTcpConnector
 import org.uci.proxy.core.port.TcpException
-import org.uci.proxy.core.profile.AppDispatchers
+import org.uci.proxy.core.common.AppDispatchers
 import java.net.ServerSocket
 import kotlin.concurrent.thread
 import kotlin.test.AfterTest

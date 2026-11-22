@@ -7,7 +7,7 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.uci.proxy.core.port.LogLevel
-import org.uci.proxy.core.profile.AppDispatchers
+import org.uci.proxy.core.common.AppDispatchers
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals

@@ -1,5 +1,6 @@
 package org.uci.proxy.core.profile
 
+import org.uci.proxy.core.common.AppDispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

@@ -8,7 +8,7 @@ import org.uci.proxy.core.dns.buildDnsQuery
 import org.uci.proxy.core.dns.dnsAnswerAddresses
 import org.uci.proxy.core.net.KtorDnsTransport
 import org.uci.proxy.core.packet.parseIpv4
-import org.uci.proxy.core.profile.AppDispatchers
+import org.uci.proxy.core.common.AppDispatchers
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress

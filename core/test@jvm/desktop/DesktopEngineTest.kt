@@ -39,7 +39,7 @@ import org.uci.proxy.core.packet.buildUdpPacket
 import org.uci.proxy.core.packet.parseIpv4
 import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.port.TunnelState
-import org.uci.proxy.core.profile.AppDispatchers
+import org.uci.proxy.core.common.AppDispatchers
 import org.uci.proxy.core.profile.StoredProfileRepository
 import java.net.InetAddress
 import java.net.Socket

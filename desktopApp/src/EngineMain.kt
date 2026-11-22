@@ -30,7 +30,7 @@ import org.uci.proxy.core.platform.windows.WinPlatformTunnel
 import org.uci.proxy.core.port.Logger
 import org.uci.proxy.core.port.PlatformInfo
 import org.uci.proxy.core.port.PlatformKind
-import org.uci.proxy.core.profile.AppDispatchers
+import org.uci.proxy.core.common.AppDispatchers
 import java.io.FileOutputStream
 import java.io.PrintStream
 import java.net.InetAddress

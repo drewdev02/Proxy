@@ -14,7 +14,7 @@ import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.port.LocalNetworkPermission
 import org.uci.proxy.core.port.TunnelMonitor
 import org.uci.proxy.core.port.TunnelState
-import org.uci.proxy.core.profile.IdGenerator
+import org.uci.proxy.core.common.IdGenerator
 import org.uci.proxy.core.profile.ProfileRepository
 import org.uci.proxy.core.proxy.NameServiceTestResult
 import org.uci.proxy.core.proxy.NameServiceTester

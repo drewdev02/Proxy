@@ -1,4 +1,4 @@
-package org.uci.proxy.core.profile
+package org.uci.proxy.core.common
 
 import kotlinx.coroutines.CoroutineDispatcher
 

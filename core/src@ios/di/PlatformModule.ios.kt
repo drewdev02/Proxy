@@ -23,7 +23,7 @@ import org.uci.proxy.core.port.RandomBytes
 import org.uci.proxy.core.port.SecretStore
 import org.uci.proxy.core.port.TunnelControl
 import org.uci.proxy.core.port.TunnelMonitor
-import org.uci.proxy.core.profile.AppDispatchers
+import org.uci.proxy.core.common.AppDispatchers
 import org.uci.proxy.core.vpn.OpenVpnCrypto
 import org.uci.proxy.core.vpn.TlsSessionFactory
 import org.uci.proxy.core.vpn.UnavailableOpenVpnCrypto
