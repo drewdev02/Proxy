@@ -41,26 +41,6 @@ jobs:
           - { name: Windows, os: windows-latest, shell: pwsh, kotlin: ./kotlin.bat }
     steps:
       - uses: actions/checkout@v4
-      # Todo lo que descarga ./kotlin (su distribución, los JDK, los SDK y Maven) vive en JetBrains/Kotlin, en la
-      # carpeta de cachés de cada sistema; las rutas de los otros dos se ignoran. ~/.gradle es del APK, que Amper
-      # construye con Gradle. Una por trabajo: cada uno baja cosas distintas.
-      - &cache-kotlin
-        name: Caché del toolchain de Kotlin
-        uses: actions/cache@v6
-        with:
-          path: |
-            ~/.cache/JetBrains/Kotlin
-            ~/Library/Caches/JetBrains/Kotlin
-            ~/AppData/Local/JetBrains/Kotlin
-            !~/.cache/JetBrains/Kotlin/telemetry
-            !~/Library/Caches/JetBrains/Kotlin/telemetry
-            !~/AppData/Local/JetBrains/Kotlin/telemetry
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: kotlin-${{ runner.os }}-${{ github.job }}-${{ hashFiles('kotlin', 'kotlin.bat', 'project.yaml', 'libs.versions.toml', '*/module.yaml') }}
-          restore-keys: |
-            kotlin-${{ runner.os }}-${{ github.job }}-
-            kotlin-${{ runner.os }}-
       - name: Poner el tar de Windows primero
         if: runner.os == 'Windows'
         run: Add-Content -Path $env:GITHUB_PATH -Value "C:\Windows\System32"
@@ -114,7 +94,24 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-      - *cache-kotlin
+      # Todo lo que descarga ./kotlin (su distribución, los JDK, los SDK y Maven) vive en JetBrains/Kotlin, en la
+      # carpeta de cachés de cada sistema; ~/.gradle es del APK, que Amper construye con Gradle. Solo aquí y en el
+      # .exe, donde ahorra minutos; en las pruebas no cambiaba el tiempo. Las rutas son las de release.yml, o no casa.
+      - &cache-kotlin
+        name: Caché del toolchain de Kotlin
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cache/JetBrains/Kotlin
+            ~/Library/Caches/JetBrains/Kotlin
+            ~/AppData/Local/JetBrains/Kotlin
+            !~/.cache/JetBrains/Kotlin/telemetry
+            !~/Library/Caches/JetBrains/Kotlin/telemetry
+            !~/AppData/Local/JetBrains/Kotlin/telemetry
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: kotlin-${{ runner.os }}-${{ github.job }}-${{ hashFiles('kotlin', 'kotlin.bat', 'project.yaml', 'libs.versions.toml', '*/module.yaml') }}
+          restore-keys: kotlin-${{ runner.os }}-${{ github.job }}-
       - uses: actions/setup-go@v5
         with:
           go-version-file: tools/tsbridge/go.mod
@@ -150,7 +147,6 @@ jobs:
         shell: pwsh
     steps:
       - uses: actions/checkout@v4
-      - *cache-kotlin
       - name: Poner el tar de Windows primero
         run: Add-Content -Path $env:GITHUB_PATH -Value "C:\Windows\System32"
       - name: Administrador

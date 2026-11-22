@@ -136,21 +136,6 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
-      # Como en el trabajo de Windows, la de las pruebas de macOS.
-      - name: Caché del toolchain de Kotlin
-        uses: actions/cache/restore@v6
-        with:
-          path: |
-            ~/.cache/JetBrains/Kotlin
-            ~/Library/Caches/JetBrains/Kotlin
-            ~/AppData/Local/JetBrains/Kotlin
-            !~/.cache/JetBrains/Kotlin/telemetry
-            !~/Library/Caches/JetBrains/Kotlin/telemetry
-            !~/AppData/Local/JetBrains/Kotlin/telemetry
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: kotlin-${{ runner.os }}-tests-${{ hashFiles('kotlin', 'kotlin.bat', 'project.yaml', 'libs.versions.toml', '*/module.yaml') }}
-          restore-keys: kotlin-${{ runner.os }}-
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
