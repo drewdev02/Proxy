@@ -29,4 +29,61 @@
     <string name="profile_list_connecting_profile">Connecting %1$s</string>
     <string name="profile_list_connect_profile">Connect %1$s</string>
     <string name="profile_list_delete_profile">Delete %1$s</string>
+
+    <!-- Profile editor. -->
+    <string name="profile_editor_title_new">New profile</string>
+    <string name="profile_editor_title_edit">Edit profile</string>
+    <string name="profile_editor_save">Save</string>
+    <string name="profile_editor_save_failed_title">Not saved</string>
+    <string name="profile_editor_save_failed">The profile couldn't be saved. Try again.</string>
+
+    <!-- Server section. -->
+    <string name="profile_server_title">Proxy server</string>
+    <string name="profile_server_subtitle">Which proxy this profile connects to</string>
+    <string name="profile_name_label">Name</string>
+    <string name="profile_name_placeholder">e.g. UCI Staff</string>
+    <string name="profile_name_error">Enter a name for the profile.</string>
+    <string name="profile_host_label">Server</string>
+    <string name="profile_host_placeholder">e.g. proxy.uci.cu</string>
+    <string name="profile_host_error">Just the name or IP, without http:// or spaces.</string>
+    <string name="profile_port_label">Port</string>
+    <string name="profile_port_error">Between 1 and 65535.</string>
+    <string name="profile_protocol_label">Protocol</string>
+
+    <!-- Authentication section. -->
+    <string name="profile_auth_title">Authentication</string>
+    <string name="profile_auth_subtitle">Optional. NTLM is used if the proxy offers it, otherwise Basic</string>
+    <string name="profile_username_label">Username</string>
+    <string name="profile_username_placeholder">first.last</string>
+    <string name="profile_password_label">Password</string>
+    <string name="profile_password_supporting">Stored in the system's secure storage</string>
+    <string name="profile_test_running">Testing…</string>
+    <string name="profile_test_button">Test proxy</string>
+    <string name="profile_uci_quota_title">Check my UCI quota</string>
+    <string name="profile_uci_quota_subtitle">With this username and password, the UCI quota service is asked how many MB you have left this month. Shown in Usage.</string>
+
+    <!-- Other Country section. -->
+    <string name="profile_country_exit_title">Other Country</string>
+    <string name="profile_country_exit_subtitle">Traffic exits through a server in another country, via the proxy</string>
+    <string name="profile_country_exit_toggle">Turn on Other Country</string>
+    <string name="profile_engine_openvpn_description">.ovpn file</string>
+    <string name="profile_engine_tailscale_description">exit node</string>
+    <string name="profile_ovpn_detail">OpenVPN over TCP</string>
+    <string name="profile_ovpn_empty">No .ovpn file chosen</string>
+    <string name="profile_ovpn_choose">Choose .ovpn</string>
+    <string name="profile_ovpn_change">Change</string>
+    <string name="profile_vpn_username_label">VPN username</string>
+    <string name="profile_vpn_username_error">Enter the VPN username.</string>
+    <string name="profile_vpn_password_label">VPN password</string>
+    <string name="profile_tailscale_description">Exits through an exit node on your Tailscale network (or a Headscale server). Behind the proxy, everything goes through Tailscale's relays: it works, with a bit more latency.</string>
+    <string name="profile_tailscale_control_url_label">Control server</string>
+    <string name="profile_tailscale_control_url_error">Enter an http:// or https:// address.</string>
+    <string name="profile_tailscale_auth_key_label">Auth key</string>
+    <string name="profile_tailscale_auth_key_supporting">Create it in the Tailscale admin console (Settings → Keys). Preferably reusable.</string>
+    <string name="profile_tailscale_auth_key_error">Enter the auth key.</string>
+    <string name="profile_tailscale_exit_node_label">Exit node</string>
+    <string name="profile_tailscale_exit_node_placeholder">Empty: the only one on the network</string>
+    <string name="profile_tailscale_searching">Searching for nodes…</string>
+    <string name="profile_tailscale_search">Search for exit nodes</string>
+    <string name="profile_tailscale_hostname_label">This device's name on the network</string>
 </resources>

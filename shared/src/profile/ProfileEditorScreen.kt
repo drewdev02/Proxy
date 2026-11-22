@@ -35,6 +35,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import org.uci.proxy.apps.AppCatalog
@@ -161,7 +162,7 @@ fun ProfileEditorScreen(
         modifier = Modifier.imePadding(),
         topBar = {
             UciTopBar(
-                title = if (state.isNew) "Nuevo perfil" else "Editar perfil",
+                title = stringResource(if (state.isNew) Res.string.profile_editor_title_new else Res.string.profile_editor_title_edit),
                 subtitle = state.draft.name.ifBlank { null },
                 onBack = onCancel.takeIf { !state.isBusy },
             )
@@ -191,7 +192,11 @@ fun ProfileEditorScreen(
                     )
                 }
                 if (state.saveFailed) {
-                    UciInlineAlert("No se pudo guardar el perfil. Inténtalo de nuevo.", tone = UciTone.Danger, title = "Sin guardar")
+                    UciInlineAlert(
+                        stringResource(Res.string.profile_editor_save_failed),
+                        tone = UciTone.Danger,
+                        title = stringResource(Res.string.profile_editor_save_failed_title),
+                    )
                 }
             }
         }
@@ -212,8 +217,8 @@ private fun SaveBar(state: ProfileEditorUiState, onSave: () -> Unit, onCancel: (
                 horizontalArrangement = Arrangement.spacedBy(ProxyUciTheme.spacing.sm, Alignment.End),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                UciButton("Cancelar", onCancel, variant = UciButtonVariant.Text, enabled = !state.isBusy)
-                UciButton("Guardar", onSave, icon = UciIcons.Check, loading = state.isSaving, enabled = !state.isBusy)
+                UciButton(stringResource(Res.string.profile_cancel), onCancel, variant = UciButtonVariant.Text, enabled = !state.isBusy)
+                UciButton(stringResource(Res.string.profile_editor_save), onSave, icon = UciIcons.Check, loading = state.isSaving, enabled = !state.isBusy)
             }
         }
     }
@@ -222,37 +227,41 @@ private fun SaveBar(state: ProfileEditorUiState, onSave: () -> Unit, onCancel: (
 @Composable
 private fun ServerSection(state: ProfileEditorUiState, onDraftChange: (ProfileDraft) -> Unit) {
     val draft = state.draft
-    UciSectionCard(title = "Servidor proxy", subtitle = "A qué proxy se conecta este perfil", icon = UciIcons.Dns) {
+    UciSectionCard(
+        title = stringResource(Res.string.profile_server_title),
+        subtitle = stringResource(Res.string.profile_server_subtitle),
+        icon = UciIcons.Dns,
+    ) {
         UciTextField(
             value = draft.name,
             onValueChange = { onDraftChange(draft.copy(name = it)) },
-            label = "Nombre",
-            placeholder = "p. ej. UCI Docente",
-            error = "Escribe un nombre para el perfil.".takeIf { ProfileField.NAME in state.errors },
+            label = stringResource(Res.string.profile_name_label),
+            placeholder = stringResource(Res.string.profile_name_placeholder),
+            error = state.errorFor(ProfileField.NAME),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(ProxyUciTheme.spacing.gutterSmall)) {
             UciTextField(
                 value = draft.host,
                 onValueChange = { onDraftChange(draft.copy(host = it)) },
-                label = "Servidor",
-                placeholder = "p. ej. proxy.uci.cu",
+                label = stringResource(Res.string.profile_host_label),
+                placeholder = stringResource(Res.string.profile_host_placeholder),
                 mono = true,
-                error = "Solo el nombre o la IP, sin http:// ni espacios.".takeIf { ProfileField.HOST in state.errors },
+                error = state.errorFor(ProfileField.HOST),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                 modifier = Modifier.weight(2f),
             )
             UciTextField(
                 value = draft.port,
                 onValueChange = { onDraftChange(draft.copy(port = it)) },
-                label = "Puerto",
+                label = stringResource(Res.string.profile_port_label),
                 placeholder = "3128",
                 mono = true,
-                error = "Entre 1 y 65535.".takeIf { ProfileField.PORT in state.errors },
+                error = state.errorFor(ProfileField.PORT),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.weight(1f),
             )
         }
-        Text("Protocolo", style = MaterialTheme.typography.labelMedium, color = ProxyUciTheme.colors.onSurfaceMuted)
+        Text(stringResource(Res.string.profile_protocol_label), style = MaterialTheme.typography.labelMedium, color = ProxyUciTheme.colors.onSurfaceMuted)
         UciSegmentedControl(
             options = ProxyProtocol.entries,
             selected = draft.protocol,
@@ -272,25 +281,25 @@ private fun AuthSection(
 ) {
     val draft = state.draft
     UciSectionCard(
-        title = "Autenticación",
-        subtitle = "Opcional. Se usa NTLM si el proxy lo ofrece, si no Basic",
+        title = stringResource(Res.string.profile_auth_title),
+        subtitle = stringResource(Res.string.profile_auth_subtitle),
         icon = UciIcons.Key,
     ) {
         UciTextField(
             value = draft.username,
             onValueChange = { onDraftChange(draft.copy(username = it)) },
-            label = "Usuario",
-            placeholder = "nombre.apellido",
+            label = stringResource(Res.string.profile_username_label),
+            placeholder = stringResource(Res.string.profile_username_placeholder),
             leadingIcon = UciIcons.Person,
         )
         UciPasswordField(
             value = state.password,
             onValueChange = onPasswordChange,
-            label = "Contraseña",
-            supportingText = "Se guarda en el almacén seguro del sistema",
+            label = stringResource(Res.string.profile_password_label),
+            supportingText = stringResource(Res.string.profile_password_supporting),
         )
         UciButton(
-            if (state.test == ProxyTestUiState.Running) "Probando…" else "Probar proxy",
+            stringResource(if (state.test == ProxyTestUiState.Running) Res.string.profile_test_running else Res.string.profile_test_button),
             onTest,
             variant = UciButtonVariant.Secondary,
             icon = UciIcons.Speed,
@@ -312,9 +321,8 @@ private fun AuthSection(
         }
         UciDivider()
         UciSwitchRow(
-            title = "Consultar mi cuota de la UCI",
-            subtitle = "Con este usuario y contraseña se pregunta al servicio de cuotas de la UCI cuántos MB te quedan " +
-                "este mes. Se ve en Consumo.",
+            title = stringResource(Res.string.profile_uci_quota_title),
+            subtitle = stringResource(Res.string.profile_uci_quota_subtitle),
             checked = state.checksUciQuota,
             onCheckedChange = onUciQuotaChange,
             enabled = !state.isBusy,
@@ -327,20 +335,28 @@ private fun AuthSection(
 private fun CountryExitSection(state: ProfileEditorUiState, actions: CountryExitActions, onPickFile: () -> Unit) {
     val vpn = state.vpn
     UciSectionCard(
-        title = "Otro País",
-        subtitle = "El tráfico sale por un servidor en otro país, pasando por el proxy",
+        title = stringResource(Res.string.profile_country_exit_title),
+        subtitle = stringResource(Res.string.profile_country_exit_subtitle),
         icon = UciIcons.Globe,
         tone = if (vpn.enabled) UciTone.Routing else UciTone.Neutral,
-        trailing = { UciSwitch(vpn.enabled, actions::onVpnEnabledChange, enabled = !state.isBusy, contentDescription = "Activar Otro País") },
+        trailing = {
+            UciSwitch(
+                vpn.enabled,
+                actions::onVpnEnabledChange,
+                enabled = !state.isBusy,
+                contentDescription = stringResource(Res.string.profile_country_exit_toggle),
+            )
+        },
     ) {
         if (!vpn.enabled) return@UciSectionCard
         if (state.engines.size > 1) {
+            val descriptions = CountryEngineKind.entries.associateWith { stringResource(it.description) }
             UciSegmentedControl(
                 options = state.engines,
                 selected = vpn.engine,
                 onSelect = actions::onEngineChange,
                 label = { it.label },
-                description = { if (it == CountryEngineKind.OPENVPN) "archivo .ovpn" else "nodo de salida" },
+                description = { descriptions[it] },
                 enabled = !state.isBusy,
             )
         }
@@ -357,22 +373,27 @@ private fun OpenVpnFields(state: ProfileEditorUiState, actions: CountryExitActio
     UciFileField(
         fileName = vpn.fileName.ifEmpty { null },
         onPick = onPickFile,
-        detail = "OpenVPN sobre TCP",
-        emptyText = "Ningún archivo .ovpn elegido",
-        chooseLabel = "Elegir .ovpn",
+        detail = stringResource(Res.string.profile_ovpn_detail),
+        emptyText = stringResource(Res.string.profile_ovpn_empty),
+        chooseLabel = stringResource(Res.string.profile_ovpn_choose),
+        changeLabel = stringResource(Res.string.profile_ovpn_change),
         enabled = !state.isBusy,
     )
-    val fileError = vpn.fileError?.message() ?: stringResource(Res.string.error_ovpn_missing).takeIf { ProfileField.VPN_FILE in state.errors }
+    val fileError = vpn.fileError?.message() ?: state.errorFor(ProfileField.VPN_FILE)
     fileError?.let { UciInlineAlert(it, tone = UciTone.Danger) }
     if (vpn.needsCredentials) {
         UciTextField(
             value = vpn.username,
             onValueChange = actions::onVpnUsernameChange,
-            label = "Usuario de la VPN",
+            label = stringResource(Res.string.profile_vpn_username_label),
             leadingIcon = UciIcons.Person,
-            error = "Escribe el usuario de la VPN.".takeIf { ProfileField.VPN_USERNAME in state.errors },
+            error = state.errorFor(ProfileField.VPN_USERNAME),
         )
-        UciPasswordField(value = vpn.password, onValueChange = actions::onVpnPasswordChange, label = "Contraseña de la VPN")
+        UciPasswordField(
+            value = vpn.password,
+            onValueChange = actions::onVpnPasswordChange,
+            label = stringResource(Res.string.profile_vpn_password_label),
+        )
     }
 }
 
@@ -381,37 +402,36 @@ private fun OpenVpnFields(state: ProfileEditorUiState, actions: CountryExitActio
 private fun TailscaleFields(state: ProfileEditorUiState, actions: CountryExitActions) {
     val tailscale = state.vpn.tailscale
     Text(
-        "Sale por un nodo de salida de tu red de Tailscale (o de un servidor Headscale). Detrás del proxy todo va por " +
-            "los relés de Tailscale: funciona, con algo más de latencia.",
+        stringResource(Res.string.profile_tailscale_description),
         style = MaterialTheme.typography.bodySmall,
         color = ProxyUciTheme.colors.onSurfaceMuted,
     )
     UciTextField(
         value = tailscale.controlUrl,
         onValueChange = actions::onTailscaleControlUrlChange,
-        label = "Servidor de control",
+        label = stringResource(Res.string.profile_tailscale_control_url_label),
         mono = true,
-        error = "Escribe una dirección http:// o https://.".takeIf { ProfileField.TAILSCALE_CONTROL_URL in state.errors },
+        error = state.errorFor(ProfileField.TAILSCALE_CONTROL_URL),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
     )
     UciPasswordField(
         value = tailscale.authKey,
         onValueChange = actions::onTailscaleAuthKeyChange,
-        label = "Clave de autenticación",
+        label = stringResource(Res.string.profile_tailscale_auth_key_label),
         placeholder = "tskey-auth-…",
-        supportingText = "Créala en la consola de Tailscale (Configuración → Claves). Mejor reutilizable.",
-        error = "Escribe la clave de autenticación.".takeIf { ProfileField.TAILSCALE_AUTH_KEY in state.errors },
+        supportingText = stringResource(Res.string.profile_tailscale_auth_key_supporting),
+        error = state.errorFor(ProfileField.TAILSCALE_AUTH_KEY),
     )
     UciTextField(
         value = tailscale.exitNode,
         onValueChange = actions::onTailscaleExitNodeChange,
-        label = "Nodo de salida",
-        placeholder = "Vacío: el único de la red",
+        label = stringResource(Res.string.profile_tailscale_exit_node_label),
+        placeholder = stringResource(Res.string.profile_tailscale_exit_node_placeholder),
         mono = true,
     )
     val searching = tailscale.search == ExitNodeSearch.Running
     UciButton(
-        if (searching) "Buscando nodos…" else "Buscar nodos de salida",
+        stringResource(if (searching) Res.string.profile_tailscale_searching else Res.string.profile_tailscale_search),
         actions::searchExitNodes,
         variant = UciButtonVariant.Secondary,
         icon = UciIcons.Search,
@@ -436,17 +456,44 @@ private fun TailscaleFields(state: ProfileEditorUiState, actions: CountryExitAct
     UciTextField(
         value = tailscale.hostname,
         onValueChange = actions::onTailscaleHostnameChange,
-        label = "Nombre de este equipo en la red",
+        label = stringResource(Res.string.profile_tailscale_hostname_label),
         mono = true,
     )
 }
 
+/** El nombre del motor: es una marca, no se traduce. */
 internal val CountryEngineKind.label: String
     get() = when (this) {
         CountryEngineKind.OPENVPN -> "OpenVPN"
         CountryEngineKind.TAILSCALE -> "Tailscale"
     }
 
+/** Lo que el motor pide, bajo su nombre en el selector. */
+private val CountryEngineKind.description: StringResource
+    get() = when (this) {
+        CountryEngineKind.OPENVPN -> Res.string.profile_engine_openvpn_description
+        CountryEngineKind.TAILSCALE -> Res.string.profile_engine_tailscale_description
+    }
+
+/**
+ * Qué decir de un campo que no vale. La validación (en el núcleo) solo dice qué campo es; el texto se elige aquí. Sin
+ * `else`: un campo nuevo no compila hasta que tenga su texto.
+ */
+private val ProfileField.error: StringResource
+    get() = when (this) {
+        ProfileField.NAME -> Res.string.profile_name_error
+        ProfileField.HOST -> Res.string.profile_host_error
+        ProfileField.PORT -> Res.string.profile_port_error
+        ProfileField.VPN_FILE -> Res.string.error_ovpn_missing
+        ProfileField.VPN_USERNAME -> Res.string.profile_vpn_username_error
+        ProfileField.TAILSCALE_CONTROL_URL -> Res.string.profile_tailscale_control_url_error
+        ProfileField.TAILSCALE_AUTH_KEY -> Res.string.profile_tailscale_auth_key_error
+    }
+
+/** El texto del error de [field], o null si ese campo está bien. */
+@Composable
+private fun ProfileEditorUiState.errorFor(field: ProfileField): String? =
+    if (field in errors) stringResource(field.error) else null
 
 
 @Preview
