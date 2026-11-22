@@ -89,9 +89,12 @@ type ExitNode struct {
 // Códigos de fallo que la app traduce a sus motivos.
 const (
 	CodeAuth        = "AUTH_FAILED"
+	CodeAuthExpired = "AUTH_EXPIRED"
 	CodeUnreachable = "CONTROL_UNREACHABLE"
 	CodeNoExitNode  = "EXIT_NODE_NOT_FOUND"
+	CodeChooseNode  = "EXIT_NODE_NOT_CHOSEN"
 	CodeConfig      = "CONFIG_INVALID"
+	CodeBusy        = "BUSY"
 	CodeInternal    = "INTERNAL"
 )
 
@@ -195,7 +198,7 @@ func Start(parent context.Context, cfg Config, logf func(string, ...any)) (*Sess
 	sessionMu.Lock()
 	if sessionAlive {
 		sessionMu.Unlock()
-		return nil, fail(CodeInternal, "ya hay una sesión de Tailscale abierta")
+		return nil, fail(CodeBusy, "ya hay una sesión de Tailscale abierta")
 	}
 	sessionAlive = true
 	sessionMu.Unlock()
@@ -311,7 +314,9 @@ func classifyUp(ctx context.Context, err error) error {
 	msg := err.Error()
 	lower := strings.ToLower(msg)
 	switch {
-	case strings.Contains(lower, "auth") && (strings.Contains(lower, "key") || strings.Contains(lower, "invalid") || strings.Contains(lower, "expired")):
+	case strings.Contains(lower, "expired"):
+		return fail(CodeAuthExpired, "%s", msg)
+	case strings.Contains(lower, "auth") && (strings.Contains(lower, "key") || strings.Contains(lower, "invalid")):
 		return fail(CodeAuth, "%s", msg)
 	case strings.Contains(lower, "not authorized"), strings.Contains(lower, "unauthorized"):
 		return fail(CodeAuth, "%s", msg)
@@ -407,7 +412,7 @@ func (s *Session) useExitNode(ctx context.Context, want string) (*ExitNode, erro
 			names = append(names, n.Name)
 		}
 		if want == "" {
-			return nil, fail(CodeNoExitNode, "elige un nodo de salida; hay %d: %s", len(nodes), strings.Join(names, ", "))
+			return nil, fail(CodeChooseNode, "elige un nodo de salida; hay %d: %s", len(nodes), strings.Join(names, ", "))
 		}
 		return nil, fail(CodeNoExitNode, "no hay un nodo de salida «%s»; hay: %s", want, strings.Join(names, ", "))
 	}
