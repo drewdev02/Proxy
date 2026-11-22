@@ -1,22 +1,28 @@
 package org.uci.proxy.quota
 
 /*
- * El servicio de cuotas de la UCI, tal como lo usa UCIProxy 5.0: SOAP 1.1 sobre HTTPS, en la intranet.
+ * El servicio de cuotas de la UCI (SOAP 1.1, rpc/encoded, hecho en PHP), en la intranet. Su WSDL, en
+ * https://cuotas.uci.cu/servicios/v1/InetCuotasWS.php?wsdl:
  *
- *   POST https://cuotas.uci.cu/servicios/v1/InetCuotasWS.php
- *   SOAPAction: "https://cuotas.uci.cu/servicios/v1/InetCuotasWS"
- *   <ObtenerCuota xmlns="https://cuotas.uci.cu/"> usuario, clave, dominio=uci.cu
+ *   ObtenerCuota(usuario, clave, dominio) → ObtenerCuotaReturn de tipo Usuario:
+ *     cuota (float, MB), cuota_usada (MB), nivel_navegacion («Navegación plena»…), usuario
+ *   namespace urn:InetCuotasWS, SOAPAction "urn:InetCuotasWSAction"
  *
- * La respuesta trae, por este orden, la cuota asignada (MB, entero), la usada (MB, decimal) y el nivel de navegación.
- * UCIProxy los lee por posición, sin mirar sus nombres, y aquí igual: así no importa cómo se llamen.
+ * El tipo se declara con xsd:all, que permite cualquier orden: los campos se leen por su nombre y, si no se reconocen,
+ * por posición (como UCIProxy, que también funcionaba con otro namespace y otra acción).
  * Para probar sin la red de la UCI: tools/test_cuotas.py.
  */
 internal object QuotaSoap {
     const val SERVICE_URL = "https://cuotas.uci.cu/servicios/v1/InetCuotasWS.php"
-    const val SOAP_ACTION = "https://cuotas.uci.cu/servicios/v1/InetCuotasWS"
-    const val NAMESPACE = "https://cuotas.uci.cu/"
+    const val SOAP_ACTION = "urn:InetCuotasWSAction"
+    const val NAMESPACE = "urn:InetCuotasWS"
     const val METHOD = "ObtenerCuota"
     const val DOMAIN = "uci.cu"
+
+    // Los nombres de los campos de la respuesta, según el WSDL.
+    private const val ASSIGNED = "cuota"
+    private const val USED = "cuota_usada"
+    private const val LEVEL = "nivel_navegacion"
 
     fun request(user: String, password: String): String =
         """<?xml version="1.0" encoding="utf-8"?>""" +
@@ -48,11 +54,15 @@ internal object QuotaSoap {
                 message = first.children.firstOrNull { it.name == "faultstring" }?.text.orEmpty(),
             )
         }
-        // <ObtenerCuotaResponse><resultado><cuota/><usada/><nivel/></resultado></ObtenerCuotaResponse>
+        // <ObtenerCuotaResponse><ObtenerCuotaReturn><cuota/><cuota_usada/><nivel_navegacion/><usuario/>…
         val result = requireNotNull(first.children.firstOrNull()) { "respuesta sin resultado" }
-        val values = result.children.map { it.text.trim() }
-        require(values.size >= 3) { "se esperaban 3 valores y llegaron ${values.size}" }
-        val assigned = requireNotNull(values[0].toDoubleOrNull()) { "cuota «${values[0]}» no es un número" }
+        val byName = result.children.associate { it.name to it.text.trim() }
+        val values = if (ASSIGNED in byName && USED in byName) {
+            listOf(byName.getValue(ASSIGNED), byName.getValue(USED), byName[LEVEL].orEmpty())
+        } else {
+            result.children.map { it.text.trim() }.also { require(it.size >= 3) { "se esperaban 3 valores y llegaron ${it.size}" } }
+        }
+        val assigned = requireNotNull(values[0].replace(',', '.').toDoubleOrNull()) { "cuota «${values[0]}» no es un número" }
         val used = requireNotNull(values[1].replace(',', '.').toDoubleOrNull()) { "cuota usada «${values[1]}» no es un número" }
         return Answer.Quota(assigned.toLong(), used, values[2])
     }

@@ -24,14 +24,29 @@ private fun answer(vararg fields: Pair<String, String>) =
   </SOAP-ENV:Body>
 </SOAP-ENV:Envelope>"""
 
+/** Tal cual la da el servicio de la UCI (con otro usuario y otras cifras). */
+private const val REAL = """<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns1="urn:InetCuotasWS" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:SOAP-ENC="http://schemas.xmlsoap.org/soap/encoding/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><SOAP-ENV:Body><ns1:ObtenerCuotaResponse><ObtenerCuotaReturn xsi:type="ns1:Usuario"><cuota xsi:type="xsd:float">240</cuota><cuota_usada xsi:type="xsd:float">171.97552394867</cuota_usada><nivel_navegacion xsi:type="xsd:string">Navegación plena</nivel_navegacion><usuario xsi:type="xsd:string">ana.perez</usuario></ObtenerCuotaReturn></ns1:ObtenerCuotaResponse></SOAP-ENV:Body></SOAP-ENV:Envelope>"""
+
+/** El fallo del servicio de la UCI con usuario o contraseña malos. */
 private const val FAULT = """<?xml version="1.0" encoding="UTF-8"?>
-<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/"><SOAP-ENV:Body><SOAP-ENV:Fault>
-<faultcode>SOAP-ENV:Server</faultcode><faultstring>Usuario o contrase&#241;a incorrectos</faultstring>
-</SOAP-ENV:Fault></SOAP-ENV:Body></SOAP-ENV:Envelope>"""
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/"><SOAP-ENV:Body><SOAP-ENV:Fault><faultcode>InetCuotas:Cuotas</faultcode><faultstring>El usuario no es válido o lo contraseña es incorrecta</faultstring></SOAP-ENV:Fault></SOAP-ENV:Body></SOAP-ENV:Envelope>"""
 
 class QuotaSoapTest {
     @Test
-    fun `the answer is read by position whatever the field names`() {
+    fun `the answer of the real service is understood`() {
+        assertEquals(QuotaSoap.Answer.Quota(240, 171.97552394867, "Navegación plena"), QuotaSoap.parse(REAL))
+    }
+
+    @Test
+    fun `the fields are read by name in any order`() {
+        val shuffled = answer("usuario" to "ana", "nivel_navegacion" to "Restringida", "cuota_usada" to "12.5", "cuota" to "500")
+
+        assertEquals(QuotaSoap.Answer.Quota(500, 12.5, "Restringida"), QuotaSoap.parse(shuffled))
+    }
+
+    @Test
+    fun `with unknown field names the answer is read by position`() {
         val expected = QuotaSoap.Answer.Quota(2000, 1420.53, "Profesores")
 
         assertEquals(expected, QuotaSoap.parse(answer("cuota" to "2000", "usada" to "1420.53", "nivel" to "Profesores")))
@@ -47,7 +62,7 @@ class QuotaSoapTest {
 
     @Test
     fun `a soap fault means wrong credentials`() {
-        assertEquals(QuotaSoap.Answer.Fault("SOAP-ENV:Server", "Usuario o contraseña incorrectos"), QuotaSoap.parse(FAULT))
+        assertEquals(QuotaSoap.Answer.Fault("InetCuotas:Cuotas", "El usuario no es válido o lo contraseña es incorrecta"), QuotaSoap.parse(FAULT))
     }
 
     @Test
@@ -65,7 +80,7 @@ class QuotaSoapTest {
         assertTrue("<usuario>ana</usuario>" in request)
         assertTrue("<clave>a&lt;b&amp;c&quot;</clave>" in request)
         assertTrue("<dominio>uci.cu</dominio>" in request)
-        assertTrue("<ObtenerCuota xmlns=\"https://cuotas.uci.cu/\">" in request)
+        assertTrue("<ObtenerCuota xmlns=\"urn:InetCuotasWS\">" in request)
     }
 }
 
@@ -95,7 +110,7 @@ class HttpUciQuotaServiceTest {
     fun `a fault with a 500 is wrong credentials`() = runTest {
         val result = service(HttpStatusCode.InternalServerError, FAULT).fetch("ana", "mala", QuotaSoap.SERVICE_URL, true)
 
-        assertEquals(QuotaFetch.WrongCredentials("Usuario o contraseña incorrectos"), result)
+        assertEquals(QuotaFetch.WrongCredentials("El usuario no es válido o lo contraseña es incorrecta"), result)
     }
 
     @Test
