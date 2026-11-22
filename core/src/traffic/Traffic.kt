@@ -1,5 +1,6 @@
 package org.uci.proxy.core.traffic
 
+import org.uci.proxy.core.model.TrafficUsage
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,16 +18,6 @@ import org.uci.proxy.core.model.RouteExit
  * se copian en cada conexión) y lo que va por Otro País (los paquetes que entran y salen de la VPN). Lo que sale directo
  * no entra en la interfaz y no se ve; lo bloqueado no lleva datos.
  */
-
-/**
- * Bytes de una salida hacia un destino en un intervalo.
- *
- * @param host el nombre (o la IP) del destino; null cuando no se sabe (todo por Otro País, sin reglas).
- * @param app la app que abrió la conexión, donde el sistema lo dice (Android, y solo para lo que va por el proxy).
- * @param up de las apps hacia fuera; [down] al revés.
- */
-@Serializable
-data class TrafficUsage(val exit: RouteExit, val host: String?, val app: String?, val up: Long, val down: Long)
 
 /**
  * Lo que pasó por el túnel en un intervalo (normalmente un segundo): el total, las conexiones abiertas al final y el

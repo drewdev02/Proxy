@@ -3,10 +3,10 @@ package org.uci.proxy.fakes
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
-import org.uci.proxy.core.traffic.DailyTraffic
-import org.uci.proxy.core.traffic.NamedTraffic
-import org.uci.proxy.core.traffic.TrafficHistory
-import org.uci.proxy.core.traffic.TrafficUsage
+import org.uci.proxy.core.model.DailyTraffic
+import org.uci.proxy.core.model.NamedTraffic
+import org.uci.proxy.core.port.TrafficHistory
+import org.uci.proxy.core.model.TrafficUsage
 
 /** El consumo guardado, en memoria: suma igual que la tabla de verdad. */
 class FakeTrafficHistory : TrafficHistory {

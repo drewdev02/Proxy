@@ -7,7 +7,7 @@ import org.uci.proxy.core.port.LogHistory
 import org.uci.proxy.database.ProxyDatabase
 import org.uci.proxy.database.log.RoomLogHistory
 import org.uci.proxy.database.traffic.RoomTrafficHistory
-import org.uci.proxy.core.traffic.TrafficHistory
+import org.uci.proxy.core.port.TrafficHistory
 import org.uci.proxy.core.traffic.TrafficRecorder
 
 /** Dónde vive el archivo de la base en cada plataforma; enlaza [ProxyDatabase]. */

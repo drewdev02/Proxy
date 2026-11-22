@@ -11,9 +11,9 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.uci.proxy.core.model.RouteExit
-import org.uci.proxy.core.traffic.DailyTraffic
-import org.uci.proxy.core.traffic.NamedTraffic
-import org.uci.proxy.core.traffic.TrafficHistory
+import org.uci.proxy.core.model.DailyTraffic
+import org.uci.proxy.core.model.NamedTraffic
+import org.uci.proxy.core.port.TrafficHistory
 import org.uci.proxy.core.traffic.TrafficRecorder
 import org.uci.proxy.quota.QuotaCardUi
 import org.uci.proxy.quota.QuotaStatus

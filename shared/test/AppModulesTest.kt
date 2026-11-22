@@ -15,7 +15,7 @@ import org.uci.proxy.core.port.SecretStore
 import org.uci.proxy.di.appModules
 import org.uci.proxy.fakes.FakeLocalNetworkPermission
 import org.uci.proxy.fakes.FakeTrafficHistory
-import org.uci.proxy.core.traffic.TrafficHistory
+import org.uci.proxy.core.port.TrafficHistory
 import org.uci.proxy.usage.UsageViewModel
 import org.uci.proxy.fakes.InMemoryKeyValueStore
 import org.uci.proxy.fakes.InMemorySecretStore

@@ -34,7 +34,7 @@ import org.uci.proxy.apps.LocalAppCatalog
 import org.uci.proxy.common.bytesText
 import org.uci.proxy.common.formatBytes
 import org.uci.proxy.core.model.RouteExit
-import org.uci.proxy.core.traffic.NamedTraffic
+import org.uci.proxy.core.model.NamedTraffic
 import org.uci.proxy.profile.label
 import org.uci.proxy.profile.tone
 import org.uci.proxy.quota.QuotaCard

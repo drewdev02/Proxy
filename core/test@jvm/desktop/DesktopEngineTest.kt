@@ -50,7 +50,7 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import org.uci.proxy.core.model.RouteExit
 import org.uci.proxy.core.traffic.TrafficDelta
-import org.uci.proxy.core.traffic.TrafficUsage
+import org.uci.proxy.core.model.TrafficUsage
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull

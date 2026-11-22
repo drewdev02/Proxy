@@ -5,10 +5,10 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.TimeZone
 import org.uci.proxy.core.model.RouteExit
 import org.uci.proxy.core.common.AppDispatchers
-import org.uci.proxy.core.traffic.NamedTraffic
+import org.uci.proxy.core.model.NamedTraffic
 import org.uci.proxy.core.traffic.TrafficRecorder
 import org.uci.proxy.core.traffic.TrafficStore
-import org.uci.proxy.core.traffic.TrafficUsage
+import org.uci.proxy.core.model.TrafficUsage
 import org.uci.proxy.fakes.FakeTrafficHistory
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.uci.proxy.quota.QuotaStatus

@@ -1,6 +1,6 @@
 package org.uci.proxy.usage
 
-import org.uci.proxy.core.traffic.NamedTraffic
+import org.uci.proxy.core.model.NamedTraffic
 import org.uci.proxy.quota.QuotaCardUi
 import org.uci.proxy.quota.QuotaProblem
 import org.uci.proxy.quota.QuotaStatus

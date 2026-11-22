@@ -1,51 +1,24 @@
 package org.uci.proxy.core.traffic
 
+import org.uci.proxy.core.model.TrafficUsage
+import org.uci.proxy.core.port.TrafficHistory
+import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import org.uci.proxy.core.model.RouteExit
 import org.uci.proxy.core.common.AppDispatchers
-import kotlin.time.Clock
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.hours
-import kotlin.time.Duration.Companion.seconds
-
-/** Lo que salió por [exit] un día. [day] es el día local contado desde el 1 de enero de 1970. */
-data class DailyTraffic(val day: Int, val exit: RouteExit, val up: Long, val down: Long) {
-    val total: Long get() = up + down
-}
-
-/** Lo consumido por un destino o una app. [name] vacío: sin detalle (todo por Otro País, sin reglas). */
-data class NamedTraffic(val name: String, val up: Long, val down: Long) {
-    val total: Long get() = up + down
-}
-
-/** El consumo guardado en disco, sumado por día, salida, destino y app. */
-interface TrafficHistory {
-    /** Suma [usage] a lo que ya hubiera de [day]. */
-    suspend fun add(day: Int, usage: List<TrafficUsage>)
-
-    /** Lo de cada día y salida desde [fromDay] (incluido). */
-    fun daily(fromDay: Int): Flow<List<DailyTraffic>>
-
-    /** Los destinos que más consumieron desde [fromDay], de más a menos. */
-    fun topHosts(fromDay: Int, limit: Int): Flow<List<NamedTraffic>>
-
-    /** Las apps que más consumieron desde [fromDay], de más a menos; solo donde se sabe la app (Android). */
-    fun topApps(fromDay: Int, limit: Int): Flow<List<NamedTraffic>>
-
-    /** Borra lo anterior a [day]. */
-    suspend fun deleteBefore(day: Int)
-}
+import org.uci.proxy.core.model.RouteExit
 
 /** El día local de [clock] en [timeZone], contado desde el 1 de enero de 1970. */
 fun localDay(clock: Clock, timeZone: TimeZone = TimeZone.currentSystemDefault()): Int =
