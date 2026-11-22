@@ -8,7 +8,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import org.jetbrains.compose.resources.StringResource
 import org.uci.proxy.common.exitSearchReason
 import org.uci.proxy.core.model.CountryEngineKind
 import org.uci.proxy.core.model.CountryExit
@@ -21,122 +20,23 @@ import org.uci.proxy.core.model.RuleKind
 import org.uci.proxy.core.port.LocalNetworkPermission
 import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.port.Logger
-import org.uci.proxy.core.port.TunnelFailure
 import org.uci.proxy.core.common.IdGenerator
 import org.uci.proxy.core.profile.ProfileDraft
 import org.uci.proxy.core.profile.ProfileField
 import org.uci.proxy.core.port.ProfileRepository
 import org.uci.proxy.core.profile.ProfileValidation
 import org.uci.proxy.core.profile.ProfileValidator
-import org.uci.proxy.core.proxy.ProxyTestResult
 import org.uci.proxy.core.proxy.ProxyTester
 import org.uci.proxy.core.routing.parseRule
 import org.uci.proxy.core.model.AppSettings
 import org.uci.proxy.core.port.SettingsRepository
 import org.uci.proxy.core.vpn.CountryEngineCatalog
-import org.uci.proxy.core.model.OvpnConfigError
 import org.uci.proxy.core.vpn.OvpnConfigException
 import org.uci.proxy.core.vpn.parseOvpn
 import org.uci.proxy.core.vpn.tailscale.ExitNodeListing
-import org.uci.proxy.core.vpn.tailscale.TailscaleExitNode
 import org.uci.proxy.resources.*
 import org.uci.proxy.resources.Res
-import org.uci.proxy.common.StorageFailure
 import org.uci.proxy.common.classifyStorageError
-
-sealed interface ProxyTestUiState {
-    data object Idle : ProxyTestUiState
-
-    data object Running : ProxyTestUiState
-
-    data class Finished(val result: ProxyTestResult) : ProxyTestUiState
-
-    /** La persona no concedió el acceso a la red local, así que la prueba no llegó a hacerse. */
-    data object LocalNetworkDenied : ProxyTestUiState
-}
-
-/** La salida «Otro País» del perfil tal como se edita. Con [enabled] en false el perfil sale directo por el proxy. */
-data class VpnDraft(
-    val enabled: Boolean = false,
-    /** El motor elegido; los campos de cada uno se conservan al cambiar, por si se vuelve atrás. */
-    val engine: CountryEngineKind = CountryEngineKind.OPENVPN,
-    val fileName: String = "",
-    /** El contenido del archivo ya leído; vacío si no se eligió uno válido. */
-    val ovpn: String = "",
-    val username: String = "",
-    val password: String = "",
-    /** Por qué no sirve el archivo elegido, para mostrarlo. */
-    val fileError: OvpnConfigError? = null,
-    /** Si el servidor VPN pide usuario y contraseña (casi todos los comerciales sí). */
-    val needsCredentials: Boolean = true,
-    val tailscale: TailscaleDraft = TailscaleDraft(),
-)
-
-/** La configuración de Tailscale tal como se edita. */
-data class TailscaleDraft(
-    val controlUrl: String = CountryExit.Tailscale.DEFAULT_CONTROL_URL,
-    val authKey: String = "",
-    val exitNode: String = "",
-    val hostname: String = CountryExit.Tailscale.DEFAULT_HOSTNAME,
-    val search: ExitNodeSearch = ExitNodeSearch.Idle,
-)
-
-/** La búsqueda de nodos de salida de la red, que lanza el botón «Buscar nodos». */
-sealed interface ExitNodeSearch {
-    data object Idle : ExitNodeSearch
-
-    data object Running : ExitNodeSearch
-
-    data class Found(val nodes: List<TailscaleExitNode>) : ExitNodeSearch
-
-    data class Failed(val reason: StringResource) : ExitNodeSearch
-}
-
-/** Las reglas de salida tal como se editan, más la regla que se está escribiendo. */
-data class RoutingDraft(
-    val rules: RoutingRules = RoutingRules(),
-    val newRule: String = "",
-    /** Proxy por defecto: un perfil nuevo no tiene Otro País (ver [withNewRuleExitFor]). */
-    val newRuleExit: RouteExit = RouteExit.PROXY,
-    /** Lo escrito no es ni un dominio ni una IP. */
-    val newRuleInvalid: Boolean = false,
-) {
-    /**
-     * La salida de la regla nueva sigue a Otro País: al apagarlo deja de ser «Otro País» (no se puede elegir) y al
-     * encenderlo pasa a serlo, que es para lo que se suelen añadir reglas. Otras salidas elegidas a mano se respetan.
-     */
-    fun withNewRuleExitFor(countryExitEnabled: Boolean): RoutingDraft = when {
-        !countryExitEnabled && newRuleExit == RouteExit.VPN -> copy(newRuleExit = RouteExit.PROXY)
-        countryExitEnabled && newRuleExit == RouteExit.PROXY -> copy(newRuleExit = RouteExit.VPN)
-        else -> this
-    }
-}
-
-data class ProfileEditorUiState(
-    val isNew: Boolean = true,
-    val draft: ProfileDraft = ProfileDraft(),
-    val password: String = "",
-    val errors: Set<ProfileField> = emptySet(),
-    val isSaving: Boolean = false,
-    /** Por qué falló el último guardado; null si no falló. */
-    val saveFailure: StorageFailure? = null,
-    /** Pasa a true cuando el perfil quedó guardado; la pantalla lo usa para cerrarse. */
-    val saved: Boolean = false,
-    val test: ProxyTestUiState = ProxyTestUiState.Idle,
-    val vpn: VpnDraft = VpnDraft(),
-    val routing: RoutingDraft = RoutingDraft(),
-    /** Los motores de Otro País que hay en este equipo, en el orden en que se ofrecen. */
-    val engines: List<CountryEngineKind> = listOf(CountryEngineKind.OPENVPN),
-    /** Consultar la cuota de la UCI con este perfil; null: según el proxy (sí, si es de la UCI). */
-    val uciQuota: Boolean? = null,
-) {
-    val saveFailed: Boolean get() = saveFailure != null
-
-    val isBusy: Boolean get() = isSaving || test == ProxyTestUiState.Running
-
-    /** Lo que se hará con la cuota, con lo escrito ahora en el formulario. */
-    val checksUciQuota: Boolean get() = uciQuota ?: ProxyProfile("", "", draft.host.trim(), 0, draft.protocol, "").isUciProxy
-}
 
 class ProfileEditorViewModel(
     private val repository: ProfileRepository,
