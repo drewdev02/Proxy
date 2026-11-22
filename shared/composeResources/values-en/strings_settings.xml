@@ -99,4 +99,7 @@
     <string name="settings_error_invalid_host">With an IP filled in, it does not give a valid domain name (letters, digits, hyphens and dots).</string>
     <string name="settings_error_local_domain">That domain is local or reserved: the proxy could not resolve it.</string>
     <string name="settings_error_duplicate">There is already a service with that template.</string>
+    <string name="settings_language_title">Language</string>
+    <string name="settings_language_subtitle">Applies right away</string>
+    <string name="settings_language_system">System</string>
 </resources>

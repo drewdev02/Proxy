@@ -101,4 +101,7 @@
     <string name="settings_error_invalid_host">Con una IP puesta, no da un nombre de dominio válido (letras, cifras, guiones y puntos).</string>
     <string name="settings_error_local_domain">Ese dominio es local o reservado: el proxy no podría resolverlo.</string>
     <string name="settings_error_duplicate">Ya hay un servicio con esa plantilla.</string>
+    <string name="settings_language_title">Idioma</string>
+    <string name="settings_language_subtitle">Se aplica al momento</string>
+    <string name="settings_language_system">Del sistema</string>
 </resources>

@@ -68,6 +68,9 @@ import org.uci.proxy.ui.components.UciTone
 import org.uci.proxy.ui.components.UciTopBar
 import org.uci.proxy.ui.components.colors
 import org.uci.proxy.ui.icons.UciIcons
+import org.koin.compose.koinInject
+import org.uci.proxy.i18n.AppLanguage
+import org.uci.proxy.i18n.AppLanguageSetting
 
 /** Todo lo que la pantalla de Ajustes puede pedir. Agrupado para no arrastrar una docena de parámetros sueltos. */
 class SettingsActions(
@@ -89,6 +92,7 @@ class SettingsActions(
     val onQuotaVerifyCertificateChange: (Boolean) -> Unit = {},
     /** Null fuera del modo desarrollo: entonces no se ofrece cambiar la dirección del servicio. */
     val onQuotaServiceUrlChange: ((String) -> Unit)? = null,
+    val onLanguageChange: (AppLanguage) -> Unit = {},
 )
 
 /** Ajustes a nivel de pantalla: obtiene su ViewModel y pasa solo estado y acciones a la versión sin estado. */
@@ -97,13 +101,16 @@ internal fun SettingsScreen(
     onBack: (() -> Unit)? = null,
     developerMode: Boolean = false,
     viewModel: SettingsViewModel = koinViewModel(),
+    languageSetting: AppLanguageSetting = koinInject(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val language by languageSetting.language.collectAsStateWithLifecycle()
 
     SettingsScreen(
         settings = state.settings,
         statuses = state.statuses,
         tests = state.tests,
+        language = language,
         actions = SettingsActions(
             onBack = onBack,
             onAnswerConnectivityChecksChange = viewModel::setAnswerConnectivityChecks,
@@ -121,6 +128,7 @@ internal fun SettingsScreen(
             onQuotaPauseChange = viewModel::setQuotaPause,
             onQuotaVerifyCertificateChange = viewModel::setQuotaVerifyCertificate,
             onQuotaServiceUrlChange = if (developerMode) viewModel::setQuotaServiceUrl else null,
+            onLanguageChange = languageSetting::set,
         ),
     )
 }
@@ -135,6 +143,7 @@ fun SettingsScreen(
     actions: SettingsActions,
     statuses: Map<String, NameServiceStatus> = emptyMap(),
     tests: Map<String, ServiceTestUi> = emptyMap(),
+    language: AppLanguage = AppLanguage.SYSTEM,
 ) {
     var adding by remember { mutableStateOf(false) }
     val spacing = ProxyUciTheme.spacing
@@ -175,6 +184,7 @@ fun SettingsScreen(
                 }
                 QuotaCard(settings.quota, actions)
                 NameServicesCard(settings, statuses, tests, actions, onAdd = { adding = true })
+                LanguageCard(language, actions.onLanguageChange)
                 Spacer(Modifier.height(spacing.md))
             }
         }
@@ -182,6 +192,27 @@ fun SettingsScreen(
 
     if (adding) {
         AddServiceSheet(onDismiss = { adding = false }, onAdd = actions.onAddService)
+    }
+}
+
+/** El idioma de la app. Cada idioma se nombra en sí mismo, para que quien no entiende el actual encuentre el suyo. */
+@Composable
+private fun LanguageCard(language: AppLanguage, onChange: (AppLanguage) -> Unit) {
+    UciSectionCard(
+        title = stringResource(Res.string.settings_language_title),
+        subtitle = stringResource(Res.string.settings_language_subtitle),
+        icon = UciIcons.Globe,
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            AppLanguage.entries.forEach { option ->
+                val label = when (option) {
+                    AppLanguage.SYSTEM -> stringResource(Res.string.settings_language_system)
+                    AppLanguage.SPANISH -> "Español"
+                    AppLanguage.ENGLISH -> "English"
+                }
+                UciFilterChip(label, language == option, { onChange(option) })
+            }
+        }
     }
 }
 

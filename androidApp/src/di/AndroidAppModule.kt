@@ -1,6 +1,8 @@
 package org.uci.proxy.di
 
 import org.koin.dsl.module
+import org.uci.proxy.i18n.AndroidLanguageSetting
+import org.uci.proxy.i18n.AppLanguageSetting
 import org.uci.proxy.quota.AndroidQuotaNotifier
 import org.uci.proxy.quota.QuotaNotifier
 import org.uci.proxy.core.platform.AndroidTunnelController
@@ -19,4 +21,5 @@ val androidAppModule = module {
         )
     }
     single<QuotaNotifier> { AndroidQuotaNotifier(get()) }
+    single<AppLanguageSetting> { AndroidLanguageSetting(get(), get()) }
 }
