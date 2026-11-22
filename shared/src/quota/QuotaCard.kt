@@ -134,7 +134,7 @@ fun QuotaCard(ui: QuotaCardUi, onRefresh: () -> Unit, onEditProfile: () -> Unit,
 internal fun problemMessage(problem: QuotaProblem): String = when (problem) {
     QuotaProblem.WRONG_CREDENTIALS -> "El servicio de cuotas no aceptó el usuario o la contraseña del perfil."
     QuotaProblem.UNREACHABLE -> "No se llegó al servicio de cuotas. Solo responde desde la red de la UCI; se reintenta solo."
-    QuotaProblem.UNTRUSTED_CERTIFICATE -> "El certificado del servicio no se pudo verificar. Si confías en la red, apaga " +
-        "«Verificar el certificado del servicio» en Ajustes."
+    QuotaProblem.UNTRUSTED_CERTIFICATE -> "El certificado del servicio no se pudo verificar: lo firma una autoridad de la " +
+        "UCI que el sistema no reconoce. Apaga «Verificar el certificado del servicio» en Ajustes."
     QuotaProblem.SERVICE_CHANGED -> "El servicio de cuotas contestó algo que esta versión no entiende."
 }

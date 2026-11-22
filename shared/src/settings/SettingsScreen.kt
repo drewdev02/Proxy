@@ -219,8 +219,8 @@ private fun QuotaCard(quota: QuotaSettings, actions: SettingsActions) {
         UciDivider()
         UciSwitchRow(
             title = "Verificar el certificado del servicio",
-            subtitle = "Apágalo solo si la consulta falla por el certificado: el servicio de la UCI puede usar uno de una " +
-                "autoridad interna que el sistema no reconoce. La contraseña viaja en esa consulta.",
+            subtitle = "Apagado, como en UCIProxy: el certificado del servicio de cuotas lo firma una autoridad de la UCI " +
+                "que los sistemas no reconocen, y con la verificación encendida la consulta falla.",
             checked = quota.verifyCertificate,
             onCheckedChange = actions.onQuotaVerifyCertificateChange,
         )

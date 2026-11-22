@@ -40,7 +40,7 @@ class StoredSettingsRepositoryTest {
     @Test
     fun `the quota settings start with every alert and survive a restart`() {
         val repository = StoredSettingsRepository(store)
-        assertEquals(QuotaSettings(alerts = listOf(50, 75, 90), checkMinutes = 5, pauseAtLimit = false, verifyCertificate = true), repository.settings.value.quota)
+        assertEquals(QuotaSettings(alerts = listOf(50, 75, 90), checkMinutes = 5, pauseAtLimit = false, verifyCertificate = false), repository.settings.value.quota)
 
         repository.updateQuota { it.copy(alerts = listOf(90), checkMinutes = 15, pauseAtLimit = true) }
 

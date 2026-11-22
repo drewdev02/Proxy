@@ -74,10 +74,10 @@ data class QuotaSettings(
     /** Desconectar el túnel al llegar al [PAUSE_THRESHOLD] % de la cuota, para no agotarla sin querer. */
     val pauseAtLimit: Boolean = false,
     /**
-     * Verificar el certificado del servicio. UCIProxy no lo hacía; aquí solo se desactiva a mano, si el servicio usa un
-     * certificado que el sistema no reconoce (de una autoridad interna de la UCI).
+     * Verificar el certificado del servicio. Apagado, como en UCIProxy: el de `cuotas.uci.cu` lo firma una autoridad de
+     * la UCI («ROOT AC UCI», bajo la raíz del Estado) que ningún sistema trae, y con la verificación la consulta falla.
      */
-    val verifyCertificate: Boolean = true,
+    val verifyCertificate: Boolean = false,
     /** Otra dirección para el servicio, solo en modo desarrollo (para el simulador `tools/test_cuotas.py`). */
     val serviceUrl: String? = null,
 ) {
