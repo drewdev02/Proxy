@@ -1,4 +1,4 @@
-package org.uci.proxy.core.storage
+package org.uci.proxy.core.data
 
 import org.uci.proxy.core.fakes.InMemoryKeyValueStore
 import org.uci.proxy.core.fakes.ReversingProtector

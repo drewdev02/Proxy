@@ -36,7 +36,7 @@ import org.uci.proxy.core.port.SecretStore
 import org.uci.proxy.core.port.TunnelControl
 import org.uci.proxy.core.port.TunnelMonitor
 import org.uci.proxy.core.common.AppDispatchers
-import org.uci.proxy.core.storage.EncryptedSecretStore
+import org.uci.proxy.core.data.EncryptedSecretStore
 import org.uci.proxy.core.vpn.JcaOpenVpnCrypto
 import org.uci.proxy.core.vpn.OpenVpnCrypto
 import org.uci.proxy.core.vpn.SslEngineTlsSessionFactory

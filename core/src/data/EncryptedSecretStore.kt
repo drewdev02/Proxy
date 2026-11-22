@@ -1,4 +1,4 @@
-package org.uci.proxy.core.storage
+package org.uci.proxy.core.data
 
 import org.uci.proxy.core.port.DataProtectionException
 import org.uci.proxy.core.port.DataProtector
