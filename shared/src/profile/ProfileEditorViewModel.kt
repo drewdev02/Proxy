@@ -14,9 +14,7 @@ import org.uci.proxy.core.model.CountryExit
 import org.uci.proxy.core.model.CountryExitSecrets
 import org.uci.proxy.core.model.ProxyProfile
 import org.uci.proxy.core.model.RouteExit
-import org.uci.proxy.core.model.RouteRule
 import org.uci.proxy.core.model.RoutingRules
-import org.uci.proxy.core.model.RuleKind
 import org.uci.proxy.core.port.LocalNetworkPermission
 import org.uci.proxy.core.model.LogLevel
 import org.uci.proxy.core.port.Logger
@@ -27,7 +25,6 @@ import org.uci.proxy.core.port.ProfileRepository
 import org.uci.proxy.core.profile.ProfileValidation
 import org.uci.proxy.core.profile.ProfileValidator
 import org.uci.proxy.core.proxy.ProxyTester
-import org.uci.proxy.core.routing.parseRule
 import org.uci.proxy.core.model.AppSettings
 import org.uci.proxy.core.port.SettingsRepository
 import org.uci.proxy.core.vpn.CountryEngineCatalog
@@ -241,67 +238,42 @@ class ProfileEditorViewModel(
         state.update { it.copy(vpn = it.vpn.copy(password = password), saveFailure = null) }
     }
 
-    fun setRoutingEnabled(enabled: Boolean) = updateRules { it.copy(enabled = enabled) }
+    fun setRoutingEnabled(enabled: Boolean) = updateRouting { it.withEnabled(enabled) }
 
-    fun setDefaultExit(exit: RouteExit) = updateRules { it.copy(defaultExit = exit) }
+    fun setDefaultExit(exit: RouteExit) = updateRouting { it.withDefaultExit(exit) }
 
     fun updateNewRule(text: String) {
-        state.update { it.copy(routing = it.routing.copy(newRule = text, newRuleInvalid = false)) }
+        state.update { it.copy(routing = it.routing.withNewRule(text)) }
     }
 
     fun setNewRuleExit(exit: RouteExit) {
-        state.update { it.copy(routing = it.routing.copy(newRuleExit = exit)) }
+        state.update { it.copy(routing = it.routing.withNewRuleExit(exit)) }
     }
 
-    /** Añade lo escrito al final de la lista. Si es un dominio con salida «Directo», que no existe para dominios, pasa a «Proxy». */
+    /** Añade lo escrito al final de la lista; si no es un dominio ni una IP, solo lo marca como inválido. */
     fun addRule() {
-        val routing = state.value.routing
-        val parsed = parseRule(routing.newRule, routing.newRuleExit)
-        if (parsed == null) {
-            state.update { it.copy(routing = it.routing.copy(newRuleInvalid = true)) }
+        val rule = state.value.routing.parsedNewRule()
+        if (rule == null) {
+            state.update { it.copy(routing = it.routing.markInvalid()) }
             return
         }
-        val rule = if (parsed.exit in RoutingRules.exitsFor(parsed.kind)) parsed else parsed.copy(exit = RouteExit.PROXY)
-        appendRule(rule, clearText = true)
+        updateRouting { it.withRule(rule, clearText = true) }
     }
 
     fun addAppRule(packageName: String) {
         if (packageName.isBlank()) return
-        appendRule(RouteRule(RuleKind.APP, packageName, state.value.routing.newRuleExit), clearText = false)
+        updateRouting { it.withAppRule(packageName) }
     }
 
-    /** Al final de la lista; si ya había una para lo mismo, se sustituye. */
-    private fun appendRule(rule: RouteRule, clearText: Boolean) {
-        state.update {
-            it.copy(
-                routing = it.routing.copy(
-                    rules = it.routing.rules.copy(rules = it.routing.rules.rules.filterNot { r -> r.kind == rule.kind && r.value == rule.value } + rule),
-                    newRule = if (clearText) "" else it.routing.newRule,
-                    newRuleInvalid = if (clearText) false else it.routing.newRuleInvalid,
-                ),
-                saveFailure = null,
-            )
-        }
-    }
+    fun setRuleExit(index: Int, exit: RouteExit) = updateRouting { it.withRuleExit(index, exit) }
 
-    fun setRuleExit(index: Int, exit: RouteExit) = updateRules { rules ->
-        rules.copy(rules = rules.rules.mapIndexed { i, rule -> if (i == index) rule.copy(exit = exit) else rule })
-    }
+    fun moveRule(index: Int, delta: Int) = updateRouting { it.withRuleMoved(index, delta) }
 
-    fun moveRule(index: Int, delta: Int) = updateRules { rules ->
-        val target = index + delta
-        if (index !in rules.rules.indices || target !in rules.rules.indices) return@updateRules rules
-        val list = rules.rules.toMutableList()
-        list.add(target, list.removeAt(index))
-        rules.copy(rules = list)
-    }
+    fun removeRule(index: Int) = updateRouting { it.withRuleRemoved(index) }
 
-    fun removeRule(index: Int) = updateRules { rules ->
-        rules.copy(rules = rules.rules.filterIndexed { i, _ -> i != index })
-    }
-
-    private fun updateRules(change: (RoutingRules) -> RoutingRules) {
-        state.update { it.copy(routing = it.routing.copy(rules = change(it.routing.rules)), saveFailure = null) }
+    /** Un cambio en las reglas: un aviso de guardado fallido anterior ya no vale. */
+    private fun updateRouting(change: (RoutingDraft) -> RoutingDraft) {
+        state.update { it.copy(routing = change(it.routing), saveFailure = null) }
     }
 
     /**
