@@ -26,7 +26,7 @@ import java.security.MessageDigest
  * Las rutas que entran en el túnel se limitan a 192.0.2.0/24 (TEST-NET-1, reservada para documentación): el resto
  * del tráfico del ejecutor, incluida su conexión con GitHub, no se toca.
  */
-internal object WindowsE2E {
+object WindowsE2E {
     const val PROXY_PORT_VAR = "PROXYUCI_E2E_PROXY_PORT"
     const val ORIGIN_PORT_VAR = "PROXYUCI_E2E_ORIGIN_PORT"
     const val BIG_SHA_VAR = "PROXYUCI_E2E_BIG_SHA"

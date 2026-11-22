@@ -2,8 +2,9 @@ product:
   type: kmp/lib
   platforms: [ jvm, android, iosArm64, iosSimulatorArm64 ]
 
-# Dobles de prueba de core (red, túnel, almacenes en memoria): código normal de un módulo porque Amper no tiene
-# «test fixtures» para compartir código de prueba entre módulos.
+# Apoyo para las pruebas de core y de los módulos que dependen de él: dobles (red, túnel, almacenes en memoria) y el
+# soporte de las pruebas de Windows. Es código normal de un módulo porque Amper no tiene «test fixtures» para compartir
+# código de prueba entre módulos.
 dependencies:
   - //core: exported
 
